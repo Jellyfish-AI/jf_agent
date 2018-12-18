@@ -115,7 +115,7 @@ def download_boards_and_sprints(jira_connection):
     
     print('downloading sprints... ', end='', flush=True)
     links = []
-    sprints = []
+    sprints = {}
     for b in boards:
         if b.raw['type'] != 'scrum':
             continue
@@ -140,10 +140,10 @@ def download_boards_and_sprints(jira_connection):
         
         links.append({'board_id': b.id,
                       'sprint_ids': [s.id for s in sprints_for_board]})
-        sprints.extend(sprints_for_board)
+        sprints.update({s.id: s for s in sprints_for_board})
     print('✓')
     
-    return [b.raw for b in boards], [s.raw for s in sprints], links
+    return [b.raw for b in boards], [s.raw for s in sprints.values()], links
         
 def download_issues(jira_connection):
     issue_count = jira_connection.search_issues('created is not empty order by id asc', fields='id', maxResults=1).total
