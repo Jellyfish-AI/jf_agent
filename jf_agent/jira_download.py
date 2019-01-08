@@ -2,6 +2,7 @@ from tqdm import tqdm
 import queue
 import threading
 import sys
+import string
 import json
 import logging
 
@@ -15,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Returns an array of User dicts
 def download_users(jira_connection):
-    print('downloading users... ', end='', flush=True)
-    
+    print('downloading jira users... ', end='', flush=True)
+
     jira_users = set()
     start_at = 0
     while True:
@@ -40,7 +41,7 @@ def download_users(jira_connection):
 
 # Returns an array of Field dicts
 def download_fields(jira_connection):
-    print('downloading fields... ', end='', flush=True)
+    print('downloading jira fields... ', end='', flush=True)
     result = jira_connection.fields()
     print('✓')
     return result
@@ -48,7 +49,7 @@ def download_fields(jira_connection):
 
 # Returns an array of Resolutions dicts
 def download_resolutions(jira_connection):
-    print('downloading resolutions... ', end='', flush=True)
+    print('downloading jira resolutions... ', end='', flush=True)
     result = [r.raw for r in jira_connection.resolutions()]
     print('✓')
     return result
@@ -56,7 +57,7 @@ def download_resolutions(jira_connection):
 
 # Returns an array of IssueType dicts
 def download_issuetypes(jira_connection):
-    print('downloading issue types... ', end='', flush=True)
+    print('downloading jira issue types... ', end='', flush=True)
     result = [it.raw for it in jira_connection.issue_types()]
     print('✓')
     return result
@@ -64,7 +65,7 @@ def download_issuetypes(jira_connection):
 
 # Returns an array of LinkType dicts
 def download_issuelinktypes(jira_connection):
-    print('downloading issue link types... ', end='', flush=True)
+    print('downloading jira issue link types... ', end='', flush=True)
     result = [lt.raw for lt in jira_connection.issue_link_types()]
     print('✓')
     return result
@@ -72,7 +73,7 @@ def download_issuelinktypes(jira_connection):
 
 # Returns an array of Priority dicts
 def download_priorities(jira_connection):
-    print('downloading priorities... ', end='', flush=True)
+    print('downloading jira priorities... ', end='', flush=True)
     result = [p.raw for p in jira_connection.priorities()]
     print('✓')
     return result
@@ -81,11 +82,11 @@ def download_priorities(jira_connection):
 # Each project has a list of version.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
 def download_projects_and_versions(jira_connection):
-    print('downloading projects... ', end='', flush=True)
+    print('downloading jira projects... ', end='', flush=True)
     projects = jira_connection.projects()
     print('✓')
 
-    print('downloading versions... ', end='', flush=True)
+    print('downloading jira versions... ', end='', flush=True)
     result = [
         p.raw.update({'versions': [v.raw for v in jira_connection.project_versions(p)]}) or p.raw
         for p in projects
@@ -102,7 +103,7 @@ def download_projects_and_versions(jira_connection):
 def download_boards_and_sprints(jira_connection):
     b_start_at = 0
     boards = []
-    print('downloading boards... ', end='', flush=True)
+    print('downloading jira boards... ', end='', flush=True)
     while True:
         # boards seem to come back in batches of 50 at most
         jira_boards = jira_connection.boards(startAt=b_start_at, maxResults=50)
@@ -112,8 +113,8 @@ def download_boards_and_sprints(jira_connection):
         boards.extend(jira_boards)
     print('✓')
 
-    
-    print('downloading sprints... ', end='', flush=True)
+
+    print('downloading jira sprints... ', end='', flush=True)
     links = []
     sprints = {}
     for b in boards:
@@ -137,14 +138,14 @@ def download_boards_and_sprints(jira_connection):
                 break
             s_start_at += len(batch)
             sprints_for_board.extend(batch)
-        
+
         links.append({'board_id': b.id,
                       'sprint_ids': [s.id for s in sprints_for_board]})
         sprints.update({s.id: s for s in sprints_for_board})
     print('✓')
-    
+
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
-        
+
 def download_issues(jira_connection):
     issue_count = jira_connection.search_issues('created is not empty order by id asc', fields='id', maxResults=1).total
     parallel_threads = 10
@@ -159,7 +160,7 @@ def download_issues(jira_connection):
         t.start()
 
     issues = {}
-    with tqdm(desc='downloading issues', total=issue_count, file=sys.stdout) as prog_bar:
+    with tqdm(desc='downloading jira issues', total=issue_count, file=sys.stdout) as prog_bar:
         # Read batches from queue
         finished = 0
         while finished < len(threads):
@@ -178,12 +179,12 @@ def download_issues(jira_connection):
             old_count = len(issues)
             issues.update({i['id']: i for i in batch})
             new_count= len(issues) - old_count
-            
+
             prog_bar.update(new_count)
 
     for t in threads:
         t.join()
-        
+
     return list(issues.values())
 
 
@@ -191,7 +192,7 @@ def download_issues(jira_connection):
 # that currently exist; 'deleted' gives the list of worklogs that
 # existed at some point previously, but have since been deleted
 def download_worklogs(jira_connection):
-    print(f'downloading worklogs... ', end='', flush=True)
+    print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
     while True:
         worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': 0})
@@ -260,7 +261,7 @@ def _download_some_jira_issues(i, jira_connection, start_at, end_at, q):
             raw_issues = [i.raw for i in issues]
 
             # TODO: configurable way to scrub things out of raw_issues here before we write them out.
-            
+
             q.put(raw_issues)
 
         # sentinel to mark that this thread finished
