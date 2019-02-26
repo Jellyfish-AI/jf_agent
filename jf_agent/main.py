@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import urllib3
+import yaml
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
@@ -18,33 +19,37 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-o',
-        '--out_dir',
+        '--out-dir',
         nargs='?',
         default='.',
-        help='output directory')
+        help='Output directory')
+
     parser.add_argument(
-        '--jira-url',
-        type=str,
-        help='the fully-qualified base URL for your Jira server, e.g. https://jira.yourcompany.com',
-        required=False)
-    parser.add_argument(
-        '--bitbucket-url',
-        type=str,
-        help='the fully-qualified base URL for your Bitbucket server, e.g. https://bitbucket.yourcompany.com',
-        required=False)
-    parser.add_argument(
-        '--no-verify-ssl',
-        action='store_true',
-        help='disable SSL verification when downloading')
+        '-c',
+        '--config-file',
+        nargs='?',
+        default='jellyfish.yaml',
+        help='Path to config file'
+    )
+    
     args = parser.parse_args()
 
-    outdir = args.out_dir
-    jira_url = args.jira_url
-    bb_url = args.bitbucket_url
-    skip_ssl_verification = args.no_verify_ssl
+    with open(args.config_file, 'r') as ymlfile:
+        config = yaml.safe_load(ymlfile)
 
+    conf_global = config.get('global', {})
+    outdir = conf_global.get('out_dir', '.')
+    skip_ssl_verification = conf_global.get('no_verify_ssl', False)
+    
+    conf_jira = config.get('jira', {})
+    conf_bitbucket = config.get('bitbucket', {})
+    
+    jira_url = conf_jira.get('url', None)
+    bb_url = conf_bitbucket.get('url', None)
+    projects = conf_jira.get('project_whitelist', None)
+    
     if not jira_url and not bb_url:
-        print('ERROR: Please provide either a Jira or Bitbucket URL.')
+        print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
         parser.print_help()
         sys.exit(1)
 
@@ -54,7 +59,7 @@ def main():
         urllib3.disable_warnings()
 
     if jira_url:
-        load_and_dump_jira(jira_url, outdir, skip_ssl_verification)
+        load_and_dump_jira(jira_url, outdir, projects, skip_ssl_verification)
 
     if bb_url:
         load_and_dump_bb(bb_url, outdir, skip_ssl_verification)
@@ -71,7 +76,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         })
 
 
-def load_and_dump_jira(jira_url, outdir, skip_ssl_verification=False):
+def load_and_dump_jira(jira_url, outdir, projects, skip_ssl_verification=False):
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
 
@@ -95,7 +100,7 @@ def load_and_dump_jira(jira_url, outdir, skip_ssl_verification=False):
     write_file(outdir, 'jira_sprints', sprints)
     write_file(outdir, 'jira_board_sprint_links', links)
 
-    write_file(outdir, 'jira_issues', download_issues(jira_connection))
+    write_file(outdir, 'jira_issues', download_issues(jira_connection, projects))
     write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection))
 
 

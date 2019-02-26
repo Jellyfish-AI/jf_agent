@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="jf_agent",
-    version="0.0.4",
+    version="0.0.5",
     description="An agent for collecting data for jellyfish",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -15,6 +15,7 @@ setuptools.setup(
         'jira',
         'tqdm',
         'stashy',
+        'pyyaml'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

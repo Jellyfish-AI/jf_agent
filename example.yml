@@ -1,0 +1,23 @@
+global:
+  # Location to put output files
+  out_dir: /tmp/agent
+
+  # Set this to True to skip verification of server SSL certificates.  This might
+  # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
+  no_verify_ssl: False
+  
+jira:
+  # URL to jira
+  url: https://jira.yourcompany.com
+
+  # optional: only pull issues from specific projects.  Comment this out
+  # to pull issues from all projects.
+  project_whitelist:
+    - PROJ1
+    - PROJ2
+
+bitbucket:
+  # URL to bitbucket
+  url: https://bitbucket.yourcompany.com
+
+  
