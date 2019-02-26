@@ -14,9 +14,35 @@ pip install jf_agent
 
 4. For Bitbucket: Gather your Bitbucket credentials. Set the `BITBUCKET_USERNAME` and `BITBUCKET_PASSWORD` environment variables to appropriate values.
 
-5. Run `jf_agent` with the URL for the service to produce data for:
+5. Create a YAML config file that tell jf_agent how to run. An example config file could be:
+
 ```
-jf_agent -o <output_directory> [--jira-url <jira_URL>] [--bitbucket-url <BITBUCKET_URL>]
+global:
+  # Location to put output files
+  out_dir: /tmp/agent
+
+  # Set this to True to skip verification of server SSL certificates.  This might
+  # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
+  no_verify_ssl: False
+  
+jira:
+  # URL to jira
+  url: https://jira.yourcompany.com
+
+  # optional: only pull issues from specific projects.  Comment this out
+  # to pull issues from all projects.
+  project_whitelist:
+    - PROJ1
+    - PROJ2
+
+bitbucket:
+  # URL to bitbucket
+  url: https://bitbucket.yourcompany.com
+```
+
+5. Run `jf_agent` with the path to your config file:
+```
+jf_agent -c jellyfish.yaml
 ```
 
 6. Collect the generated files from the output directory you specified, and send them to Jellyfish.
