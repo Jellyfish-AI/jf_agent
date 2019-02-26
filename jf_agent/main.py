@@ -18,13 +18,6 @@ from jf_agent.bb_download import get_all_users, get_all_projects, get_all_repos,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-o',
-        '--out-dir',
-        nargs='?',
-        default='.',
-        help='Output directory')
-
-    parser.add_argument(
         '-c',
         '--config-file',
         nargs='?',
