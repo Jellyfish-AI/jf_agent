@@ -1,6 +1,6 @@
 global:
   # Location to put output files
-  out_dir: /tmp/agent
+  out_dir: /tmpaaaaq/agent
 
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
@@ -8,16 +8,16 @@ global:
   
 jira:
   # URL to jira
-  url: https://jira.yourcompany.com
+  url: https://jelly-ai.atlassian.net
 
   # optional: only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
-  project_whitelist:
-    - PROJ1
-    - PROJ2
+  # project_whitelist:
+  #   - PROJ1
+  #   - PROJ2
 
-bitbucket:
-  # URL to bitbucket
-  url: https://bitbucket.yourcompany.com
+# bitbucket:
+#   # URL to bitbucket
+#   url: https://bitbucket.yourcompany.com
 
   

@@ -31,7 +31,7 @@ jira:
 
   # optional: only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
-  project_whitelist:
+  include_projects:
     - PROJ1
     - PROJ2
 

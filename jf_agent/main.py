@@ -39,7 +39,10 @@ def main():
     
     jira_url = conf_jira.get('url', None)
     bb_url = conf_bitbucket.get('url', None)
-    projects = conf_jira.get('project_whitelist', None)
+    include_projects = set(conf_jira.get('include_projects', None))
+    exclude_projects = set(conf_jira.get('exclude_projects', None))
+    include_fields = set(conf_jira.get('include_fields', None))
+    exclude_fields = set(conf_jira.get('exclude_fields', None))
     
     if not jira_url and not bb_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
@@ -52,7 +55,7 @@ def main():
         urllib3.disable_warnings()
 
     if jira_url:
-        load_and_dump_jira(jira_url, outdir, projects, skip_ssl_verification)
+        load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification)
 
     if bb_url:
         load_and_dump_bb(bb_url, outdir, skip_ssl_verification)
@@ -69,7 +72,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         })
 
 
-def load_and_dump_jira(jira_url, outdir, projects, skip_ssl_verification=False):
+def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification=False):
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
 
@@ -93,7 +96,7 @@ def load_and_dump_jira(jira_url, outdir, projects, skip_ssl_verification=False):
     write_file(outdir, 'jira_sprints', sprints)
     write_file(outdir, 'jira_board_sprint_links', links)
 
-    write_file(outdir, 'jira_issues', download_issues(jira_connection, projects))
+    write_file(outdir, 'jira_issues', download_issues(jira_connection, include_projects, exclude_projects, include_fields, exclude_fields))
     write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection))
 
 
