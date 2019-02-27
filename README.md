@@ -4,7 +4,7 @@ An agent that can run on-premise and collect data to be sent to [Jellyfish](http
 
 ## Usage
 
-1. Install jf_agent with `pip`:
+1. Make sure you're running python 3. Install jf_agent with `pip`:
 ```bash
 pip install jf_agent
 ```
