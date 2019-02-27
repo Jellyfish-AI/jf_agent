@@ -97,3 +97,23 @@ Rank
 
 Make sure that at least these set of fields are configured for Jellyfish to pull.
 
+Additional Jellyfish functionality is enabled if the following fields are pulled:
+```
+summary                           
+description                     
+priority                        
+worklog                         
+comment                         
+timetracking                    
+duedate                         
+labels                          
+fixVersions                     
+versions                        
+components                      
+timeestimate                    
+timeoriginalestimate            
+timespent                       
+aggregatetimespent              
+aggregatetimeoriginalestimate   
+aggregatetimeestimate
+```
