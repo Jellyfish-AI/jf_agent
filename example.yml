@@ -10,20 +10,20 @@ jira:
   # URL to jira
   url: https://jelly-ai.atlassian.net
 
-  # Uncomment this to print the list of available fields and exit
-  print_fields_only: True
+  # # Uncomment this to print the list of available fields and exit
+  # print_fields_only: True
 
   # only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
   include_projects:
-    - MTP
+    - PROJ1
+    - PROJ2
 
   # Uncomment this to pull issues from all but specific projects.
   # exclude_projects:
   #   - PROJ1
 
-  # Only pull specific fields on issues.  Comment this out
-  # to pull all fields.
+  # Uncomment this to pull only specific fields on issues.  
   # include_fields:
   #   - id
   #   - summary
@@ -33,8 +33,8 @@ jira:
   #   - description
   #   - comment
 
-# bitbucket:
-#   # URL to bitbucket
-#   url: https://bitbucket.yourcompany.com
+bitbucket:
+  # URL to bitbucket
+  url: https://bitbucket.yourcompany.com
 
   
