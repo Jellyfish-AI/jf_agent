@@ -38,11 +38,13 @@ def main():
     conf_bitbucket = config.get('bitbucket', {})
     
     jira_url = conf_jira.get('url', None)
+    include_projects = set(conf_jira.get('include_projects', []))
+    exclude_projects = set(conf_jira.get('exclude_projects', []))
+    include_fields = set(conf_jira.get('include_fields', []))
+    exclude_fields = set(conf_jira.get('exclude_fields', []))
+    print_fields_only = conf_jira.get('print_fields_only', False)
+    
     bb_url = conf_bitbucket.get('url', None)
-    include_projects = set(conf_jira.get('include_projects', None))
-    exclude_projects = set(conf_jira.get('exclude_projects', None))
-    include_fields = set(conf_jira.get('include_fields', None))
-    exclude_fields = set(conf_jira.get('exclude_fields', None))
     
     if not jira_url and not bb_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
@@ -55,7 +57,7 @@ def main():
         urllib3.disable_warnings()
 
     if jira_url:
-        load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification)
+        load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification, print_fields_only)
 
     if bb_url:
         load_and_dump_bb(bb_url, outdir, skip_ssl_verification)
@@ -72,7 +74,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         })
 
 
-def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification=False):
+def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification, print_fields_only):
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
 
@@ -83,8 +85,14 @@ def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, inc
         print('Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD')
         sys.exit(1)
 
+    fields = download_fields(jira_connection)
+    if print_fields_only:
+        for f in fields:
+            print(f"{f['key']:30}\t{f['name']}")
+        return
+        
+    write_file(outdir, 'jira_fields', fields)
     write_file(outdir, 'jira_users', download_users(jira_connection))
-    write_file(outdir, 'jira_fields', download_fields(jira_connection))
     write_file(outdir, 'jira_resolutions', download_resolutions(jira_connection))
     write_file(outdir, 'jira_issuetypes', download_issuetypes(jira_connection))
     write_file(outdir, 'jira_linktypes', download_issuelinktypes(jira_connection))
