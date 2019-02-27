@@ -8,7 +8,7 @@ global:
   
 jira:
   # URL to jira
-  url: https://jelly-ai.atlassian.net
+  url: https://jira.yourcompany.com
 
   # # Uncomment this to print the list of available fields and exit
   # print_fields_only: True

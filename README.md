@@ -36,11 +36,28 @@ jira:
   # URL to jira
   url: https://jira.yourcompany.com
 
-  # optional: only pull issues from specific projects.  Comment this out
+  # # Uncomment this to print the list of available fields and exit
+  # print_fields_only: True
+
+  # only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
   include_projects:
     - PROJ1
     - PROJ2
+
+  # Uncomment this to pull issues from all but specific projects.
+  # exclude_projects:
+  #   - PROJ1
+
+  # Uncomment this to pull only specific fields on issues.  
+  # include_fields:
+  #   - id
+  #   - summary
+
+  # Uncomment this to pull all but specific fields on issues.
+  # exclude_fields:
+  #   - description
+  #   - comment
 
 bitbucket:
   # URL to bitbucket
