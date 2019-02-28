@@ -4,10 +4,17 @@ An agent that can run on-premise and collect data to be sent to [Jellyfish](http
 
 ## Usage
 
-1. Make sure you're running python 3. Install jf_agent with `pip`:
+1. In a python 3 environment, install jf_agent with `pip`:
 ```bash
 pip install jf_agent
 ```
+
+or, depending how your python environment is set up,
+
+```bash
+pip3 install jf_agent
+```
+
 2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with an API token for that user.
 
 3. Set up environment variables with your Jira credentials. Set JIRA_USERNAME and JIRA_PASSWORD to the username and API token you found above.
@@ -29,11 +36,28 @@ jira:
   # URL to jira
   url: https://jira.yourcompany.com
 
-  # optional: only pull issues from specific projects.  Comment this out
+  # # Uncomment this to print the list of available fields and exit
+  # print_fields_only: True
+
+  # only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
-  project_whitelist:
+  include_projects:
     - PROJ1
     - PROJ2
+
+  # Uncomment this to pull issues from all but specific projects.
+  # exclude_projects:
+  #   - PROJ1
+
+  # Uncomment this to pull only specific fields on issues.  
+  # include_fields:
+  #   - id
+  #   - summary
+
+  # Uncomment this to pull all but specific fields on issues.
+  # exclude_fields:
+  #   - description
+  #   - comment
 
 bitbucket:
   # URL to bitbucket
@@ -46,3 +70,67 @@ jf_agent -c jellyfish.yaml
 ```
 
 6. Collect the generated files from the output directory you specified, and send them to Jellyfish.
+
+
+## Fields
+
+It is possible to configure the agent to pull a subset of fields from
+Jira.  This can be useful if, for example, certain fields contain
+sensitive data that you don't want to send to Jellyfish.
+
+This can be controlled through the `include_fields` and `exclude_fields`
+options in the config file.  Note, however, that certain fields are required in order
+for Jellyfish to work.  These required fields are:
+
+```
+issuekey              
+project               
+reporter              
+assignee              
+creator               
+issuetype             
+resolution            
+resolutiondate        
+status                
+created               
+updated               
+subtasks        
+```
+
+Some of the Jira agile feature are built internally on "custom fields" that Jellyfish uses. These
+custom fields have keys in the form `customfield_XXXXX`, but where the digits represented by X
+are different in each Jira installation. You can find the keys for your custom
+fields by running the agent with the `print_fields_only` option in the config file.  The custom
+fields used by Jellyfish are the following:
+
+```
+Epic Link      
+Epic Name      
+Sprint         
+Parent Link   
+Story Points
+Rank
+```
+
+Make sure that at least these set of fields are configured for Jellyfish to pull.
+
+Additional Jellyfish functionality is enabled if the following fields are pulled:
+```
+summary                           
+description                     
+priority                        
+worklog                         
+comment                         
+timetracking                    
+duedate                         
+labels                          
+fixVersions                     
+versions                        
+components                      
+timeestimate                    
+timeoriginalestimate            
+timespent                       
+aggregatetimespent              
+aggregatetimeoriginalestimate   
+aggregatetimeestimate
+```
