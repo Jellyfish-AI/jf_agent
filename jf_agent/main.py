@@ -34,18 +34,12 @@ def main():
     outdir = conf_global.get('out_dir', '.')
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
     
-    conf_jira = config.get('jira', {})
-    conf_bitbucket = config.get('bitbucket', {})
+    jira_config = config.get('jira', {})
+    bb_config = config.get('bitbucket', {})
     
-    jira_url = conf_jira.get('url', None)
-    include_projects = set(conf_jira.get('include_projects', []))
-    exclude_projects = set(conf_jira.get('exclude_projects', []))
-    include_fields = set(conf_jira.get('include_fields', []))
-    exclude_fields = set(conf_jira.get('exclude_fields', []))
-    print_fields_only = conf_jira.get('print_fields_only', False)
-    
-    bb_url = conf_bitbucket.get('url', None)
-    
+    jira_url = jira_config.get('url', None)
+    bb_url = bb_config.get('url', None)
+
     if not jira_url and not bb_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
         parser.print_help()
@@ -57,35 +51,28 @@ def main():
         urllib3.disable_warnings()
 
     if jira_url:
-        load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification, print_fields_only)
+        jira_username = os.environ.get('JIRA_USERNAME', None)
+        jira_password = os.environ.get('JIRA_PASSWORD', None)
+        if jira_username and jira_password:
+            jira_connection = get_basic_jira_connection(jira_url, jira_username, jira_password, skip_ssl_verification)
+            load_and_dump_jira(outdir, jira_config, jira_connection)
+        else:
+            print('Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...')
 
     if bb_url:
-        load_and_dump_bb(bb_url, outdir, skip_ssl_verification)
+        bb_user = os.environ.get('BITBUCKET_USERNAME', None)
+        bb_pass = os.environ.get('BITBUCKET_PASSWORD', None)
+        if bb_user and bb_pass:
+            bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
+            load_and_dump_bb(outdir, bb_config, bb_conn)
+        else:
+            print('Bitbucket credendtials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...')
 
 
-def get_basic_jira_connection(url, username, password, skip_ssl_verification):
-    return JIRA(
-        server=url,
-        basic_auth=(username, password),
-        max_retries=10,
-        options={
-            'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
-            'verify': not skip_ssl_verification,
-        })
-
-
-def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, include_fields, exclude_fields, skip_ssl_verification, print_fields_only):
-    jira_username = os.environ.get('JIRA_USERNAME', None)
-    jira_password = os.environ.get('JIRA_PASSWORD', None)
-
-    if jira_username and jira_password:
-        jira_connection = get_basic_jira_connection(
-            jira_url, jira_username, jira_password, skip_ssl_verification)
-    else:
-        print('Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD')
-        sys.exit(1)
-
+def load_and_dump_jira(outdir, jira_config, jira_connection):
     fields = download_fields(jira_connection)
+
+    print_fields_only = jira_config.get('print_fields_only', False)
     if print_fields_only:
         for f in fields:
             print(f"{f['key']:30}\t{f['name']}")
@@ -104,8 +91,29 @@ def load_and_dump_jira(jira_url, outdir, include_projects, exclude_projects, inc
     write_file(outdir, 'jira_sprints', sprints)
     write_file(outdir, 'jira_board_sprint_links', links)
 
-    write_file(outdir, 'jira_issues', download_issues(jira_connection, include_projects, exclude_projects, include_fields, exclude_fields))
+    write_file(outdir, 'jira_issues', download_issues(jira_connection, jira_config))
     write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection))
+
+
+def get_basic_jira_connection(url, username, password, skip_ssl_verification):
+    return JIRA(
+        server=url,
+        basic_auth=(username, password),
+        max_retries=10,
+        options={
+            'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
+            'verify': not skip_ssl_verification,
+        })
+
+
+def load_and_dump_bb(outdir, bb_config, bb_conn):
+    write_file(outdir, 'bb_users', get_all_users(bb_conn))
+    projects = get_all_projects(bb_conn)
+    write_file(outdir, 'bb_projects', projects)
+    repos = list(get_all_repos(bb_conn, projects))
+    write_file(outdir, 'bb_repos', repos)
+    write_file(outdir, 'bb_commits', list(get_default_branch_commits(bb_conn, repos)))
+    write_file(outdir, 'bb_prs', list(get_pull_requests(bb_conn, repos)))
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
@@ -116,25 +124,6 @@ def get_bitbucket_server_client(url, username, password, skip_ssl_verification=F
         verify=not skip_ssl_verification)
 
     return client
-
-
-def load_and_dump_bb(bb_url, outdir, skip_ssl_verification):
-    bb_user = os.environ.get('BITBUCKET_USERNAME', None)
-    bb_pass = os.environ.get('BITBUCKET_PASSWORD', None)
-
-    if bb_user and bb_pass:
-        bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
-    else:
-        print('Bitbucket credendtials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD')
-        sys.exit(1)
-
-    write_file(outdir, 'bb_users', get_all_users(bb_conn))
-    projects = get_all_projects(bb_conn)
-    write_file(outdir, 'bb_projects', projects)
-    repos = list(get_all_repos(bb_conn, projects))
-    write_file(outdir, 'bb_repos', repos)
-    write_file(outdir, 'bb_commits', list(get_default_branch_commits(bb_conn, repos)))
-    write_file(outdir, 'bb_prs', list(get_pull_requests(bb_conn, repos)))
 
 
 def write_file(outdir, name, results):
