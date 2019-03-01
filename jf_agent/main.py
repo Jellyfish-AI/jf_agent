@@ -66,7 +66,7 @@ def main():
             bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
             load_and_dump_bb(outdir, bb_config, bb_conn)
         else:
-            print('Bitbucket credendtials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...')
+            print('Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...')
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection):
