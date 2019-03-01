@@ -23,6 +23,14 @@ jira:
   # exclude_projects:
   #   - PROJ1
 
+  # # Uncomment to pull issues from specific project categories only.  
+  # include_project_categories:
+  #   - Engineering
+
+  # Uncomment this to pull issues from all but specific project categories.
+  # exclude_project_categories:
+  #   - Support
+
   # Uncomment this to pull only specific fields on issues.  
   # include_fields:
   #   - id

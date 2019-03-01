@@ -146,16 +146,16 @@ def download_boards_and_sprints(jira_connection):
 
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
-def download_issues(jira_connection, include_projects, exclude_projects, include_fields, exclude_fields):
+def download_issues(jira_connection, jira_config):
+    include_projects = set(jira_config.get('include_projects', []))
+    exclude_projects = set(jira_config.get('exclude_projects', []))
+    include_categories = set(jira_config.get('include_project_categories', []))
+    exclude_categories = set(jira_config.get('exclude_project_categories', []))
+    
+    include_fields = set(jira_config.get('include_fields', []))
+    exclude_fields = set(jira_config.get('exclude_fields', []))
 
-    if include_projects:
-        projects_jql = f' and project in ({",".join(include_projects-exclude_projects)})'
-    elif exclude_projects:
-        projects_jql = f' and project not in ({{",".join(exclude_projects)}})'
-    else:
-        projects_jql = ''
-        
-    issue_jql = f'created is not empty{projects_jql} order by id asc'
+    issue_jql = f'created is not empty{projects_jql(include_projects, exclude_projects)}{category_jql(include_categories, exclude_categories)} order by id asc'
     issue_count = jira_connection.search_issues(issue_jql, fields='id', maxResults=1).total
     parallel_threads = 10
     issues_per_thread = -(-issue_count // parallel_threads)
@@ -196,6 +196,22 @@ def download_issues(jira_connection, include_projects, exclude_projects, include
         t.join()
 
     return list(issues.values())
+
+
+def projects_jql(include_projects, exclude_projects):
+    if include_projects:
+        return f' and project in ({",".join(include_projects-exclude_projects)})'
+    if exclude_projects:
+        return f' and project not in ({",".join(exclude_projects)})'
+    return ''
+
+
+def category_jql(include_categories, exclude_categories):
+    if include_categories:
+        return f' and category in ({",".join(include_categories - exclude_categories)})'
+    if exclude_categories:
+        return f' and category not in ({",".join(exclude_categories)})'
+    return ''
 
 
 # Returns a dict with two items: 'existing' gives a list of all worklogs
