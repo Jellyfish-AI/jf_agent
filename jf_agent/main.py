@@ -7,12 +7,12 @@ import yaml
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
+import stashy
+
+from jf_agent.bb_download import get_all_users, get_all_projects, get_all_repos, get_default_branch_commits, get_pull_requests
 from jf_agent.jira_download import download_users, download_fields, download_resolutions, download_issuetypes, \
     download_issuelinktypes, download_priorities, download_projects_and_versions, download_boards_and_sprints, \
     download_issues, download_worklogs
-
-import stashy
-from jf_agent.bb_download import get_all_users, get_all_projects, get_all_repos, get_default_branch_commits, get_pull_requests
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
         default='jellyfish.yaml',
         help='Path to config file'
     )
-    
+
     args = parser.parse_args()
 
     with open(args.config_file, 'r') as ymlfile:
@@ -33,10 +33,10 @@ def main():
     conf_global = config.get('global', {})
     outdir = conf_global.get('out_dir', '.')
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
-    
+
     jira_config = config.get('jira', {})
     bb_config = config.get('bitbucket', {})
-    
+
     jira_url = jira_config.get('url', None)
     bb_url = bb_config.get('url', None)
 
@@ -70,29 +70,45 @@ def main():
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection):
-    fields = download_fields(jira_connection)
+    include_fields = set(jira_config.get('include_fields', []))
+    exclude_fields = set(jira_config.get('exclude_fields', []))
+
+    fields = download_fields(jira_connection, include_fields, exclude_fields)
 
     print_fields_only = jira_config.get('print_fields_only', False)
     if print_fields_only:
         for f in fields:
             print(f"{f['key']:30}\t{f['name']}")
         return
-        
+
+    include_projects = set(jira_config.get('include_projects', []))
+    exclude_projects = set(jira_config.get('exclude_projects', []))
+    include_categories = set(jira_config.get('include_project_categories', []))
+    exclude_categories = set(jira_config.get('exclude_project_categories', []))
+
     write_file(outdir, 'jira_fields', fields)
+
+    projects_and_versions = download_projects_and_versions(jira_connection, include_projects, exclude_projects,
+        include_categories, exclude_categories)
+    project_ids = set([proj['id'] for proj in projects_and_versions])
+    write_file(outdir, 'jira_projects_and_versions', projects_and_versions)
+
     write_file(outdir, 'jira_users', download_users(jira_connection))
     write_file(outdir, 'jira_resolutions', download_resolutions(jira_connection))
-    write_file(outdir, 'jira_issuetypes', download_issuetypes(jira_connection))
+    write_file(outdir, 'jira_issuetypes',
+        download_issuetypes(jira_connection, project_ids))
     write_file(outdir, 'jira_linktypes', download_issuelinktypes(jira_connection))
     write_file(outdir, 'jira_priorities', download_priorities(jira_connection))
-    write_file(outdir, 'jira_projects_and_versions', download_projects_and_versions(jira_connection))
 
-    boards, sprints, links = download_boards_and_sprints(jira_connection)
+    boards, sprints, links = download_boards_and_sprints(jira_connection, project_ids)
     write_file(outdir, 'jira_boards', boards)
     write_file(outdir, 'jira_sprints', sprints)
     write_file(outdir, 'jira_board_sprint_links', links)
 
-    write_file(outdir, 'jira_issues', download_issues(jira_connection, jira_config))
-    write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection))
+    issues = download_issues(jira_connection, project_ids, include_fields, exclude_fields)
+    issue_ids = set([i['id'] for i in issues])
+    write_file(outdir, 'jira_issues', issues)
+    write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection, issue_ids))
 
 
 def get_basic_jira_connection(url, username, password, skip_ssl_verification):
@@ -129,3 +145,7 @@ def get_bitbucket_server_client(url, username, password, skip_ssl_verification=F
 def write_file(outdir, name, results):
     with open(f'{outdir}/{name}.json', 'w') as outfile:
         json.dump(results, outfile, indent=2, default=str)
+
+
+if __name__ == '__main__':
+    main()
