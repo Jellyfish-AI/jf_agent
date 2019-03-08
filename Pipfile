@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-jf-agent = {editable = true,path = "."}
+jf-agent = {editable = true, path = "."}
 
 [dev-packages]
 twine = "*"
