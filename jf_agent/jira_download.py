@@ -40,11 +40,20 @@ def download_users(jira_connection):
 
 
 # Returns an array of Field dicts
-def download_fields(jira_connection):
+def download_fields(jira_connection, include_fields, exclude_fields):
+
     print('downloading jira fields... ', end='', flush=True)
-    result = jira_connection.fields()
+
+    filters = []
+    if include_fields:
+        filters.append(lambda field: field['key'] in include_fields)
+    if exclude_fields:
+        filters.append(lambda field: field['key'] not in exclude_fields)
+
+    fields = [field for field in jira_connection.fields() if all(filt(field) for filt in filters)]
+
     print('✓')
-    return result
+    return fields
 
 
 # Returns an array of Resolutions dicts
@@ -56,9 +65,20 @@ def download_resolutions(jira_connection):
 
 
 # Returns an array of IssueType dicts
-def download_issuetypes(jira_connection):
+def download_issuetypes(jira_connection, project_ids):
+    '''
+    For Jira next-gen projects, issue types can be scoped to projects.
+    For issue types that are scoped to projects, only extract the ones
+    in the extracted projects.
+    '''
     print('downloading jira issue types... ', end='', flush=True)
-    result = [it.raw for it in jira_connection.issue_types()]
+    result = []
+    for it in jira_connection.issue_types():
+        if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
+            if it.raw['scope']['project']['id'] in project_ids:
+                result.append(it.raw)
+        else:
+            result.append(it.raw)
     print('✓')
     return result
 
@@ -79,11 +99,25 @@ def download_priorities(jira_connection):
     return result
 
 
-# Each project has a list of version.
+# Each project has a list of versions.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
-def download_projects_and_versions(jira_connection):
+def download_projects_and_versions(jira_connection, include_projects, exclude_projects,
+        include_categories, exclude_categories):
+
     print('downloading jira projects... ', end='', flush=True)
-    projects = jira_connection.projects()
+
+    filters = []
+    if include_projects:
+        filters.append(lambda proj: proj.key in include_projects)
+    if exclude_projects:
+        filters.append(lambda proj: proj.key not in exclude_projects)
+    if include_categories:
+        filters.append(lambda proj: proj.projectCategory.name in include_categories)
+    if exclude_categories:
+        filters.append(lambda proj: proj.projectCategory.name not in exclude_categories)
+
+    projects = [proj for proj in jira_connection.projects() if all(filt(proj) for filt in filters)]
+
     print('✓')
 
     print('downloading jira versions... ', end='', flush=True)
@@ -100,7 +134,7 @@ def download_projects_and_versions(jira_connection):
 #   - Array of board dicts
 #   - Array of sprint dicts
 #   - Array of board/sprint links
-def download_boards_and_sprints(jira_connection):
+def download_boards_and_sprints(jira_connection, project_ids):
     b_start_at = 0
     boards = []
     print('downloading jira boards... ', end='', flush=True)
@@ -110,9 +144,8 @@ def download_boards_and_sprints(jira_connection):
         if not jira_boards:
             break
         b_start_at += len(jira_boards)
-        boards.extend(jira_boards)
+        boards.extend([b for b in jira_boards if str(b.location.projectId) in project_ids])
     print('✓')
-
 
     print('downloading jira sprints... ', end='', flush=True)
     links = []
@@ -146,16 +179,9 @@ def download_boards_and_sprints(jira_connection):
 
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
-def download_issues(jira_connection, jira_config):
-    include_projects = set(jira_config.get('include_projects', []))
-    exclude_projects = set(jira_config.get('exclude_projects', []))
-    include_categories = set(jira_config.get('include_project_categories', []))
-    exclude_categories = set(jira_config.get('exclude_project_categories', []))
-    
-    include_fields = set(jira_config.get('include_fields', []))
-    exclude_fields = set(jira_config.get('exclude_fields', []))
 
-    issue_jql = f'created is not empty{projects_jql(include_projects, exclude_projects)}{category_jql(include_categories, exclude_categories)} order by id asc'
+def download_issues(jira_connection, project_ids, include_fields, exclude_fields):
+    issue_jql = f'created is not empty and project in ({",".join(project_ids)}) order by id asc'
     issue_count = jira_connection.search_issues(issue_jql, fields='id', maxResults=1).total
     parallel_threads = 10
     issues_per_thread = -(-issue_count // parallel_threads)
@@ -164,7 +190,7 @@ def download_issues(jira_connection, jira_config):
     q = queue.Queue()
     threads = [threading.Thread(target=_download_some_jira_issues,
                                 args=[i, issue_jql, include_fields, exclude_fields, jira_connection,
-                                      i*issues_per_thread, (i+1)*issues_per_thread, q])
+                                      i * issues_per_thread, (i + 1) * issues_per_thread, q])
                    for i in range(parallel_threads)]
     for t in threads:
         t.start()
@@ -188,7 +214,7 @@ def download_issues(jira_connection, jira_config):
             # the dict to dedupe
             old_count = len(issues)
             issues.update({i['id']: i for i in batch})
-            new_count= len(issues) - old_count
+            new_count = len(issues) - old_count
 
             prog_bar.update(new_count)
 
@@ -198,26 +224,10 @@ def download_issues(jira_connection, jira_config):
     return list(issues.values())
 
 
-def projects_jql(include_projects, exclude_projects):
-    if include_projects:
-        return f' and project in ({",".join(include_projects-exclude_projects)})'
-    if exclude_projects:
-        return f' and project not in ({",".join(exclude_projects)})'
-    return ''
-
-
-def category_jql(include_categories, exclude_categories):
-    if include_categories:
-        return f' and category in ({",".join(include_categories - exclude_categories)})'
-    if exclude_categories:
-        return f' and category not in ({",".join(exclude_categories)})'
-    return ''
-
-
 # Returns a dict with two items: 'existing' gives a list of all worklogs
 # that currently exist; 'deleted' gives the list of worklogs that
 # existed at some point previously, but have since been deleted
-def download_worklogs(jira_connection):
+def download_worklogs(jira_connection, issue_ids):
     print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
     while True:
@@ -234,7 +244,7 @@ def download_worklogs(jira_connection):
             logger.exception("Couldn't parse JIRA response as JSON: %s", resp.text)
             raise e
 
-        updated.extend(worklog_list_json)
+        updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
         if worklog_ids_json['lastPage']:
             break
     print('✓')
@@ -337,7 +347,7 @@ def _expand_changelog(jira_issues, jira_connection):
             start_at = changelog.maxResults
             batch_size = 100
             while (start_at < changelog.total):
-                more_cls = jira_connection._get_json(f'issue/{i.id}/changelog', {'startAt':start_at, 'maxResults':batch_size})['values']
+                more_cls = jira_connection._get_json(f'issue/{i.id}/changelog', {'startAt': start_at, 'maxResults': batch_size})['values']
                 changelog.histories.extend(dict2resource(i) for i in more_cls)
                 i.raw['changelog']['histories'].extend(more_cls)
                 start_at += len(more_cls)
