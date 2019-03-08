@@ -5,25 +5,26 @@ global:
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
-  
+
 jira:
   # URL to jira
-  url: https://jira.yourcompany.com
+  url: https://jira.yourcompany.com/
 
-  # # Uncomment this to print the list of available fields and exit
+  # Uncomment this to print the list of available fields and exit
   # print_fields_only: True
 
-  # only pull issues from specific projects.  Comment this out
-  # to pull issues from all projects.
+  # Only pull issues from specific projects (by project key).  Comment
+  # this out to pull issues from all projects.
   include_projects:
     - PROJ1
     - PROJ2
 
-  # Uncomment this to pull issues from all but specific projects.
+  # Uncomment this to pull issues from all but specific projects (by
+  # project key).
   # exclude_projects:
   #   - PROJ1
 
-  # # Uncomment to pull issues from specific project categories only.  
+  # Uncomment to pull issues from specific project categories only.
   # include_project_categories:
   #   - Engineering
 
@@ -31,18 +32,16 @@ jira:
   # exclude_project_categories:
   #   - Support
 
-  # Uncomment this to pull only specific fields on issues.  
+  # Uncomment this to pull only specific fields (by field key).
   # include_fields:
   #   - id
   #   - summary
 
-  # Uncomment this to pull all but specific fields on issues.
+  # Uncomment this to pull all but specific fields (by field key).
   # exclude_fields:
   #   - description
   #   - comment
 
 bitbucket:
   # URL to bitbucket
-  url: https://bitbucket.yourcompany.com
-
-  
+  url: https://bitbucket.yourcompany.com/
