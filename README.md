@@ -1,6 +1,6 @@
 # jf_agent
 
-An agent that can run on-premise and collect data to be sent to [Jellyfish](https://jellyfish.co).
+An agent that can run on-premise and collect data to be sent to [Jellyfish](https://jellyfish.co/).
 
 ## Usage
 
@@ -15,9 +15,9 @@ or, depending how your python environment is set up,
 pip3 install jf_agent
 ```
 
-2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with an API token for that user.
+2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with the password for that user.
 
-3. Set up environment variables with your Jira credentials. Set JIRA_USERNAME and JIRA_PASSWORD to the username and API token you found above.
+3. Set up environment variables with your Jira credentials. Set `JIRA_USERNAME` and `JIRA_PASSWORD` to the username and password you found above.
 
 4. For Bitbucket: Gather your Bitbucket credentials. Set the `BITBUCKET_USERNAME` and `BITBUCKET_PASSWORD` environment variables to appropriate values.
 
@@ -31,7 +31,7 @@ global:
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
-  
+
 jira:
   # URL to jira
   url: https://jira.yourcompany.com
@@ -49,7 +49,7 @@ jira:
   # exclude_projects:
   #   - PROJ1
 
-  # # Uncomment to pull issues from specific project categories only.  
+  # # Uncomment to pull issues from specific project categories only.
   # include_project_categories:
   #   - Engineering
 
@@ -57,7 +57,7 @@ jira:
   # exclude_project_categories:
   #   - Support
 
-  # Uncomment this to pull only specific fields on issues.  
+  # Uncomment this to pull only specific fields on issues.
   # include_fields:
   #   - id
   #   - summary
@@ -74,7 +74,7 @@ bitbucket:
 
 5. Run `jf_agent` with the path to your config file:
 ```
-jf_agent -c jellyfish.yaml
+jf_agent -c jellyfish.yml
 ```
 
 6. Collect the generated files from the output directory you specified, and send them to Jellyfish.
@@ -91,18 +91,18 @@ options in the config file.  Note, however, that certain fields are required in 
 for Jellyfish to work.  These required fields are:
 
 ```
-issuekey              
-project               
-reporter              
-assignee              
-creator               
-issuetype             
-resolution            
-resolutiondate        
-status                
-created               
-updated               
-subtasks        
+issuekey
+project
+reporter
+assignee
+creator
+issuetype
+resolution
+resolutiondate
+status
+created
+updated
+subtasks
 ```
 
 Some of the Jira agile feature are built internally on "custom fields" that Jellyfish uses. These
@@ -112,33 +112,33 @@ fields by running the agent with the `print_fields_only` option in the config fi
 fields used by Jellyfish are the following:
 
 ```
-Epic Link      
-Epic Name      
-Sprint         
-Parent Link   
+Epic Link
+Epic Name
+Sprint
+Parent Link
 Story Points
 Rank
 ```
 
-Make sure that at least these set of fields are configured for Jellyfish to pull.
+Make sure that at least these fields are configured for Jellyfish to pull.
 
 Additional Jellyfish functionality is enabled if the following fields are pulled:
 ```
-summary                           
-description                     
-priority                        
-worklog                         
-comment                         
-timetracking                    
-duedate                         
-labels                          
-fixVersions                     
-versions                        
-components                      
-timeestimate                    
-timeoriginalestimate            
-timespent                       
-aggregatetimespent              
-aggregatetimeoriginalestimate   
+summary
+description
+priority
+worklog
+comment
+timetracking
+duedate
+labels
+fixVersions
+versions
+components
+timeestimate
+timeoriginalestimate
+timespent
+aggregatetimespent
+aggregatetimeoriginalestimate
 aggregatetimeestimate
 ```
