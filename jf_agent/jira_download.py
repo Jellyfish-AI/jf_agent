@@ -233,8 +233,9 @@ def download_issues(jira_connection, project_ids, include_fields, exclude_fields
 def download_worklogs(jira_connection, issue_ids):
     print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
+    since = 0
     while True:
-        worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': 0})
+        worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': since})
         updated_worklog_ids = [v['worklogId'] for v in worklog_ids_json['values']]
 
         resp = jira_connection._session.post(
@@ -250,6 +251,8 @@ def download_worklogs(jira_connection, issue_ids):
         updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
         if worklog_ids_json['lastPage']:
             break
+        since = worklog_ids_json['until']
+        
     print('✓')
 
     print(f'Finding old worklogs that have been deleted... ', end='', flush=True)
