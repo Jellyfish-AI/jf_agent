@@ -46,9 +46,9 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
     filters = []
     if include_fields:
-        filters.append(lambda field: field['key'] in include_fields)
+        filters.append(lambda field: field['id'] in include_fields)
     if exclude_fields:
-        filters.append(lambda field: field['key'] not in exclude_fields)
+        filters.append(lambda field: field['id'] not in exclude_fields)
 
     fields = [field for field in jira_connection.fields() if all(filt(field) for filt in filters)]
 
@@ -144,13 +144,16 @@ def download_boards_and_sprints(jira_connection, project_ids):
         if not jira_boards:
             break
         b_start_at += len(jira_boards)
-        boards.extend([b for b in jira_boards if str(b.location.projectId) in project_ids])
+
+        # Some versions of Jira map boards to projects, some do not.
+        # If this includes a "location" for boards, then only
+        # include boards for the projects we're pulling
+        boards.extend([b for b in jira_boards if not hasattr(b, 'location') or str(getattr(b.location, 'projectId', '')) in project_ids])
     print('✓')
 
-    print('downloading jira sprints... ', end='', flush=True)
     links = []
     sprints = {}
-    for b in boards:
+    for b in tqdm(boards, desc='downloading jira sprints', file=sys.stdout):
         if b.raw['type'] != 'scrum':
             continue
         s_start_at = 0
@@ -163,10 +166,11 @@ def download_boards_and_sprints(jira_connection, project_ids):
                 # JIRA returns 500 errors for various reasons: board is
                 # misconfigured; "falied to execute search"; etc.  Just
                 # skip and move on
-                if e.status_code == 500:
-                    logger.exception(f"Couldn't get sprints for board {b.id}.  Skipping...")
+                if e.status_code == 500 or e.status_code == 404:
+                    logger.warn(f"Couldn't get sprints for board {b.id}.  Skipping...")
                 else:
                     raise
+
             if not batch:
                 break
             s_start_at += len(batch)
@@ -175,7 +179,6 @@ def download_boards_and_sprints(jira_connection, project_ids):
         links.append({'board_id': b.id,
                       'sprint_ids': [s.id for s in sprints_for_board]})
         sprints.update({s.id: s for s in sprints_for_board})
-    print('✓')
 
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
@@ -230,8 +233,9 @@ def download_issues(jira_connection, project_ids, include_fields, exclude_fields
 def download_worklogs(jira_connection, issue_ids):
     print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
+    since = 0
     while True:
-        worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': 0})
+        worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': since})
         updated_worklog_ids = [v['worklogId'] for v in worklog_ids_json['values']]
 
         resp = jira_connection._session.post(
@@ -247,6 +251,8 @@ def download_worklogs(jira_connection, issue_ids):
         updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
         if worklog_ids_json['lastPage']:
             break
+        since = worklog_ids_json['until']
+        
     print('✓')
 
     print(f'Finding old worklogs that have been deleted... ', end='', flush=True)
