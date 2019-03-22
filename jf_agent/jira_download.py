@@ -15,29 +15,19 @@ logger = logging.getLogger(__name__)
 
 
 # Returns an array of User dicts
-def download_users(jira_connection):
+def download_users(jira_connection, gdpr_active):
     print('downloading jira users... ', end='', flush=True)
 
-    jira_users = set()
-    start_at = 0
-    while True:
-        # Search for '%' or '@' so we get results from cloud or
-        # on-prem, the latter being what on-prem appears to use as
-        # a wildcard
-        users = jira_connection.search_users('%', maxResults=1000, startAt=start_at, includeInactive=True) or \
-                jira_connection.search_users('@', maxResults=1000, startAt=start_at, includeInactive=True)
+    jira_users = _search_all_users(jira_connection, gdpr_active)
 
-        if not users:
-            # Some jira instances won't return more than one page of
-            # results.  If we have seen exactly 1000 results, try
-            # searching a different way
-            result = [u.raw for u in (jira_users if len(jira_users) != 1000 else _users_by_letter(jira_connection))]
-            print('✓')
-            return result
+    # Some jira instances won't return more than one page of
+    # results.  If we have seen exactly 1000 results, try
+    # searching a different way
+    if len(jira_users) == 1000:
+        jira_users = _users_by_letter(jira_connection, gdpr_active)
 
-        jira_users.update(users)
-        start_at += len(users)
-
+    print('✓')
+    return jira_users
 
 # Returns an array of Field dicts
 def download_fields(jira_connection, include_fields, exclude_fields):
@@ -271,13 +261,63 @@ def download_worklogs(jira_connection, issue_ids):
     }
 
 
-def _users_by_letter(jira_connection):
-    jira_users = set()
-    for letter in string.ascii_lowercase:
-        jira_users.update(jira_connection.search_users(f'{letter}.', maxResults=1000, includeInactive=True, includeActive=False))
-        jira_users.update(jira_connection.search_users(f'{letter}.', maxResults=1000, includeInactive=False, includeActive=True))
-    return jira_users
+def _jira_user_key(user_dict, gdpr_active):
+    if gdpr_active:
+        return user_dict['accountId']
+    else:
+        return user_dict['key']
 
+
+def _search_all_users(jira_connection, gdpr_active):
+    jira_users = {}
+    start_at = 0
+    while True:
+        # Search for '%' or '@' so we get results from cloud or
+        # on-prem, the latter being what on-prem appears to use as
+        # a wildcard
+        users = _search_users(jira_connection, gdpr_active, query='%', start_at=start_at, include_inactive=True) or \
+                _search_users(jira_connection, gdpr_active, query='@', start_at=start_at, include_inactive=True)
+        if not users:
+            return list(jira_users.values())
+
+        jira_users.update({
+            _jira_user_key(u, gdpr_active): u
+            for u in users
+        })
+
+        start_at += len(users)
+        
+
+def _users_by_letter(jira_connection, gdpr_active):
+    jira_users = {}
+    for letter in string.ascii_lowercase:
+        jira_users.update({
+            _jira_user_key(u, gdpr_active): u
+            for u in _search_users(jira_connection, gdpr_active, query=f'{letter}.', include_inactive=True, include_active=False)
+        })
+        jira_users.update({
+            _jira_user_key(u, gdpr_active): u
+            for u in _search_users(jira_connection, gdpr_active, query=f'{letter}.', include_inactive=False, include_active=True)
+        })
+    return list(jira_users.values())
+
+
+def _search_users(jira_connection, gdpr_active, query, start_at=0, max_results=1000, include_active=True, include_inactive=False):
+    if gdpr_active:
+        # jira_connection.search_users creates a query that is no longer accepted on
+        # GDPR-compliant Jira instances.  Construct the right query by hand
+        params = {
+            'startAt': start_at,
+            'maxResults': max_results,
+            'query': query,
+            'includeActive': include_active,
+            'includeInactive': include_inactive
+        }
+        return jira_connection._get_json('user/search', params)
+
+    return [u.raw for u in jira_connection.search_users(query, startAt=start_at, maxResults=max_results,
+                                                        includeInactive=include_inactive, includeActive=include_active)]
+    
 
 def _download_some_jira_issues(i, issue_jql, include_fields, exclude_fields, jira_connection, start_at, end_at, q):
     # Empirically, Jira cloud won't return more than 100 issues at a

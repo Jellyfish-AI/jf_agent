@@ -81,6 +81,8 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
             print(f"{f['key']:30}\t{f['name']}")
         return
 
+    gdpr_active = jira_config.get('gdpr_active', False)
+
     include_projects = set(jira_config.get('include_projects', []))
     exclude_projects = set(jira_config.get('exclude_projects', []))
     include_categories = set(jira_config.get('include_project_categories', []))
@@ -93,7 +95,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
     project_ids = set([proj['id'] for proj in projects_and_versions])
     write_file(outdir, 'jira_projects_and_versions', projects_and_versions)
 
-    write_file(outdir, 'jira_users', download_users(jira_connection))
+    write_file(outdir, 'jira_users', download_users(jira_connection, gdpr_active))
     write_file(outdir, 'jira_resolutions', download_resolutions(jira_connection))
     write_file(outdir, 'jira_issuetypes',
         download_issuetypes(jira_connection, project_ids))

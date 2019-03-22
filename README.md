@@ -39,6 +39,11 @@ jira:
   # # Uncomment this to print the list of available fields and exit
   # print_fields_only: True
 
+  # GDPR mode: enable this if your Jira instance's API has User
+  # endpoints modified in order to support GDPR.  This should be True
+  # for Atlassian Cloud hosted JIRA as of March 30, 2019.
+  gdpr_active: False
+  
   # only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
   include_projects:

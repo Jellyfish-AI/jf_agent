@@ -19,6 +19,11 @@ jira:
     - PROJ1
     - PROJ2
 
+  # GDPR mode: enable this if your Jira instance's API has User
+  # endpoints modified in order to support GDPR.  This should be True
+  # for Atlassian Cloud hosted JIRA as of March 30, 2019.
+  gdpr_active: False
+  
   # Uncomment this to pull issues from all but specific projects (by
   # project key).
   # exclude_projects:
