@@ -11,18 +11,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Jellyfish-AI/jf_agent",
     packages=setuptools.find_packages(),
-    install_requires=[
-        'jira',
-        'tqdm',
-        'stashy',
-        'pyyaml'
-    ],
+    install_requires=["jira", "tqdm", "stashy", "pyyaml>=4.2b1", "urllib3==1.24.2"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    entry_points={
-        'console_scripts': ['jf_agent=jf_agent.main:main'],
-    }
+    entry_points={"console_scripts": ["jf_agent=jf_agent.main:main"]},
 )
