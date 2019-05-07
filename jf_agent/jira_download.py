@@ -29,6 +29,7 @@ def download_users(jira_connection, gdpr_active):
     print('✓')
     return jira_users
 
+
 # Returns an array of Field dicts
 def download_fields(jira_connection, include_fields, exclude_fields):
 
@@ -91,8 +92,9 @@ def download_priorities(jira_connection):
 
 # Each project has a list of versions.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
-def download_projects_and_versions(jira_connection, include_projects, exclude_projects,
-        include_categories, exclude_categories):
+def download_projects_and_versions(
+    jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
+):
 
     print('downloading jira projects... ', end='', flush=True)
 
@@ -138,7 +140,14 @@ def download_boards_and_sprints(jira_connection, project_ids):
         # Some versions of Jira map boards to projects, some do not.
         # If this includes a "location" for boards, then only
         # include boards for the projects we're pulling
-        boards.extend([b for b in jira_boards if not hasattr(b, 'location') or str(getattr(b.location, 'projectId', '')) in project_ids])
+        boards.extend(
+            [
+                b
+                for b in jira_boards
+                if not hasattr(b, 'location')
+                or str(getattr(b.location, 'projectId', '')) in project_ids
+            ]
+        )
     print('✓')
 
     links = []
@@ -166,8 +175,7 @@ def download_boards_and_sprints(jira_connection, project_ids):
             s_start_at += len(batch)
             sprints_for_board.extend(batch)
 
-        links.append({'board_id': b.id,
-                      'sprint_ids': [s.id for s in sprints_for_board]})
+        links.append({'board_id': b.id, 'sprint_ids': [s.id for s in sprints_for_board]})
         sprints.update({s.id: s for s in sprints_for_board})
 
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
@@ -181,10 +189,22 @@ def download_issues(jira_connection, project_ids, include_fields, exclude_fields
 
     # Make threads to talk to Jira and write batches of issues to the queue
     q = queue.Queue()
-    threads = [threading.Thread(target=_download_some_jira_issues,
-                                args=[i, issue_jql, include_fields, exclude_fields, jira_connection,
-                                      i * issues_per_thread, (i + 1) * issues_per_thread, q])
-                   for i in range(parallel_threads)]
+    threads = [
+        threading.Thread(
+            target=_download_some_jira_issues,
+            args=[
+                i,
+                issue_jql,
+                include_fields,
+                exclude_fields,
+                jira_connection,
+                i * issues_per_thread,
+                (i + 1) * issues_per_thread,
+                q,
+            ],
+        )
+        for i in range(parallel_threads)
+    ]
     for t in threads:
         t.start()
 
@@ -230,7 +250,7 @@ def download_worklogs(jira_connection, issue_ids):
 
         resp = jira_connection._session.post(
             url=jira_connection._get_url('worklog/list'),
-            data=json.dumps({'ids': updated_worklog_ids})
+            data=json.dumps({'ids': updated_worklog_ids}),
         )
         try:
             worklog_list_json = json_loads(resp)
@@ -242,7 +262,7 @@ def download_worklogs(jira_connection, issue_ids):
         if worklog_ids_json['lastPage']:
             break
         since = worklog_ids_json['until']
-        
+
     print('✓')
 
     print(f'Finding old worklogs that have been deleted... ', end='', flush=True)
@@ -255,10 +275,7 @@ def download_worklogs(jira_connection, issue_ids):
 
     print('✓')
 
-    return {
-        'existing': updated,
-        'deleted': deleted,
-    }
+    return {'existing': updated, 'deleted': deleted}
 
 
 def _jira_user_key(user_dict, gdpr_active):
@@ -275,34 +292,58 @@ def _search_all_users(jira_connection, gdpr_active):
         # Search for '%' or '@' so we get results from cloud or
         # on-prem, the latter being what on-prem appears to use as
         # a wildcard
-        users = _search_users(jira_connection, gdpr_active, query='%', start_at=start_at, include_inactive=True) or \
-                _search_users(jira_connection, gdpr_active, query='@', start_at=start_at, include_inactive=True)
+        users = _search_users(
+            jira_connection, gdpr_active, query='%', start_at=start_at, include_inactive=True
+        ) or _search_users(
+            jira_connection, gdpr_active, query='@', start_at=start_at, include_inactive=True
+        )
         if not users:
             return list(jira_users.values())
 
-        jira_users.update({
-            _jira_user_key(u, gdpr_active): u
-            for u in users
-        })
+        jira_users.update({_jira_user_key(u, gdpr_active): u for u in users})
 
         start_at += len(users)
-        
+
 
 def _users_by_letter(jira_connection, gdpr_active):
     jira_users = {}
     for letter in string.ascii_lowercase:
-        jira_users.update({
-            _jira_user_key(u, gdpr_active): u
-            for u in _search_users(jira_connection, gdpr_active, query=f'{letter}.', include_inactive=True, include_active=False)
-        })
-        jira_users.update({
-            _jira_user_key(u, gdpr_active): u
-            for u in _search_users(jira_connection, gdpr_active, query=f'{letter}.', include_inactive=False, include_active=True)
-        })
+        jira_users.update(
+            {
+                _jira_user_key(u, gdpr_active): u
+                for u in _search_users(
+                    jira_connection,
+                    gdpr_active,
+                    query=f'{letter}.',
+                    include_inactive=True,
+                    include_active=False,
+                )
+            }
+        )
+        jira_users.update(
+            {
+                _jira_user_key(u, gdpr_active): u
+                for u in _search_users(
+                    jira_connection,
+                    gdpr_active,
+                    query=f'{letter}.',
+                    include_inactive=False,
+                    include_active=True,
+                )
+            }
+        )
     return list(jira_users.values())
 
 
-def _search_users(jira_connection, gdpr_active, query, start_at=0, max_results=1000, include_active=True, include_inactive=False):
+def _search_users(
+    jira_connection,
+    gdpr_active,
+    query,
+    start_at=0,
+    max_results=1000,
+    include_active=True,
+    include_inactive=False,
+):
     if gdpr_active:
         # jira_connection.search_users creates a query that is no longer accepted on
         # GDPR-compliant Jira instances.  Construct the right query by hand
@@ -311,15 +352,25 @@ def _search_users(jira_connection, gdpr_active, query, start_at=0, max_results=1
             'maxResults': max_results,
             'query': query,
             'includeActive': include_active,
-            'includeInactive': include_inactive
+            'includeInactive': include_inactive,
         }
         return jira_connection._get_json('user/search', params)
 
-    return [u.raw for u in jira_connection.search_users(query, startAt=start_at, maxResults=max_results,
-                                                        includeInactive=include_inactive, includeActive=include_active)]
-    
+    return [
+        u.raw
+        for u in jira_connection.search_users(
+            query,
+            startAt=start_at,
+            maxResults=max_results,
+            includeInactive=include_inactive,
+            includeActive=include_active,
+        )
+    ]
 
-def _download_some_jira_issues(i, issue_jql, include_fields, exclude_fields, jira_connection, start_at, end_at, q):
+
+def _download_some_jira_issues(
+    i, issue_jql, include_fields, exclude_fields, jira_connection, start_at, end_at, q
+):
     # Empirically, Jira cloud won't return more than 100 issues at a
     # time even if you ask for more, but on-premise can do 1000
     #
@@ -331,14 +382,18 @@ def _download_some_jira_issues(i, issue_jql, include_fields, exclude_fields, jir
     try:
         # pull batches and bulk load each into our database
         while start_at < min(end_at, total_issues):
-            issues = _get_jira_issues_batch(issue_jql, include_fields, exclude_fields, jira_connection, start_at, batch_size)
+            issues = _get_jira_issues_batch(
+                issue_jql, include_fields, exclude_fields, jira_connection, start_at, batch_size
+            )
 
             total_issues = issues.total
             issues_retrieved = len(issues)
             start_at += issues_retrieved
-            if (issues_retrieved == 0):
-                logger.warn(f'[Thread {i}] Jira issue downloaded might be stuck; asked for {batch_size} issues starting at {start_at}, '
-                            f'ending at ending at {min(end_at, total_issues)}, got none back.  Trying again...')
+            if issues_retrieved == 0:
+                logger.warn(
+                    f'[Thread {i}] Jira issue downloaded might be stuck; asked for {batch_size} issues starting at {start_at}, '
+                    f'ending at ending at {min(end_at, total_issues)}, got none back.  Trying again...'
+                )
 
             raw_issues = [i.raw for i in issues]
 
@@ -354,25 +409,29 @@ def _download_some_jira_issues(i, issue_jql, include_fields, exclude_fields, jir
         q.put(e)
 
 
-def _get_jira_issues_batch(issue_jql, include_fields, exclude_fields, jira_connection, start_at, max_results):
+def _get_jira_issues_batch(
+    issue_jql, include_fields, exclude_fields, jira_connection, start_at, max_results
+):
     get_changelog = True
 
     fieldspec = ','.join(include_fields) if include_fields else '*all'
     for f in exclude_fields:
         fieldspec += f',-{f}'
 
-    while (max_results > 0):
+    while max_results > 0:
         search_kwargs = {
             'fields': fieldspec,
             'expand': 'renderedFields',
             'startAt': start_at,
             'maxResults': max_results,
         }
-        if (get_changelog):
+        if get_changelog:
             search_kwargs['expand'] += ',changelog'
 
         try:
-            return _expand_changelog(jira_connection.search_issues(issue_jql, **search_kwargs), jira_connection)
+            return _expand_changelog(
+                jira_connection.search_issues(issue_jql, **search_kwargs), jira_connection
+            )
         except JIRAError:
             logger.exception(f'JIRAError, reducing batch size')
             ## back off the max results requested to try and avoid the error
@@ -392,8 +451,10 @@ def _expand_changelog(jira_issues, jira_connection):
             # expand the changelog
             start_at = changelog.maxResults
             batch_size = 100
-            while (start_at < changelog.total):
-                more_cls = jira_connection._get_json(f'issue/{i.id}/changelog', {'startAt': start_at, 'maxResults': batch_size})['values']
+            while start_at < changelog.total:
+                more_cls = jira_connection._get_json(
+                    f'issue/{i.id}/changelog', {'startAt': start_at, 'maxResults': batch_size}
+                )['values']
                 changelog.histories.extend(dict2resource(i) for i in more_cls)
                 i.raw['changelog']['histories'].extend(more_cls)
                 start_at += len(more_cls)

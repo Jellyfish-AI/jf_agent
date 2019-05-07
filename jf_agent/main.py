@@ -9,20 +9,31 @@ from jira import JIRA
 from jira.resources import GreenHopperResource
 import stashy
 
-from jf_agent.bb_download import get_all_users, get_all_projects, get_all_repos, get_default_branch_commits, get_pull_requests
-from jf_agent.jira_download import download_users, download_fields, download_resolutions, download_issuetypes, \
-    download_issuelinktypes, download_priorities, download_projects_and_versions, download_boards_and_sprints, \
-    download_issues, download_worklogs
+from jf_agent.bb_download import (
+    get_all_users,
+    get_all_projects,
+    get_all_repos,
+    get_default_branch_commits,
+    get_pull_requests,
+)
+from jf_agent.jira_download import (
+    download_users,
+    download_fields,
+    download_resolutions,
+    download_issuetypes,
+    download_issuelinktypes,
+    download_priorities,
+    download_projects_and_versions,
+    download_boards_and_sprints,
+    download_issues,
+    download_worklogs,
+)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-c',
-        '--config-file',
-        nargs='?',
-        default='jellyfish.yaml',
-        help='Path to config file'
+        '-c', '--config-file', nargs='?', default='jellyfish.yaml', help='Path to config file'
     )
 
     args = parser.parse_args()
@@ -54,10 +65,14 @@ def main():
         jira_username = os.environ.get('JIRA_USERNAME', None)
         jira_password = os.environ.get('JIRA_PASSWORD', None)
         if jira_username and jira_password:
-            jira_connection = get_basic_jira_connection(jira_url, jira_username, jira_password, skip_ssl_verification)
+            jira_connection = get_basic_jira_connection(
+                jira_url, jira_username, jira_password, skip_ssl_verification
+            )
             load_and_dump_jira(outdir, jira_config, jira_connection)
         else:
-            print('Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...')
+            print(
+                'Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
+            )
 
     if bb_url:
         bb_user = os.environ.get('BITBUCKET_USERNAME', None)
@@ -66,7 +81,9 @@ def main():
             bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
             load_and_dump_bb(outdir, bb_config, bb_conn)
         else:
-            print('Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...')
+            print(
+                'Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...'
+            )
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection):
@@ -90,15 +107,15 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
 
     write_file(outdir, 'jira_fields', fields)
 
-    projects_and_versions = download_projects_and_versions(jira_connection, include_projects, exclude_projects,
-        include_categories, exclude_categories)
+    projects_and_versions = download_projects_and_versions(
+        jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
+    )
     project_ids = set([proj['id'] for proj in projects_and_versions])
     write_file(outdir, 'jira_projects_and_versions', projects_and_versions)
 
     write_file(outdir, 'jira_users', download_users(jira_connection, gdpr_active))
     write_file(outdir, 'jira_resolutions', download_resolutions(jira_connection))
-    write_file(outdir, 'jira_issuetypes',
-        download_issuetypes(jira_connection, project_ids))
+    write_file(outdir, 'jira_issuetypes', download_issuetypes(jira_connection, project_ids))
     write_file(outdir, 'jira_linktypes', download_issuelinktypes(jira_connection))
     write_file(outdir, 'jira_priorities', download_priorities(jira_connection))
 
@@ -121,7 +138,8 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         options={
             'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
             'verify': not skip_ssl_verification,
-        })
+        },
+    )
 
 
 def load_and_dump_bb(outdir, bb_config, bb_conn):
@@ -136,10 +154,8 @@ def load_and_dump_bb(outdir, bb_config, bb_conn):
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
     client = stashy.connect(
-        url=url,
-        username=username,
-        password=password,
-        verify=not skip_ssl_verification)
+        url=url, username=username, password=password, verify=not skip_ssl_verification
+    )
 
     return client
 
