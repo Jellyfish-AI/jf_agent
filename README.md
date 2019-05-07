@@ -93,7 +93,7 @@ bitbucket:
       - repo_to_skip
       
   # Strip out long-form text content (commit messages, PR text, etc)
-  strip_text_content = False
+  strip_text_content: False
       
 ```
 
