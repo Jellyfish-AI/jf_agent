@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="jf_agent",
-    version="0.0.11",
+    version="0.0.12",
     description="An agent for collecting data for jellyfish",
     long_description=long_description,
     long_description_content_type="text/markdown",
