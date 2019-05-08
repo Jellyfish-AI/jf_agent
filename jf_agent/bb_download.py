@@ -54,35 +54,38 @@ def get_all_repos(client, projects, include_repos, exclude_repos):
     if exclude_repos:
         filters.append(lambda r: r['name'] not in exclude_repos)
 
-    for project in projects:
-        api_project = client.projects[project['login']]
-        for repo in api_project.repos.list():
-            if all(filt(repo) for filt in filters):
-                api_repo = api_project.repos[repo['name']]
+    api_repos = (
+        api_project.repos[repo['name']]
+        for project in projects
+        for api_project in [client.projects[project['login']]]
+        for repo in api_project.repos.list()
+        if all(filt(repo) for filt in filters)
+    )
 
-                repo_url = repo['links']['self'][0]['href']
-                try:
-                    default_branch_name = (
-                        api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-                    )
-                except stashy.errors.NotFoundException:
-                    default_branch_name = ''
+    for api_repo in api_repos:
+        repo_url = repo['links']['self'][0]['href']
+        try:
+            default_branch_name = (
+                api_repo.default_branch['displayId'] if api_repo.default_branch else ''
+            )
+        except stashy.errors.NotFoundException:
+            default_branch_name = ''
 
-                branches = list(
-                    {'name': b['displayId'], 'sha': b['latestCommit']} for b in api_repo.branches()
-                )
+        branches = list(
+            {'name': b['displayId'], 'sha': b['latestCommit']} for b in api_repo.branches()
+        )
 
-                yield {
-                    'id': repo['id'],
-                    'name': repo['name'],
-                    'full_name': repo['name'],
-                    'description': repo['name'],
-                    'url': repo_url,
-                    'default_branch_name': default_branch_name,
-                    'branches': branches,
-                    'is_fork': 'origin' in repo,
-                    'project': project,
-                }
+        yield {
+            'id': repo['id'],
+            'name': repo['name'],
+            'full_name': repo['name'],
+            'description': repo['name'],
+            'url': repo_url,
+            'default_branch_name': default_branch_name,
+            'branches': branches,
+            'is_fork': 'origin' in repo,
+            'project': project,
+        }
 
     print('✓')
 
@@ -91,12 +94,12 @@ JIRA_KEY_REGEX = re.compile(r'([a-z0-9]+)[-|_|/| ]?(\d+)', re.IGNORECASE)
 
 
 def _sanitize_text(text, strip_text_content):
-    if strip_text_content:
-        text = (' ').join(
-            {f'{m[0].upper().strip()}-{m[1].upper().strip()}' for m in JIRA_KEY_REGEX.findall(text)}
-        )
+    if not text or not strip_text_content:
+        return text
 
-    return text
+    return (' ').join(
+        {f'{m[0].upper().strip()}-{m[1].upper().strip()}' for m in JIRA_KEY_REGEX.findall(text)}
+    )
 
 
 def _normalize_commit(commit, repo, strip_text_content):
