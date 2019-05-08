@@ -143,13 +143,25 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
 
 
 def load_and_dump_bb(outdir, bb_config, bb_conn):
+    include_projects = set(bb_config.get('include_projects', []))
+    exclude_projects = set(bb_config.get('exclude_projects', []))
+    include_repos = set(bb_config.get('include_repos', []))
+    exclude_repos = set(bb_config.get('exclude_projects', []))
+    strip_text_content = bb_config.get('strip_text_content', False)
+
     write_file(outdir, 'bb_users', get_all_users(bb_conn))
-    projects = get_all_projects(bb_conn)
+
+    projects = get_all_projects(bb_conn, include_projects, exclude_projects)
     write_file(outdir, 'bb_projects', projects)
-    repos = list(get_all_repos(bb_conn, projects))
+
+    repos = list(get_all_repos(bb_conn, projects, include_repos, exclude_repos))
     write_file(outdir, 'bb_repos', repos)
-    write_file(outdir, 'bb_commits', list(get_default_branch_commits(bb_conn, repos)))
-    write_file(outdir, 'bb_prs', list(get_pull_requests(bb_conn, repos)))
+
+    commits = list(get_default_branch_commits(bb_conn, repos, strip_text_content))
+    write_file(outdir, 'bb_commits', commits)
+
+    prs = list(get_pull_requests(bb_conn, repos, strip_text_content))
+    write_file(outdir, 'bb_prs', prs)
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
