@@ -63,7 +63,6 @@ def get_all_repos(client, projects, include_repos, exclude_repos):
     )
 
     for api_repo in api_repos:
-        repo_url = repo['links']['self'][0]['href']
         try:
             default_branch_name = (
                 api_repo.default_branch['displayId'] if api_repo.default_branch else ''
@@ -80,7 +79,7 @@ def get_all_repos(client, projects, include_repos, exclude_repos):
             'name': repo['name'],
             'full_name': repo['name'],
             'description': repo['name'],
-            'url': repo_url,
+            'url': repo['links']['self'][0]['href'],
             'default_branch_name': default_branch_name,
             'branches': branches,
             'is_fork': 'origin' in repo,
