@@ -36,7 +36,7 @@ jira:
   # URL to jira
   url: https://jira.yourcompany.com
 
-  # # Uncomment this to print the list of available fields and exit
+  # Uncomment this to print the list of available fields and exit
   # print_fields_only: True
 
   # GDPR mode: enable this if your Jira instance's API has User
@@ -54,7 +54,7 @@ jira:
   # exclude_projects:
   #   - PROJ1
 
-  # # Uncomment to pull issues from specific project categories only.
+  # Uncomment to pull issues from specific project categories only.
   # include_project_categories:
   #   - Engineering
 
@@ -81,25 +81,25 @@ bitbucket:
       - PROJ1
       
   # Uncomment this to pull from all but specific projects.
-  exclude_projects:
-      - PROJ1
+  #  exclude_projects:
+  #    - PROJ1
       
   # only pull from specific repos.  Comment this out to pull from all repos.
   include_repos:
       - my_repository
       
   # Uncomment this to pull from all but specific repos.
-  exclude_repos:
-      - repo_to_skip
+  # exclude_repos:
+  #    - repo_to_skip
       
   # Strip out long-form text content (commit messages, PR text, etc)
   strip_text_content: False
       
 ```
 
-5. Run `jf_agent` with the path to your config file:
+5. Run `jf_agent` with the path to your config file, optionally specifying constraints on time to pull git data:
 ```
-jf_agent -c jellyfish.yml
+jf_agent -c jellyfish.yml [--since 2018-01-01] [--until 2019-04-02]
 ```
 
 6. Collect the generated files from the output directory you specified, and send them to Jellyfish.

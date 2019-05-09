@@ -4,6 +4,9 @@ import sys
 import json
 import urllib3
 import yaml
+import dateparser
+from datetime import datetime
+import pytz
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
@@ -35,6 +38,20 @@ def main():
     parser.add_argument(
         '-c', '--config-file', nargs='?', default='jellyfish.yaml', help='Path to config file'
     )
+    parser.add_argument(
+        '-s',
+        '--since',
+        nargs='?',
+        default=None,
+        help='Pull bitbucket activity on or after this timestamp',
+    )
+    parser.add_argument(
+        '-u',
+        '--until',
+        nargs='?',
+        default=None,
+        help='Pull bitbucket activity before this timestamp',
+    )
 
     args = parser.parse_args()
 
@@ -50,6 +67,13 @@ def main():
 
     jira_url = jira_config.get('url', None)
     bb_url = bb_config.get('url', None)
+
+    pull_since = dateparser.parse(args.since) if args.since else None
+    if pull_since:
+        pull_since = pull_since.replace(tzinfo=pytz.utc)
+
+    pull_until = dateparser.parse(args.until) if args.until else datetime.utcnow()
+    pull_until = pull_until.replace(tzinfo=pytz.utc)
 
     if not jira_url and not bb_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
@@ -79,7 +103,9 @@ def main():
         bb_pass = os.environ.get('BITBUCKET_PASSWORD', None)
         if bb_user and bb_pass:
             bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
-            load_and_dump_bb(outdir, bb_config, bb_conn)
+            load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until)
+            print()
+            print(f'Pulled until: {pull_until}')
         else:
             print(
                 'Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...'
@@ -142,7 +168,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
     )
 
 
-def load_and_dump_bb(outdir, bb_config, bb_conn):
+def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
     include_projects = set(bb_config.get('include_projects', []))
     exclude_projects = set(bb_config.get('exclude_projects', []))
     include_repos = set(bb_config.get('include_repos', []))
@@ -157,10 +183,12 @@ def load_and_dump_bb(outdir, bb_config, bb_conn):
     repos = list(get_all_repos(bb_conn, projects, include_repos, exclude_repos))
     write_file(outdir, 'bb_repos', repos)
 
-    commits = list(get_default_branch_commits(bb_conn, repos, strip_text_content))
+    commits = list(
+        get_default_branch_commits(bb_conn, repos, strip_text_content, pull_since, pull_until)
+    )
     write_file(outdir, 'bb_commits', commits)
 
-    prs = list(get_pull_requests(bb_conn, repos, strip_text_content))
+    prs = list(get_pull_requests(bb_conn, repos, strip_text_content, pull_since, pull_until))
     write_file(outdir, 'bb_prs', prs)
 
 

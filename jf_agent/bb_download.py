@@ -2,10 +2,11 @@ from datetime import datetime
 from tqdm import tqdm
 import stashy
 import re
+import pytz
 
 
 def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
-    return datetime.fromtimestamp(float(bb_server_timestamp_str) / 1000)
+    return datetime.fromtimestamp(float(bb_server_timestamp_str) / 1000).replace(tzinfo=pytz.utc)
 
 
 def _normalize_user(user):
@@ -55,14 +56,14 @@ def get_all_repos(client, projects, include_repos, exclude_repos):
         filters.append(lambda r: r['name'] not in exclude_repos)
 
     api_repos = (
-        api_project.repos[repo['name']]
+        (project, api_project.repos[repo['name']])
         for project in projects
         for api_project in [client.projects[project['login']]]
         for repo in api_project.repos.list()
         if all(filt(repo) for filt in filters)
     )
 
-    for api_repo in api_repos:
+    for project, api_repo in api_repos:
         try:
             default_branch_name = (
                 api_repo.default_branch['displayId'] if api_repo.default_branch else ''
@@ -74,6 +75,7 @@ def get_all_repos(client, projects, include_repos, exclude_repos):
             {'name': b['displayId'], 'sha': b['latestCommit']} for b in api_repo.branches()
         )
 
+        repo = api_repo.get()
         yield {
             'id': repo['id'],
             'name': repo['name'],
@@ -114,7 +116,7 @@ def _normalize_commit(commit, repo, strip_text_content):
     }
 
 
-def get_default_branch_commits(client, repos, strip_text_content):
+def get_default_branch_commits(client, repos, strip_text_content, pull_since, pull_until):
     for repo in repos:
         api_project = client.projects[repo['project']['login']]
 
@@ -126,11 +128,22 @@ def get_default_branch_commits(client, repos, strip_text_content):
                 desc=f'downloading {repo["project"]["login"]}/{repo["name"]} commits',
                 unit='commit',
             ):
-                yield _normalize_commit(commit, repo, strip_text_content)
+                normalized_commit = _normalize_commit(commit, repo, strip_text_content)
+                # commits are ordered newest to oldest; if this isn't
+                # old enough, skip it and keep going
+                if normalized_commit['commit_date'] >= pull_until:
+                    continue
+
+                # if this is too old, we're done
+                if pull_since and normalized_commit['commit_date'] < pull_since:
+                    return
+
+                yield normalized_commit
 
         except stashy.errors.NotFoundException as e:
-            print(f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}')
-            return []
+            print(
+                f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}. Skipping...'
+            )
 
 
 def _normalize_pr_repo(repo):
@@ -144,7 +157,7 @@ def _normalize_pr_repo(repo):
     return normal_repo
 
 
-def get_pull_requests(client, repos, strip_text_content):
+def get_pull_requests(client, repos, strip_text_content, pull_since, pull_until):
     print('downloading bitbucket PRs... ', end='', flush=True)
 
     for repo in repos:
@@ -156,6 +169,14 @@ def get_pull_requests(client, repos, strip_text_content):
             desc=f'downloading PRs for {repo["project"]["login"]}/{repo["name"]}',
             unit='pr',
         ):
+            updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
+            # PRs are ordered newest to oldest; if this isn't old enough, skip it and keep going
+            if updated_at >= pull_until:
+                continue
+
+            # if this is too old, we're done
+            if pull_since and updated_at < pull_since:
+                return
 
             api_pr = api_repo.pull_requests[pr['id']]
 
@@ -214,21 +235,21 @@ def get_pull_requests(client, repos, strip_text_content):
             )
 
             try:
-                commits = [_normalize_commit(c, repo, strip_text_content) for c in api_pr.commits()]
+                commits = (_normalize_commit(c, repo, strip_text_content) for c in api_pr.commits())
             except stashy.errors.NotFoundException:
                 print(
                     f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
                 )
                 commits = []
 
-            yield {
+            normalized_pr = {
                 'id': pr['id'],
                 'author': _normalize_user(pr['author']['user']),
                 'title': _sanitize_text(pr['title'], strip_text_content),
                 'is_closed': pr['state'] != 'OPEN',
                 'is_merged': pr['state'] == 'MERGED',
                 'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
-                'updated_at': datetime_from_bitbucket_server_timestamp(pr['updatedDate']),
+                'updated_at': updated_at,
                 'closed_date': closed_date,
                 'url': pr['links']['self'][0]['href'],
                 'base_repo': _normalize_pr_repo(pr['toRef']['repository']),
@@ -242,7 +263,9 @@ def get_pull_requests(client, repos, strip_text_content):
                 'approvals': approvals,
                 'merge_date': merge_date,
                 'merged_by': merged_by,
-                'commits': commits,
+                'commits': list(commits),
             }
+
+            yield normalized_pr
 
     print('✓')
