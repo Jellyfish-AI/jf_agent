@@ -5,11 +5,15 @@ import pytz
 
 
 class NameRedactor:
-    def __init__(self):
+    def __init__(self, preserve_names=None):
         self.redacted_names = {}
         self.seq = 0
+        self.preserve_names = preserve_names or []
 
     def redact_name(self, name):
+        if name in self.preserve_names:
+            return name
+
         redacted_name = self.redacted_names.get(name)
         if not redacted_name:
             redacted_name = f'redacted-{self.seq}'
@@ -18,7 +22,7 @@ class NameRedactor:
         return redacted_name
 
 
-_branch_redactor = NameRedactor()
+_branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
 
