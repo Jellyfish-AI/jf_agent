@@ -174,21 +174,34 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
     include_repos = set(bb_config.get('include_repos', []))
     exclude_repos = set(bb_config.get('exclude_projects', []))
     strip_text_content = bb_config.get('strip_text_content', False)
+    redact_names_and_urls = bb_config.get('redact_names_and_urls', False)
 
     write_file(outdir, 'bb_users', get_all_users(bb_conn))
 
-    projects = get_all_projects(bb_conn, include_projects, exclude_projects)
-    write_file(outdir, 'bb_projects', projects)
+    project_data = get_all_projects(
+        bb_conn, include_projects, exclude_projects, redact_names_and_urls
+    )
+    write_file(outdir, 'bb_projects', (pd[1] for pd in project_data))
+    api_projects = [pd[0] for pd in project_data]
 
-    repos = list(get_all_repos(bb_conn, projects, include_repos, exclude_repos))
-    write_file(outdir, 'bb_repos', repos)
+    repo_data = list(
+        get_all_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
+    )
+    write_file(outdir, 'bb_repos', [rd[1] for rd in repo_data])
+    api_repos = [rd[0] for rd in repo_data]
 
     commits = list(
-        get_default_branch_commits(bb_conn, repos, strip_text_content, pull_since, pull_until)
+        get_default_branch_commits(
+            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+        )
     )
     write_file(outdir, 'bb_commits', commits)
 
-    prs = list(get_pull_requests(bb_conn, repos, strip_text_content, pull_since, pull_until))
+    prs = list(
+        get_pull_requests(
+            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+        )
+    )
     write_file(outdir, 'bb_prs', prs)
 
 

@@ -94,7 +94,9 @@ bitbucket:
       
   # Strip out long-form text content (commit messages, PR text, etc)
   strip_text_content: False
-      
+  
+  # Redact names and URLs for projects, repos, branches
+  redact_names_and_urls: False
 ```
 
 5. Run `jf_agent` with the path to your config file, optionally specifying constraints on time to pull git data:
