@@ -16,7 +16,7 @@ class NameRedactor:
 
         redacted_name = self.redacted_names.get(name)
         if not redacted_name:
-            redacted_name = f'redacted-{self.seq}'
+            redacted_name = f'redacted-{self.seq:04}'
             self.seq += 1
             self.redacted_names[name] = redacted_name
         return redacted_name
