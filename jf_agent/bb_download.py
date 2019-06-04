@@ -2,6 +2,41 @@ from datetime import datetime
 import stashy
 import re
 import pytz
+import requests
+
+
+class StashySession(requests.Session):
+    """
+    Session wrapper class, intended to intercept requests made from the stashy module.
+    """
+    max_retries = 3
+
+    retry_exceptions = (
+        requests.exceptions.Timeout,
+        requests.exceptions.ProxyError,
+        requests.exceptions.ConnectionError
+    )
+
+    def request(self, method, url, **kwargs):
+
+        max_retries = StashySession.max_retries
+
+        for retries in range(1, max_retries):
+
+            try:
+                response = super().request(method, url, **kwargs)
+
+                if response.status_code == 401:
+                    print(f'WARN: received 401 for the request [{method}] {url} - '
+                          f'attempting to retry ({retries}/{max_retries})')
+                else:
+                    return response
+
+            except StashySession.retry_exceptions as e:
+                print(f'WARN: received {e.__class__.__module__}.{e.__class__.__name__} '
+                      f'for the request [{method}] {url} - attempting to retry ({retries}/{max_retries})')
+
+        raise requests.exceptions.RetryError(f'Reached the maximum number of retries for [{method}] {url}')
 
 
 class NameRedactor:
