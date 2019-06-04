@@ -5,12 +5,12 @@ import json
 import urllib3
 import yaml
 import dateparser
-from datetime import datetime
 import pytz
+from datetime import datetime
+from stashy.client import Stash
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
-import stashy
 
 from jf_agent.bb_download import (
     get_all_users,
@@ -18,6 +18,7 @@ from jf_agent.bb_download import (
     get_all_repos,
     get_default_branch_commits,
     get_pull_requests,
+    StashySession
 )
 from jf_agent.jira_download import (
     download_users,
@@ -206,9 +207,11 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
-    client = stashy.connect(
-        url=url, username=username, password=password, verify=not skip_ssl_verification
-    )
+
+    with StashySession() as session:
+        client = Stash(
+            base_url=url, username=username, password=password, verify=not skip_ssl_verification, session=session
+        )
 
     return client
 
