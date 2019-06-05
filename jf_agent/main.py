@@ -18,7 +18,7 @@ from jf_agent.bb_download import (
     get_all_repos,
     get_default_branch_commits,
     get_pull_requests,
-    StashySession
+    StashySession,
 )
 from jf_agent.jira_download import (
     download_users,
@@ -177,40 +177,38 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
     strip_text_content = bb_config.get('strip_text_content', False)
     redact_names_and_urls = bb_config.get('redact_names_and_urls', False)
 
-    write_file(outdir, 'bb_users', get_all_users(bb_conn))
+    users = get_all_users(bb_conn)
+    write_file(outdir, 'bb_users', users)
 
-    project_data = get_all_projects(
-        bb_conn, include_projects, exclude_projects, redact_names_and_urls
+    api_projects, projects = zip(
+        *get_all_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
     )
-    write_file(outdir, 'bb_projects', (pd[1] for pd in project_data))
-    api_projects = [pd[0] for pd in project_data]
+    write_file(outdir, 'bb_projects', projects)
 
-    repo_data = list(
-        get_all_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
+    api_repos, repos = zip(
+        *get_all_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
     )
-    write_file(outdir, 'bb_repos', [rd[1] for rd in repo_data])
-    api_repos = [rd[0] for rd in repo_data]
+    write_file(outdir, 'bb_repos', repos)
 
-    commits = list(
-        get_default_branch_commits(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
-        )
+    commits = get_default_branch_commits(
+        bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
     write_file(outdir, 'bb_commits', commits)
 
-    prs = list(
-        get_pull_requests(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
-        )
+    prs = get_pull_requests(
+        bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
     write_file(outdir, 'bb_prs', prs)
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
-
     with StashySession() as session:
         client = Stash(
-            base_url=url, username=username, password=password, verify=not skip_ssl_verification, session=session
+            base_url=url,
+            username=username,
+            password=password,
+            verify=not skip_ssl_verification,
+            session=session,
         )
 
     return client
@@ -218,7 +216,7 @@ def get_bitbucket_server_client(url, username, password, skip_ssl_verification=F
 
 def write_file(outdir, name, results):
     with open(f'{outdir}/{name}.json', 'w') as outfile:
-        json.dump(results, outfile, indent=2, default=str)
+        json.dump(list(results), outfile, indent=2, default=str)
 
 
 if __name__ == '__main__':
