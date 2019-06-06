@@ -3,18 +3,20 @@ import stashy
 import re
 import pytz
 import requests
+from tqdm import tqdm
 
 
 class StashySession(requests.Session):
     """
     Session wrapper class, intended to intercept requests made from the stashy module.
     """
+
     max_retries = 3
 
     retry_exceptions = (
         requests.exceptions.Timeout,
         requests.exceptions.ProxyError,
-        requests.exceptions.ConnectionError
+        requests.exceptions.ConnectionError,
     )
 
     def request(self, method, url, **kwargs):
@@ -27,16 +29,22 @@ class StashySession(requests.Session):
                 response = super().request(method, url, **kwargs)
 
                 if response.status_code == 401:
-                    print(f'WARN: received 401 for the request [{method}] {url} - '
-                          f'attempting to retry ({retries}/{max_retries})')
+                    print(
+                        f'WARN: received 401 for the request [{method}] {url} - '
+                        f'attempting to retry ({retries}/{max_retries})'
+                    )
                 else:
                     return response
 
             except StashySession.retry_exceptions as e:
-                print(f'WARN: received {e.__class__.__module__}.{e.__class__.__name__} '
-                      f'for the request [{method}] {url} - attempting to retry ({retries}/{max_retries})')
+                print(
+                    f'WARN: received {e.__class__.__module__}.{e.__class__.__name__} '
+                    f'for the request [{method}] {url} - attempting to retry ({retries}/{max_retries})'
+                )
 
-        raise requests.exceptions.RetryError(f'Reached the maximum number of retries for [{method}] {url}')
+        raise requests.exceptions.RetryError(
+            f'Reached the maximum number of retries for [{method}] {url}'
+        )
 
 
 class NameRedactor:
@@ -202,8 +210,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 def get_default_branch_commits(
     client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
 ):
-    print('downloading commits... ', end='', flush=True)
-    for api_repo in api_repos:
+    for api_repo in tqdm(api_repos, desc='downloading commits from all repos'):
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
 
@@ -211,7 +218,9 @@ def get_default_branch_commits(
             default_branch = api_repo.default_branch['displayId'] if api_repo.default_branch else ''
             commits = api_project.repos[repo['name']].commits(until=default_branch)
 
-            for commit in commits:
+            for commit in tqdm(
+                commits, desc=f'downloading commits for {repo["name"]}', leave=False
+            ):
                 normalized_commit = _normalize_commit(
                     commit, repo, strip_text_content, redact_names_and_urls
                 )
@@ -230,7 +239,6 @@ def get_default_branch_commits(
             print(
                 f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}. Skipping...'
             )
-    print('✓')
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
@@ -253,9 +261,7 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 def get_pull_requests(
     client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
 ):
-    print('downloading bitbucket PRs... ', end='', flush=True)
-
-    for api_repo in api_repos:
+    for api_repo in tqdm(api_repos, desc='downloading pull requests from all repos'):
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
         api_repo = api_project.repos[repo['name']]
@@ -327,10 +333,12 @@ def get_pull_requests(
             )
 
             try:
-                commits = (
+                commits = [
                     _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
-                    for c in api_pr.commits()
-                )
+                    for c in tqdm(
+                        api_pr.commits(), f'downloading commits for PR {pr["id"]}', leave=False
+                    )
+                ]
             except stashy.errors.NotFoundException:
                 print(
                     f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
@@ -366,9 +374,7 @@ def get_pull_requests(
                 'approvals': approvals,
                 'merge_date': merge_date,
                 'merged_by': merged_by,
-                'commits': list(commits),
+                'commits': commits,
             }
 
             yield normalized_pr
-
-    print('✓')
