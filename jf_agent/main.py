@@ -180,11 +180,13 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
     users = get_all_users(bb_conn)
     write_file(outdir, 'bb_users', users)
 
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_projects, projects = zip(
         *get_all_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
     )
     write_file(outdir, 'bb_projects', projects)
 
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_repos, repos = zip(
         *get_all_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
     )
