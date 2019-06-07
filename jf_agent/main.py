@@ -8,6 +8,7 @@ import dateparser
 import pytz
 from datetime import datetime
 from stashy.client import Stash
+import logging
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
@@ -18,7 +19,7 @@ from jf_agent.bb_download import (
     get_all_repos,
     get_default_branch_commits,
     get_pull_requests,
-    get_session
+    get_session,
 )
 from jf_agent.jira_download import (
     download_users,
@@ -35,6 +36,8 @@ from jf_agent.jira_download import (
 
 
 def main():
+    logging.basicConfig(level=logging.WARNING)
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-c', '--config-file', nargs='?', default='jellyfish.yaml', help='Path to config file'
@@ -204,11 +207,17 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
-    session = get_session(base_url=url, username=username, password=password, verify=not skip_ssl_verification)
-    client = Stash(
-        base_url=url, username=username, password=password, verify=not skip_ssl_verification, session=session
+    session = get_session(
+        base_url=url, username=username, password=password, verify=not skip_ssl_verification
     )
-    session.set_client_reference(client)
+    client = Stash(
+        base_url=url,
+        username=username,
+        password=password,
+        verify=not skip_ssl_verification,
+        session=session,
+    )
+    session.save_client_reference(client)
 
     return client
 

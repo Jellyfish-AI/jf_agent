@@ -9,47 +9,50 @@ from requests.packages.urllib3.util.retry import Retry
 
 
 class StashySession(requests.Session):
+    def __init__(self, base_url, username, password, verify):
+        super().__init__()
 
-    _client = None
-    username = None
-    password = None
-    verify = None
+        self._client = None
+        self.base_url = base_url
+        self.username = username
+        self.password = password
+        self.verify = verify
 
     def save_client_reference(self, client):
         self._client = client
 
     def reset_client_session(self):
-        """
-
-        """
-        stash_client = stashy.client.StashClient(
+        self._client._client = stashy.client.StashClient(
             self.base_url,
             username=self.username,
             password=self.password,
             verify=self.verify,
-            session=self
+            session=self,
         )
-        self._client._client = stash_client
 
     def request(self, method, url, **kwargs):
-
+        # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
-
         if response.status_code == 401:
             print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
-            if self._client:
-                self.reset_client_session()
-
+            self._client._client = stashy.client.StashClient(
+                self.base_url,
+                username=self.username,
+                password=self.password,
+                verify=self.verify,
+                session=self,
+            )
+            response = super().request(method, url, **kwargs)
         return response
 
 
-def get_session():
+def get_session(base_url, username, password, verify):
     """
     Obtains a requests session with retry settings.
     :return: session: Session
     """
 
-    session = StashySession()
+    session = StashySession(base_url, username, password, verify)
 
     retries = 3
     backoff_factor = 0.5
