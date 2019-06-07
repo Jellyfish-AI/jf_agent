@@ -16,7 +16,7 @@ class StashySession(requests.Session):
     def request(self, method, url, **kwargs):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
-        if response.status_code == 401 and method != 'HEAD':
+        if response.status_code == 401 and method.lower() != 'head':
             print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
             # Clear cookies and re-auth
             self.cookies.clear()
