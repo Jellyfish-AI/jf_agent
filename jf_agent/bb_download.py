@@ -21,15 +21,6 @@ class StashySession(requests.Session):
     def save_client_reference(self, client):
         self._client = client
 
-    def reset_client_session(self):
-        self._client._client = stashy.client.StashClient(
-            self.base_url,
-            username=self.username,
-            password=self.password,
-            verify=self.verify,
-            session=self,
-        )
-
     def request(self, method, url, **kwargs):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
