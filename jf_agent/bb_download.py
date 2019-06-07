@@ -9,29 +9,25 @@ from requests.packages.urllib3.util.retry import Retry
 
 
 class StashySession(requests.Session):
-    def __init__(self, base_url):
-        self.base_url = base_url
-        super().__init__()
-
     def request(self, method, url, **kwargs):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
-        if response.status_code == 401 and method.lower() != 'head':
+        if response.status_code == 401:
             print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
             # Clear cookies and re-auth
             self.cookies.clear()
-            self.cookies = self.head(self.base_url).cookies
             response = super().request(method, url, **kwargs)
+            self.cookies = response.cookies
         return response
 
 
-def get_session(base_url):
+def retry_session():
     """
     Obtains a requests session with retry settings.
     :return: session: Session
     """
 
-    session = StashySession(base_url)
+    session = StashySession()
 
     retries = 3
     backoff_factor = 0.5
