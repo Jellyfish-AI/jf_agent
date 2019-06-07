@@ -8,13 +8,48 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 
+class StashySession(requests.Session):
+
+    _client = None
+    username = None
+    password = None
+    verify = None
+
+    def save_client_reference(self, client):
+        self._client = client
+
+    def reset_client_session(self):
+        """
+
+        """
+        stash_client = stashy.client.StashClient(
+            self.base_url,
+            username=self.username,
+            password=self.password,
+            verify=self.verify,
+            session=self
+        )
+        self._client._client = stash_client
+
+    def request(self, method, url, **kwargs):
+
+        response = super().request(method, url, **kwargs)
+
+        if response.status_code == 401:
+            print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
+            if self._client:
+                self.reset_client_session()
+
+        return response
+
+
 def get_session():
     """
     Obtains a requests session with retry settings.
     :return: session: Session
     """
 
-    session = requests.session()
+    session = StashySession()
 
     retries = 3
     backoff_factor = 0.5
