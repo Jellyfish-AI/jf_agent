@@ -207,19 +207,14 @@ def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
 
 
 def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
-    session = get_session(
-        base_url=url, username=username, password=password, verify=not skip_ssl_verification
-    )
-    client = Stash(
+    session = get_session(base_url=url)
+    return Stash(
         base_url=url,
         username=username,
         password=password,
         verify=not skip_ssl_verification,
         session=session,
     )
-    session.save_client_reference(client)
-
-    return client
 
 
 def write_file(outdir, name, results):
