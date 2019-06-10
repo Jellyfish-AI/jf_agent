@@ -9,33 +9,29 @@ from requests.packages.urllib3.util.retry import Retry
 
 
 class StashySession(requests.Session):
-    def __init__(self, base_url):
-        self.base_url = base_url
-        super().__init__()
-
     def request(self, method, url, **kwargs):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
-        if response.status_code == 401 and method.lower() != 'head':
+        if response.status_code == 401:
             print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
             # Clear cookies and re-auth
             self.cookies.clear()
-            self.cookies = self.head(self.base_url).cookies
             response = super().request(method, url, **kwargs)
+            self.cookies = response.cookies
         return response
 
 
-def get_session(base_url):
+def retry_session():
     """
     Obtains a requests session with retry settings.
     :return: session: Session
     """
 
-    session = StashySession(base_url)
+    session = StashySession()
 
     retries = 3
     backoff_factor = 0.5
-    status_forcelist = (401, 500, 502, 504)
+    status_forcelist = (500, 502, 504)
 
     retry = Retry(
         total=retries,
@@ -329,7 +325,7 @@ def get_pull_requests(
                     )
                 elif activity['action'] == 'MERGED':
                     merge_date = datetime_from_bitbucket_server_timestamp(activity['createdDate'])
-                    merged_by = (_normalize_user(activity['user']),)
+                    merged_by = _normalize_user(activity['user'])
 
             closed_date = (
                 datetime_from_bitbucket_server_timestamp(pr['closedDate'])
@@ -354,6 +350,7 @@ def get_pull_requests(
                 'id': pr['id'],
                 'author': _normalize_user(pr['author']['user']),
                 'title': _sanitize_text(pr['title'], strip_text_content),
+                'body': _sanitize_text(pr.get('description'), strip_text_content),
                 'is_closed': pr['state'] != 'OPEN',
                 'is_merged': pr['state'] == 'MERGED',
                 'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
