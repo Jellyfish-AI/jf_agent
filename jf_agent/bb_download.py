@@ -325,7 +325,7 @@ def get_pull_requests(
                     )
                 elif activity['action'] == 'MERGED':
                     merge_date = datetime_from_bitbucket_server_timestamp(activity['createdDate'])
-                    merged_by = (_normalize_user(activity['user']),)
+                    merged_by = _normalize_user(activity['user'])
 
             closed_date = (
                 datetime_from_bitbucket_server_timestamp(pr['closedDate'])
@@ -350,6 +350,7 @@ def get_pull_requests(
                 'id': pr['id'],
                 'author': _normalize_user(pr['author']['user']),
                 'title': _sanitize_text(pr['title'], strip_text_content),
+                'body': _sanitize_text(pr.get('description'), strip_text_content),
                 'is_closed': pr['state'] != 'OPEN',
                 'is_merged': pr['state'] == 'MERGED',
                 'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
