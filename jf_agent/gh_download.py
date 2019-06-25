@@ -140,7 +140,6 @@ def get_default_branch_commits(
     for repo in api_repos:
         try:
             for commit in tqdm(
-<<<<<<< HEAD
                 repo.get_commits(
                     sha=repo.get_branch(repo.default_branch).commit.sha,
                     since=pull_since,
@@ -150,25 +149,6 @@ def get_default_branch_commits(
                 unit='commit',
             ):
                 yield _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls)
-=======
-                repo.get_commits(sha=repo.get_branch(repo.default_branch).commit.sha),
-                desc=f'downloading commits for {repo.name}',
-                unit='commit',
-            ):
-                normalized_commit = _normalize_commit(
-                    commit, repo, strip_text_content, redact_names_and_urls
-                )
-                # commits are ordered newest to oldest; if this isn't
-                # old enough, skip it and keep going
-                if normalized_commit['commit_date'] >= pull_until:
-                    continue
-
-                # if this is too old, we're done with this repo
-                if pull_since and normalized_commit['commit_date'] < pull_since:
-                    break
-
-                yield normalized_commit
->>>>>>> Add github support
 
         except GithubException as e:
             print(f':WARN: Got exception for branch {repo.default_branch}: {e}. Skipping...')
