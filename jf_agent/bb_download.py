@@ -2,69 +2,9 @@ from datetime import datetime
 import stashy
 import re
 import pytz
-import requests
 from tqdm import tqdm
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 
-
-class StashySession(requests.Session):
-    def request(self, method, url, **kwargs):
-        # If we get HTTP 401, re-authenticate and try again
-        response = super().request(method, url, **kwargs)
-        if response.status_code == 401:
-            print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
-            # Clear cookies and re-auth
-            self.cookies.clear()
-            response = super().request(method, url, **kwargs)
-            self.cookies = response.cookies
-        return response
-
-
-def retry_session():
-    """
-    Obtains a requests session with retry settings.
-    :return: session: Session
-    """
-
-    session = StashySession()
-
-    retries = 3
-    backoff_factor = 0.5
-    status_forcelist = (500, 502, 504)
-
-    retry = Retry(
-        total=retries,
-        read=retries,
-        connect=retries,
-        backoff_factor=backoff_factor,
-        status_forcelist=status_forcelist,
-    )
-
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
-
-    return session
-
-
-class NameRedactor:
-    def __init__(self, preserve_names=None):
-        self.redacted_names = {}
-        self.seq = 0
-        self.preserve_names = preserve_names or []
-
-    def redact_name(self, name):
-        if name in self.preserve_names:
-            return name
-
-        redacted_name = self.redacted_names.get(name)
-        if not redacted_name:
-            redacted_name = f'redacted-{self.seq:04}'
-            self.seq += 1
-            self.redacted_names[name] = redacted_name
-        return redacted_name
-
+from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -179,18 +119,6 @@ def get_all_repos(client, api_projects, include_repos, exclude_repos, redact_nam
     print('✓')
 
 
-JIRA_KEY_REGEX = re.compile(r'([a-z0-9]+)[-|_|/| ]?(\d+)', re.IGNORECASE)
-
-
-def _sanitize_text(text, strip_text_content):
-    if not text or not strip_text_content:
-        return text
-
-    return (' ').join(
-        {f'{m[0].upper().strip()}-{m[1].upper().strip()}' for m in JIRA_KEY_REGEX.findall(text)}
-    )
-
-
 def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
@@ -202,7 +130,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
             if not redact_names_and_urls
             else None
         ),
-        'message': _sanitize_text(commit.get('message'), strip_text_content),
+        'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
         'repo': _normalize_pr_repo(repo, redact_names_and_urls),
     }
@@ -211,7 +139,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 def get_default_branch_commits(
     client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
 ):
-    for api_repo in tqdm(api_repos, desc='downloading commits from all repos'):
+    for api_repo in api_repos:
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
 
@@ -220,7 +148,7 @@ def get_default_branch_commits(
             commits = api_project.repos[repo['name']].commits(until=default_branch)
 
             for commit in tqdm(
-                commits, desc=f'downloading commits for {repo["name"]}', leave=False
+                commits, desc=f'downloading commits for {repo["name"]}', unit='commit'
             ):
                 normalized_commit = _normalize_commit(
                     commit, repo, strip_text_content, redact_names_and_urls
@@ -262,12 +190,16 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 def get_pull_requests(
     client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
 ):
-    for api_repo in tqdm(api_repos, desc='downloading pull requests from all repos'):
+    for api_repo in api_repos:
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
         api_repo = api_project.repos[repo['name']]
 
-        for pr in api_repo.pull_requests.all(state='ALL', order='NEWEST'):
+        for pr in tqdm(
+            api_repo.pull_requests.all(state='ALL', order='NEWEST'),
+            desc=f'downloading PRs for {repo["name"]}',
+            unit='pr',
+        ):
             updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
             # PRs are ordered newest to oldest; if this isn't old enough, skip it and keep going
             if updated_at >= pull_until:
@@ -309,7 +241,7 @@ def get_pull_requests(
                     comments.append(
                         {
                             'user': _normalize_user(activity['comment']['author']),
-                            'body': _sanitize_text(activity['comment']['text'], strip_text_content),
+                            'body': sanitize_text(activity['comment']['text'], strip_text_content),
                             'created_at': datetime_from_bitbucket_server_timestamp(
                                 activity['comment']['createdDate']
                             ),
@@ -337,7 +269,10 @@ def get_pull_requests(
                 commits = [
                     _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
                     for c in tqdm(
-                        api_pr.commits(), f'downloading commits for PR {pr["id"]}', leave=False
+                        api_pr.commits(),
+                        f'downloading commits for PR {pr["id"]}',
+                        leave=False,
+                        unit='commit',
                     )
                 ]
             except stashy.errors.NotFoundException:
@@ -349,8 +284,8 @@ def get_pull_requests(
             normalized_pr = {
                 'id': pr['id'],
                 'author': _normalize_user(pr['author']['user']),
-                'title': _sanitize_text(pr['title'], strip_text_content),
-                'body': _sanitize_text(pr.get('description'), strip_text_content),
+                'title': sanitize_text(pr['title'], strip_text_content),
+                'body': sanitize_text(pr.get('description'), strip_text_content),
                 'is_closed': pr['state'] != 'OPEN',
                 'is_merged': pr['state'] == 'MERGED',
                 'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),

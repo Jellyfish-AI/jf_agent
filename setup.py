@@ -5,13 +5,21 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="jf_agent",
-    version="0.0.20",
+    version="0.0.21",
     description="An agent for collecting data for jellyfish",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Jellyfish-AI/jf_agent",
     packages=setuptools.find_packages(),
-    install_requires=["jira", "tqdm", "stashy", "pyyaml>=4.2b1", "urllib3==1.24.2", "dateparser"],
+    install_requires=[
+        "jira",
+        "tqdm",
+        "stashy",
+        "pyyaml>=4.2b1",
+        "urllib3==1.24.2",
+        "dateparser",
+        "pygithub",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
