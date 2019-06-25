@@ -72,15 +72,19 @@ jira:
   #   - description
   #   - comment
 
-bitbucket:
-  # URL to bitbucket
+
+git:
+  # supported providers are `bitbucket_server` and `github`
+  provider: bitbucket_server
+  
+  # URL to bitbucket or github.  For github cloud, this should be https://api.github.com; otherwise, use the URL to your local git server.
   url: https://bitbucket.yourcompany.com
   
-  # only pull from specific projects.  Comment this out to pull from all projects.
+  # only pull from specific projects / organizations.  Required for github; comment this out to pull from all projects for bitbucket server.
   include_projects:
       - PROJ1
       
-  # Uncomment this to pull from all but specific projects.
+  # Uncomment this to pull from all but specific projects (not supported for github).
   #  exclude_projects:
   #    - PROJ1
       

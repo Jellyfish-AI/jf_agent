@@ -8,19 +8,31 @@ import dateparser
 import pytz
 from datetime import datetime
 from stashy.client import Stash
+from github import Github
 import logging
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
 
 from jf_agent.bb_download import (
-    get_all_users,
-    get_all_projects,
-    get_all_repos,
-    get_default_branch_commits,
-    get_pull_requests,
-    retry_session,
+    get_all_users as get_bb_users,
+    get_all_projects as get_bb_projects,
+    get_all_repos as get_bb_repos,
+    get_default_branch_commits as get_bb_default_branch_commits,
+    get_pull_requests as get_bb_pull_requests,
 )
+
+from jf_agent.gh_download import (
+    get_all_users as get_gh_users,
+    get_all_projects as get_gh_projects,
+    get_all_repos as get_gh_repos,
+    get_default_branch_commits as get_gh_default_branch_commits,
+    get_pull_requests as get_gh_pull_requests,
+)
+
+from jf_agent.session import retry_session
+
+
 from jf_agent.jira_download import (
     download_users,
     download_fields,
@@ -47,14 +59,10 @@ def main():
         '--since',
         nargs='?',
         default=None,
-        help='Pull bitbucket activity on or after this timestamp',
+        help='Pull git activity on or after this timestamp',
     )
     parser.add_argument(
-        '-u',
-        '--until',
-        nargs='?',
-        default=None,
-        help='Pull bitbucket activity before this timestamp',
+        '-u', '--until', nargs='?', default=None, help='Pull git activity before this timestamp'
     )
 
     args = parser.parse_args()
@@ -67,10 +75,11 @@ def main():
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
 
     jira_config = config.get('jira', {})
-    bb_config = config.get('bitbucket', {})
+    git_config = config.get('git', config.get('bitbucket', {}))
 
     jira_url = jira_config.get('url', None)
-    bb_url = bb_config.get('url', None)
+
+    git_url = git_config.get('url', None)
 
     pull_since = dateparser.parse(args.since) if args.since else None
     if pull_since:
@@ -79,7 +88,7 @@ def main():
     pull_until = dateparser.parse(args.until) if args.until else datetime.utcnow()
     pull_until = pull_until.replace(tzinfo=pytz.utc)
 
-    if not jira_url and not bb_url:
+    if not jira_url and not git_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
         parser.print_help()
         sys.exit(1)
@@ -103,17 +112,55 @@ def main():
                 'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
             )
 
-    if bb_url:
-        bb_user = os.environ.get('BITBUCKET_USERNAME', None)
-        bb_pass = os.environ.get('BITBUCKET_PASSWORD', None)
-        if bb_user and bb_pass:
-            bb_conn = get_bitbucket_server_client(bb_url, bb_user, bb_pass, skip_ssl_verification)
-            if bb_conn:
-                load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until)
-        else:
+    if git_url:
+        provider = git_config.get('provider', 'bitbucket_server')
+        if provider not in ('bitbucket_server', 'github'):
             print(
-                'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.  Skipping Bitbucket...'
+                f'ERROR: unsupported git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
             )
+            return
+
+        git_conn = get_git_client(provider, git_url, skip_ssl_verification)
+        if git_conn:
+            try:
+                include_projects = set(git_config.get('include_projects', []))
+                exclude_projects = set(git_config.get('exclude_projects', []))
+                include_repos = set(git_config.get('include_repos', []))
+                exclude_repos = set(git_config.get('exclude_projects', []))
+                strip_text_content = git_config.get('strip_text_content', False)
+                redact_names_and_urls = git_config.get('redact_names_and_urls', False)
+
+                if provider == 'bitbucket_server':
+                    load_and_dump_bb(
+                        outdir,
+                        git_conn,
+                        pull_since,
+                        pull_until,
+                        include_projects,
+                        exclude_projects,
+                        include_repos,
+                        exclude_repos,
+                        strip_text_content,
+                        redact_names_and_urls,
+                    )
+                elif provider == 'github':
+                    load_and_dump_github(
+                        outdir,
+                        git_conn,
+                        pull_since,
+                        pull_until,
+                        include_projects,
+                        exclude_projects,
+                        include_repos,
+                        exclude_repos,
+                        strip_text_content,
+                        redact_names_and_urls,
+                    )
+                print()
+                print(f'Pulled until: {pull_until}')
+            except Exception as e:
+                print(f'ERROR: Failed to download {provider} data:\n{e}')
+                raise
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection):
@@ -182,58 +229,132 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         print(f'ERROR: Failed to connect to Jira:\n{e}')
 
 
-def load_and_dump_bb(outdir, bb_config, bb_conn, pull_since, pull_until):
-    try:
-        include_projects = set(bb_config.get('include_projects', []))
-        exclude_projects = set(bb_config.get('exclude_projects', []))
-        include_repos = set(bb_config.get('include_repos', []))
-        exclude_repos = set(bb_config.get('exclude_projects', []))
-        strip_text_content = bb_config.get('strip_text_content', False)
-        redact_names_and_urls = bb_config.get('redact_names_and_urls', False)
-
-        users = get_all_users(bb_conn)
-        write_file(outdir, 'bb_users', users)
-
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_projects, projects = zip(
-            *get_all_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
+def load_and_dump_github(
+    outdir,
+    git_conn,
+    pull_since,
+    pull_until,
+    include_projects,
+    exclude_projects,
+    include_repos,
+    exclude_repos,
+    strip_text_content,
+    redact_names_and_urls,
+):
+    # github must be in whitelist mode
+    if exclude_projects or not include_projects:
+        print(
+            'ERROR: Github cloud requires a list of projects (ie Github organizations) to pull from. Make sure you set for `include_projects` and not `exclude_projects`, and try again.'
         )
-        write_file(outdir, 'bb_projects', projects)
+        return
 
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_repos, repos = zip(
-            *get_all_repos(
-                bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls
+    users = get_gh_users(git_conn, include_projects)
+    write_file(outdir, 'bb_users', users)
+
+    projects = get_gh_projects(git_conn, include_projects, redact_names_and_urls)
+    write_file(outdir, 'bb_projects', projects)
+
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+    api_repos, repos = zip(
+        *get_gh_repos(
+            git_conn, include_projects, include_repos, exclude_repos, redact_names_and_urls
+        )
+    )
+    write_file(outdir, 'bb_repos', repos)
+
+    commits = get_gh_default_branch_commits(
+        git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    )
+    write_file(outdir, 'bb_commits', commits)
+
+    prs = get_gh_pull_requests(
+        git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    )
+    write_file(outdir, 'bb_prs', prs)
+
+
+def load_and_dump_bb(
+    outdir,
+    bb_conn,
+    pull_since,
+    pull_until,
+    include_projects,
+    exclude_projects,
+    include_repos,
+    exclude_repos,
+    strip_text_content,
+    redact_names_and_urls,
+):
+    users = get_bb_users(bb_conn)
+    write_file(outdir, 'bb_users', users)
+
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+    api_projects, projects = zip(
+        *get_bb_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
+    )
+    write_file(outdir, 'bb_projects', projects)
+
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+    api_repos, repos = zip(
+        *get_bb_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
+    )
+    write_file(outdir, 'bb_repos', repos)
+
+    commits = get_bb_default_branch_commits(
+        bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    )
+    write_file(outdir, 'bb_commits', commits)
+
+    prs = get_bb_pull_requests(
+        bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    )
+    write_file(outdir, 'bb_prs', prs)
+
+
+def get_git_client(provider, git_url, skip_ssl_verification):
+    if provider == 'bitbucket_server':
+        bb_username = os.environ.get('BITBUCKET_USERNAME', None)
+        bb_password = os.environ.get('BITBUCKET_PASSWORD', None)
+        if not bb_username or not bb_password:
+            print(
+                'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD. Skipping Bitbucket...'
             )
-        )
-        write_file(outdir, 'bb_repos', repos)
+            return
 
-        commits = get_default_branch_commits(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
-        )
-        write_file(outdir, 'bb_commits', commits)
+        try:
+            return Stash(
+                base_url=git_url,
+                username=bb_username,
+                password=bb_password,
+                verify=not skip_ssl_verification,
+                session=retry_session(),
+            )
+        except Exception as e:
+            print(f'ERROR: Failed to connect to Bitbucket:\n{e}')
+            return
 
-        prs = get_pull_requests(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
-        )
-        write_file(outdir, 'bb_prs', prs)
-        print()
-        print(f'Pulled until: {pull_until}')
-    except Exception as e:
-        print(f'ERROR: Failed to download bitbucket data:\n{e}')
+    elif provider == 'github':
+        gh_token = os.environ.get('GITHUB_TOKEN', None)
+        if not gh_token:
+            print(
+                'ERROR: Github credentials not found. Set environment variable GITHUB_TOKEN. Skipping Github...'
+            )
+            return
 
+        try:
+            return Github(
+                base_url=git_url,
+                login_or_token=gh_token,
+                verify=not skip_ssl_verification,
+                session=retry_session(),
+                per_page=100,
+            )
 
-def get_bitbucket_server_client(url, username, password, skip_ssl_verification=False):
-    try:
-        return Stash(
-            base_url=url,
-            username=username,
-            password=password,
-            verify=not skip_ssl_verification,
-            session=retry_session(),
-        )
-    except Exception as e:
-        print(f'ERROR: Failed to connect to Bitbucket:\n{e}')
+        except Exception as e:
+            print(f'ERROR: Failed to connect to Github:\n{e}')
+            return
+
+    raise ValueError(f'unsupported git provider {provider}')
 
 
 def write_file(outdir, name, results):
