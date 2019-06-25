@@ -343,14 +343,13 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             return
 
         try:
-            client = Github(
+            return Github(
                 base_url=git_url,
                 login_or_token=gh_token,
                 verify=not skip_ssl_verification,
+                session=retry_session(),
                 per_page=100,
             )
-            client._Github__requester._Requester__session = retry_session()
-            return client
 
         except Exception as e:
             print(f'ERROR: Failed to connect to Github:\n{e}')

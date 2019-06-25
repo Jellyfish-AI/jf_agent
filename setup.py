@@ -18,7 +18,7 @@ setuptools.setup(
         "pyyaml>=4.2b1",
         "urllib3==1.24.2",
         "dateparser",
-        "pygithub",
+        "pygithub @ git+ssh://git@github.com/Jellyfish-AI/PyGithub@ed5ec0ab#egg=pygithub-1.43.2",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
