@@ -75,8 +75,7 @@ def main():
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
 
     jira_config = config.get('jira', {})
-    bb_config = config.get('bitbucket', {})
-    git_config = config.get('git', bb_config)
+    git_config = config.get('git', config.get('bitbucket', {}))
 
     jira_url = jira_config.get('url', None)
 
