@@ -11,15 +11,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Jellyfish-AI/jf_agent",
     packages=setuptools.find_packages(),
-    install_requires=[
-        "jira",
-        "tqdm",
-        "stashy",
-        "pyyaml>=4.2b1",
-        "urllib3==1.24.2",
-        "dateparser",
-        "pygithub @ git+ssh://git@github.com/Jellyfish-AI/PyGithub@d2d44793#egg=pygithub-1.43.2",
-    ],
+    install_requires=["jira", "tqdm", "stashy", "pyyaml>=4.2b1", "urllib3==1.24.2", "dateparser"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

@@ -75,7 +75,12 @@ def main():
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
 
     jira_config = config.get('jira', {})
+<<<<<<< HEAD
     git_config = config.get('git', config.get('bitbucket', {}))
+=======
+    bb_config = config.get('bitbucket', {})
+    git_config = config.get('git', bb_config)
+>>>>>>> Add github support
 
     jira_url = jira_config.get('url', None)
 
@@ -342,6 +347,7 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             return
 
         try:
+<<<<<<< HEAD
             return Github(
                 base_url=git_url,
                 login_or_token=gh_token,
@@ -349,6 +355,16 @@ def get_git_client(provider, git_url, skip_ssl_verification):
                 session=retry_session(),
                 per_page=100,
             )
+=======
+            client = Github(
+                base_url=git_url,
+                login_or_token=gh_token,
+                verify=not skip_ssl_verification,
+                per_page=100,
+            )
+            client._Github__requester._Requester__session = retry_session()
+            return client
+>>>>>>> Add github support
 
         except Exception as e:
             print(f'ERROR: Failed to connect to Github:\n{e}')
