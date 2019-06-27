@@ -8,7 +8,7 @@ import dateparser
 import pytz
 from datetime import datetime
 from stashy.client import Stash
-from github import Github
+from jf_agent.github_client import GithubClient
 import logging
 
 from jira import JIRA
@@ -160,7 +160,6 @@ def main():
                 print(f'Pulled until: {pull_until}')
             except Exception as e:
                 print(f'ERROR: Failed to download {provider} data:\n{e}')
-                raise
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection):
@@ -342,12 +341,11 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             return
 
         try:
-            return Github(
+            return GithubClient(
                 base_url=git_url,
-                login_or_token=gh_token,
+                token=gh_token,
                 verify=not skip_ssl_verification,
                 session=retry_session(),
-                per_page=100,
             )
 
         except Exception as e:

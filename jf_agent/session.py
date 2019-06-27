@@ -4,6 +4,9 @@ from requests.packages.urllib3.util.retry import Retry
 
 
 class ReauthSession(requests.Session):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def request(self, method, url, **kwargs):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
@@ -16,13 +19,13 @@ class ReauthSession(requests.Session):
         return response
 
 
-def retry_session():
+def retry_session(**kwargs):
     """
     Obtains a requests session with retry settings.
     :return: session: Session
     """
 
-    session = ReauthSession()
+    session = ReauthSession(**kwargs)
 
     retries = 3
     backoff_factor = 0.5
