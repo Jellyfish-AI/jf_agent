@@ -57,11 +57,11 @@ class GithubClient:
 
     def get_pr_reviews(self, full_repo, pr_id):
         url = f'{self.base_url}/repos/{full_repo}/pulls/{pr_id}/reviews'
-        return self.get_all_pages(url)  # no rate limiting
+        return self.get_all_pages(url)
 
     def get_pr_commits(self, full_repo, pr_id):
         url = f'{self.base_url}/repos/{full_repo}/pulls/{pr_id}/commits'
-        return self.get_all_pages(url)  # no rate limiting
+        return self.get_all_pages(url)
 
     # Raw web service operations with optional rate limiting
     def get_json(self, url):
