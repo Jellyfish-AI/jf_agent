@@ -21,7 +21,9 @@ pip3 install jf_agent
 
 4. For Bitbucket: Gather your Bitbucket credentials. Set the `BITBUCKET_USERNAME` and `BITBUCKET_PASSWORD` environment variables to appropriate values.
 
-5. Create a YAML config file that tell jf_agent how to run. An example config file could be:
+5. For Github: Create a personal access token (https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).  Set the `GITHUB_TOKEN` environment variable to the contents of your token.
+
+6. Create a YAML config file that tell jf_agent how to run. An example config file could be:
 
 ```
 global:
