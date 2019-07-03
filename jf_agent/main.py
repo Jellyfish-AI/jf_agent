@@ -6,6 +6,7 @@ import urllib3
 import yaml
 import dateparser
 import pytz
+from types import GeneratorType
 from datetime import datetime
 from stashy.client import Stash
 from jf_agent.github_client import GithubClient
@@ -212,6 +213,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
         )
         issue_ids = set([i['id'] for i in issues])
         write_file(outdir, 'jira_issues', issues)
+
         write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection, issue_ids))
     except Exception as e:
         print(f'ERROR: Failed to download jira data:\n{e}')
@@ -360,8 +362,11 @@ def get_git_client(provider, git_url, skip_ssl_verification):
 
 
 def write_file(outdir, name, results):
+    if isinstance(results, GeneratorType):
+        results = list(results)
+
     with open(f'{outdir}/{name}.json', 'w') as outfile:
-        json.dump(list(results), outfile, indent=2, default=str)
+        json.dump(results, outfile, indent=2, default=str)
 
 
 if __name__ == '__main__':
