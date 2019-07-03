@@ -1,5 +1,4 @@
 from tqdm import tqdm
-from github import GithubException
 from dateutil import parser
 
 from jf_agent.name_redactor import NameRedactor, sanitize_text
@@ -164,7 +163,7 @@ def get_default_branch_commits(
             ):
                 yield _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls)
 
-        except GithubException as e:
+        except Exception as e:
             print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
 
 
@@ -250,6 +249,6 @@ def get_pull_requests(
 
                 yield _normalize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
-        except GithubException as e:
+        except Exception as e:
             print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
     print()
