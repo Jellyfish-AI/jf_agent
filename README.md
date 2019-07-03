@@ -64,6 +64,9 @@ jira:
   # exclude_project_categories:
   #   - Support
 
+  # Uncomment this to pull only issues matching a specific JQL filter
+  # issue_jql: 'text ~ pattern and issuetype != "Secret Type"'
+
   # Uncomment this to pull only specific fields on issues.
   # include_fields:
   #   - id

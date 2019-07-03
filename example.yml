@@ -8,24 +8,23 @@ global:
 
 jira:
   # URL to jira
-  url: https://jira.yourcompany.com/
+  url: https://jira.yourcompany.com
 
   # Uncomment this to print the list of available fields and exit
   # print_fields_only: True
-
-  # Only pull issues from specific projects (by project key).  Comment
-  # this out to pull issues from all projects.
-  include_projects:
-    - PROJ1
-    - PROJ2
 
   # GDPR mode: enable this if your Jira instance's API has User
   # endpoints modified in order to support GDPR.  This should be True
   # for Atlassian Cloud hosted JIRA as of March 30, 2019.
   gdpr_active: False
   
-  # Uncomment this to pull issues from all but specific projects (by
-  # project key).
+  # only pull issues from specific projects.  Comment this out
+  # to pull issues from all projects.
+  include_projects:
+    - PROJ1
+    - PROJ2
+
+  # Uncomment this to pull issues from all but specific projects.
   # exclude_projects:
   #   - PROJ1
 
@@ -37,16 +36,45 @@ jira:
   # exclude_project_categories:
   #   - Support
 
-  # Uncomment this to pull only specific fields (by field key).
+  # Uncomment this to pull only issues matching a specific JQL filter
+  # issue_jql: 'text ~ pattern and issuetype != "Secret Type"'
+
+  # Uncomment this to pull only specific fields on issues.
   # include_fields:
   #   - id
   #   - summary
 
-  # Uncomment this to pull all but specific fields (by field key).
+  # Uncomment this to pull all but specific fields on issues.
   # exclude_fields:
   #   - description
   #   - comment
 
-bitbucket:
-  # URL to bitbucket
-  url: https://bitbucket.yourcompany.com/
+
+git:
+  # supported providers are `bitbucket_server` and `github`
+  provider: bitbucket_server
+  
+  # URL to bitbucket or github.  For github cloud, this should be https://api.github.com; otherwise, use the URL to your local git server.
+  url: https://bitbucket.yourcompany.com
+  
+  # only pull from specific projects / organizations.  Required for github; comment this out to pull from all projects for bitbucket server.
+  include_projects:
+      - PROJ1
+      
+  # Uncomment this to pull from all but specific projects (not supported for github).
+  #  exclude_projects:
+  #    - PROJ1
+      
+  # only pull from specific repos.  Comment this out to pull from all repos.
+  include_repos:
+      - my_repository
+      
+  # Uncomment this to pull from all but specific repos.
+  # exclude_repos:
+  #    - repo_to_skip
+      
+  # Strip out long-form text content (commit messages, PR text, etc)
+  strip_text_content: False
+  
+  # Redact names and URLs for projects, repos, branches
+  redact_names_and_urls: False

@@ -181,8 +181,13 @@ def download_boards_and_sprints(jira_connection, project_ids):
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
 
-def download_issues(jira_connection, project_ids, include_fields, exclude_fields):
-    issue_jql = f'created is not empty and project in ({",".join(project_ids)}) order by id asc'
+def download_issues(
+    jira_connection, project_ids, include_fields, exclude_fields, issue_filter=None
+):
+    if not issue_filter:
+        issue_filter = 'created is not empty'
+
+    issue_jql = f'{issue_filter} and project in ({",".join(project_ids)}) order by id asc'
     issue_count = jira_connection.search_issues(issue_jql, fields='id', maxResults=1).total
     parallel_threads = 10
     issues_per_thread = -(-issue_count // parallel_threads)
