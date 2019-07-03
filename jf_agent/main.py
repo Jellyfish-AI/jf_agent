@@ -182,6 +182,8 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
         include_categories = set(jira_config.get('include_project_categories', []))
         exclude_categories = set(jira_config.get('exclude_project_categories', []))
 
+        issue_jql = jira_config.get('issue_jql', '')
+
         write_file(outdir, 'jira_fields', fields)
 
         projects_and_versions = download_projects_and_versions(
@@ -205,7 +207,9 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
         write_file(outdir, 'jira_sprints', sprints)
         write_file(outdir, 'jira_board_sprint_links', links)
 
-        issues = download_issues(jira_connection, project_ids, include_fields, exclude_fields)
+        issues = download_issues(
+            jira_connection, project_ids, include_fields, exclude_fields, issue_jql
+        )
         issue_ids = set([i['id'] for i in issues])
         write_file(outdir, 'jira_issues', issues)
         write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection, issue_ids))
