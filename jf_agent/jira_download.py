@@ -270,17 +270,7 @@ def download_worklogs(jira_connection, issue_ids):
 
     print('✓')
 
-    print(f'Finding old worklogs that have been deleted... ', end='', flush=True)
-    deleted = []
-    while True:
-        worklog_ids_json = jira_connection._get_json('worklog/deleted', params={'since': 0})
-        deleted.extend(worklog_ids_json['values'])
-        if worklog_ids_json['lastPage']:
-            break
-
-    print('✓')
-
-    return {'existing': updated, 'deleted': deleted}
+    return {'existing': updated, 'deleted': []}
 
 
 def _jira_user_key(user_dict, gdpr_active):
