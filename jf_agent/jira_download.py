@@ -281,22 +281,28 @@ def _search_all_users(jira_connection, gdpr_active):
     jira_users = {}
     start_at = 0
 
-    # iterate through pages of results
-    while True:
-        users = None
+    # different jira versions / different times, the way to list all users has changed. Try a few.
+    for q in [None, '', '%', '@']:
 
-        # different jira versions / different times, the way to list all users has changed. Try a few.
-        for q in [None, '', '%', '@']:
+        # iterate through pages of results
+        while True:
+            users = _search_users(
+                jira_connection, gdpr_active, query=q, start_at=start_at, include_inactive=True
+            )
             if not users:
-                users = _search_users(
-                    jira_connection, gdpr_active, query=q, start_at=start_at, include_inactive=True
-                )
-        if not users:
-            # we're done, return whatever we have
+                # we're done, no more pages
+                break
+
+            # add this page of results and get the next page
+            jira_users.update({_jira_user_key(u): u for u in users})
+            start_at += len(users)
+
+        # found users; no need to try other query techniques
+        if jira_users:
             return list(jira_users.values())
 
-        jira_users.update({_jira_user_key(u): u for u in users})
-        start_at += len(users)
+    # no users found
+    return []
 
 
 def _users_by_letter(jira_connection, gdpr_active):
