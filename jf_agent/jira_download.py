@@ -273,31 +273,36 @@ def download_worklogs(jira_connection, issue_ids):
     return {'existing': updated, 'deleted': []}
 
 
-def _jira_user_key(user_dict, gdpr_active):
-    if gdpr_active:
-        return user_dict['accountId']
-    else:
-        return user_dict['key']
+def _jira_user_key(user_dict):
+    return user_dict.get('key', user_dict['accountId'])
 
 
 def _search_all_users(jira_connection, gdpr_active):
     jira_users = {}
     start_at = 0
-    while True:
-        # Search for '%' or '@' so we get results from cloud or
-        # on-prem, the latter being what on-prem appears to use as
-        # a wildcard
-        users = _search_users(
-            jira_connection, gdpr_active, query='%', start_at=start_at, include_inactive=True
-        ) or _search_users(
-            jira_connection, gdpr_active, query='@', start_at=start_at, include_inactive=True
-        )
-        if not users:
+
+    # different jira versions / different times, the way to list all users has changed. Try a few.
+    for q in [None, '', '%', '@']:
+
+        # iterate through pages of results
+        while True:
+            users = _search_users(
+                jira_connection, gdpr_active, query=q, start_at=start_at, include_inactive=True
+            )
+            if not users:
+                # we're done, no more pages
+                break
+
+            # add this page of results and get the next page
+            jira_users.update({_jira_user_key(u): u for u in users})
+            start_at += len(users)
+
+        # found users; no need to try other query techniques
+        if jira_users:
             return list(jira_users.values())
 
-        jira_users.update({_jira_user_key(u, gdpr_active): u for u in users})
-
-        start_at += len(users)
+    # no users found
+    return []
 
 
 def _users_by_letter(jira_connection, gdpr_active):
@@ -305,7 +310,7 @@ def _users_by_letter(jira_connection, gdpr_active):
     for letter in string.ascii_lowercase:
         jira_users.update(
             {
-                _jira_user_key(u, gdpr_active): u
+                _jira_user_key(u): u
                 for u in _search_users(
                     jira_connection,
                     gdpr_active,
@@ -317,7 +322,7 @@ def _users_by_letter(jira_connection, gdpr_active):
         )
         jira_users.update(
             {
-                _jira_user_key(u, gdpr_active): u
+                _jira_user_key(u): u
                 for u in _search_users(
                     jira_connection,
                     gdpr_active,
@@ -339,6 +344,15 @@ def _search_users(
     include_active=True,
     include_inactive=False,
 ):
+    if query is None:
+        # use new endpoint that doesn't take a query.  This may not exist in some instances.
+        try:
+            return jira_connection._get_json(
+                'users/search', {'startAt': start_at, 'maxResults': max_results}
+            )
+        except JIRAError:
+            return []
+
     if gdpr_active:
         # jira_connection.search_users creates a query that is no longer accepted on
         # GDPR-compliant Jira instances.  Construct the right query by hand
