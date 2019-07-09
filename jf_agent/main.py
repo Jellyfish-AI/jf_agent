@@ -217,6 +217,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
         write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection, issue_ids))
     except Exception as e:
         print(f'ERROR: Failed to download jira data:\n{e}')
+        raise
 
 
 def get_basic_jira_connection(url, username, password, skip_ssl_verification):
