@@ -44,7 +44,11 @@ class GithubClient:
         return self.get_all_pages(url)
 
     def get_commits(self, full_repo, sha, since, until):
-        url = f'{self.base_url}/repos/{full_repo}/commits?sha={sha}&since={since.isoformat()}&until={until.isoformat()}'
+        url = f'{self.base_url}/repos/{full_repo}/commits?sha={sha}'
+        if since:
+            url += f'&since={since.isoformat()}'
+        if until:
+            url += f'&until={until.isoformat()}'
         return self.get_all_pages(url)
 
     def get_pullrequests(self, full_repo):
