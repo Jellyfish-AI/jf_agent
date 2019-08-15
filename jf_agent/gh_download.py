@@ -32,7 +32,7 @@ def get_all_users(client, include_orgs):
     print('✓')
 
     if not users:
-        raise ValueError('No users found.  Make sure your token has appropriate access to Github.')
+        raise ValueError('No users found.  Make sure your token has appropriate access to GitHub.')
 
     return users
 
@@ -60,7 +60,7 @@ def get_all_projects(client, include_orgs, redact_names_and_urls):
 
     if not projects:
         raise ValueError(
-            'No projects found.  Make sure your token has appropriate access to Github.'
+            'No projects found.  Make sure your token has appropriate access to GitHub.'
         )
     return projects
 
@@ -116,7 +116,7 @@ def get_all_repos(client, include_orgs, include_repos, exclude_repos, redact_nam
     print('✓')
     if not repos:
         raise ValueError(
-            'No repos found. Make sure your token has appropriate access to Github and check your configuration of repos to pull.'
+            'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
         )
     return repos
 
@@ -159,7 +159,7 @@ def get_default_branch_commits(
                     repo['full_name'], repo['default_branch'], since=pull_since, until=pull_until
                 ),
                 desc=f'downloading commits for {repo["name"]}',
-                unit='commit',
+                unit='commits',
             ):
                 yield _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls)
 
@@ -220,7 +220,7 @@ def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
                 f'downloading commits for PR {pr["number"]}',
                 leave=False,
-                unit='commit',
+                unit='commits',
             )
         ],
     }
@@ -235,7 +235,7 @@ def get_pull_requests(
             for pr in tqdm(
                 client.get_pullrequests(repo['full_name']),
                 desc=f'downloading PRs for {repo["name"]}',
-                unit='pr',
+                unit='prs',
             ):
                 updated_at = parser.parse(pr['updated_at'])
 

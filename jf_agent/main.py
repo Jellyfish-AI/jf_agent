@@ -249,7 +249,7 @@ def load_and_dump_github(
     # github must be in whitelist mode
     if exclude_projects or not include_projects:
         print(
-            'ERROR: Github cloud requires a list of projects (ie Github organizations) to pull from. Make sure you set for `include_projects` and not `exclude_projects`, and try again.'
+            'ERROR: GitHub Cloud requires a list of projects (i.e., GitHub organizations) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
         )
         return
 
@@ -342,7 +342,7 @@ def get_git_client(provider, git_url, skip_ssl_verification):
         gh_token = os.environ.get('GITHUB_TOKEN', None)
         if not gh_token:
             print(
-                'ERROR: Github credentials not found. Set environment variable GITHUB_TOKEN. Skipping Github...'
+                'ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN. Skipping GitHub...'
             )
             return
 
@@ -355,7 +355,7 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             )
 
         except Exception as e:
-            print(f'ERROR: Failed to connect to Github:\n{e}')
+            print(f'ERROR: Failed to connect to GitHub:\n{e}')
             return
 
     raise ValueError(f'unsupported git provider {provider}')

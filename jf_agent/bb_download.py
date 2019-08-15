@@ -1,6 +1,5 @@
 from datetime import datetime
 import stashy
-import re
 import pytz
 from tqdm import tqdm
 
@@ -148,7 +147,7 @@ def get_default_branch_commits(
             commits = api_project.repos[repo['name']].commits(until=default_branch)
 
             for commit in tqdm(
-                commits, desc=f'downloading commits for {repo["name"]}', unit='commit'
+                commits, desc=f'downloading commits for {repo["name"]}', unit='commits'
             ):
                 normalized_commit = _normalize_commit(
                     commit, repo, strip_text_content, redact_names_and_urls
@@ -198,7 +197,7 @@ def get_pull_requests(
         for pr in tqdm(
             api_repo.pull_requests.all(state='ALL', order='NEWEST'),
             desc=f'downloading PRs for {repo["name"]}',
-            unit='pr',
+            unit='prs',
         ):
             updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
             # PRs are ordered newest to oldest; if this isn't old enough, skip it and keep going
@@ -272,7 +271,7 @@ def get_pull_requests(
                         api_pr.commits(),
                         f'downloading commits for PR {pr["id"]}',
                         leave=False,
-                        unit='commit',
+                        unit='commits',
                     )
                 ]
             except stashy.errors.NotFoundException:
