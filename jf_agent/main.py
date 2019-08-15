@@ -1,19 +1,18 @@
 import argparse
-import os
-import sys
-import json
-import urllib3
-import yaml
-import dateparser
-import pytz
-from types import GeneratorType
 from datetime import datetime
-from stashy.client import Stash
-from jf_agent.github_client import GithubClient
+import json
 import logging
+import os
+import pytz
+import sys
+from types import GeneratorType
+import urllib3
 
+import dateparser
 from jira import JIRA
 from jira.resources import GreenHopperResource
+from stashy.client import Stash
+import yaml
 
 from jf_agent.bb_download import (
     get_all_users as get_bb_users,
@@ -22,7 +21,6 @@ from jf_agent.bb_download import (
     get_default_branch_commits as get_bb_default_branch_commits,
     get_pull_requests as get_bb_pull_requests,
 )
-
 from jf_agent.gh_download import (
     get_all_users as get_gh_users,
     get_all_projects as get_gh_projects,
@@ -30,10 +28,7 @@ from jf_agent.gh_download import (
     get_default_branch_commits as get_gh_default_branch_commits,
     get_pull_requests as get_gh_pull_requests,
 )
-
-from jf_agent.session import retry_session
-
-
+from jf_agent.github_client import GithubClient
 from jf_agent.jira_download import (
     download_users,
     download_fields,
@@ -46,6 +41,7 @@ from jf_agent.jira_download import (
     download_issues,
     download_worklogs,
 )
+from jf_agent.session import retry_session
 
 
 def main():
