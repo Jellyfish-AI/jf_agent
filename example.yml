@@ -1,10 +1,10 @@
 global:
-  # Location to put output files
-  out_dir: /tmp/agent
-
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
+  # Set this to False if you do not want to compress the output JSON files.  This might
+  # be convenient if you want to manually inspect them.
+  compress_output_files: True
 
 jira:
   # URL to Jira

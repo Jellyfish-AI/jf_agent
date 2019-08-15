@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+import gzip
 import json
 import logging
 import os
@@ -68,8 +69,8 @@ def main():
         config = yaml.safe_load(ymlfile)
 
     conf_global = config.get('global', {})
-    outdir = conf_global.get('out_dir', '.')
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
+    compress_output_files = conf_global.get('compress_output_files', True)
 
     jira_config = config.get('jira', {})
     git_config = config.get('git', config.get('bitbucket', {}))
@@ -82,7 +83,8 @@ def main():
     if pull_since:
         pull_since = pull_since.replace(tzinfo=pytz.utc)
 
-    pull_until = dateparser.parse(args.until) if args.until else datetime.utcnow()
+    now = datetime.utcnow()
+    pull_until = dateparser.parse(args.until) if args.until else now
     pull_until = pull_until.replace(tzinfo=pytz.utc)
 
     if not jira_url and not git_url:
@@ -95,6 +97,48 @@ def main():
         # To silence "Unverified HTTPS request is being made."
         urllib3.disable_warnings()
 
+    output_basedir = os.environ.get('OUTPUT_BASEDIR', None)
+    if not output_basedir:
+        print('ERROR: OUTPUT_BASEDIR not found in the environment.')
+        return
+    outdir = os.path.join(output_basedir, now.strftime('%Y%m%d_%H%M%S'))
+    try:
+        os.makedirs(outdir, exist_ok=False)
+    except FileExistsError:
+        print(f"ERROR: Output dir {outdir} already exists")
+        return
+    except Exception:
+        print(
+            f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
+        )
+        return
+    print(f'Will write output files into {outdir}')
+
+    download_data(
+        outdir,
+        jira_url,
+        jira_config,
+        skip_ssl_verification,
+        git_url,
+        git_config,
+        pull_since,
+        pull_until,
+        compress_output_files,
+    )
+
+
+
+def download_data(
+    outdir,
+    jira_url,
+    jira_config,
+    skip_ssl_verification,
+    git_url,
+    git_config,
+    pull_since,
+    pull_until,
+    compress_output_files,
+):
     if jira_url:
         jira_username = os.environ.get('JIRA_USERNAME', None)
         jira_password = os.environ.get('JIRA_PASSWORD', None)
@@ -103,7 +147,7 @@ def main():
                 jira_url, jira_username, jira_password, skip_ssl_verification
             )
             if jira_connection:
-                load_and_dump_jira(outdir, jira_config, jira_connection)
+                load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files)
         else:
             print(
                 'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
@@ -139,6 +183,7 @@ def main():
                         exclude_repos,
                         strip_text_content,
                         redact_names_and_urls,
+                        compress_output_files,
                     )
                 elif provider == 'github':
                     load_and_dump_github(
@@ -152,6 +197,7 @@ def main():
                         exclude_repos,
                         strip_text_content,
                         redact_names_and_urls,
+                        compress_output_files,
                     )
                 print()
                 print(f'Pulled until: {pull_until}')
@@ -159,7 +205,7 @@ def main():
                 print(f'ERROR: Failed to download {provider} data:\n{e}')
 
 
-def load_and_dump_jira(outdir, jira_config, jira_connection):
+def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files):
     try:
         include_fields = set(jira_config.get('include_fields', []))
         exclude_fields = set(jira_config.get('exclude_fields', []))
@@ -181,7 +227,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
 
         issue_jql = jira_config.get('issue_jql', '')
 
-        write_file(outdir, 'jira_fields', fields)
+        write_file(outdir, 'jira_fields', fields, compress_output_files)
 
         projects_and_versions = download_projects_and_versions(
             jira_connection,
@@ -191,26 +237,52 @@ def load_and_dump_jira(outdir, jira_config, jira_connection):
             exclude_categories,
         )
         project_ids = set([proj['id'] for proj in projects_and_versions])
-        write_file(outdir, 'jira_projects_and_versions', projects_and_versions)
+        write_file(
+            outdir, 'jira_projects_and_versions', projects_and_versions, compress_output_files
+        )
 
-        write_file(outdir, 'jira_users', download_users(jira_connection, gdpr_active))
-        write_file(outdir, 'jira_resolutions', download_resolutions(jira_connection))
-        write_file(outdir, 'jira_issuetypes', download_issuetypes(jira_connection, project_ids))
-        write_file(outdir, 'jira_linktypes', download_issuelinktypes(jira_connection))
-        write_file(outdir, 'jira_priorities', download_priorities(jira_connection))
+        write_file(
+            outdir,
+            'jira_users',
+            download_users(jira_connection, gdpr_active),
+            compress_output_files,
+        )
+        write_file(
+            outdir, 'jira_resolutions', download_resolutions(jira_connection), compress_output_files
+        )
+        write_file(
+            outdir,
+            'jira_issuetypes',
+            download_issuetypes(jira_connection, project_ids),
+            compress_output_files,
+        )
+        write_file(
+            outdir,
+            'jira_linktypes',
+            download_issuelinktypes(jira_connection),
+            compress_output_files,
+        )
+        write_file(
+            outdir, 'jira_priorities', download_priorities(jira_connection), compress_output_files
+        )
 
         boards, sprints, links = download_boards_and_sprints(jira_connection, project_ids)
-        write_file(outdir, 'jira_boards', boards)
-        write_file(outdir, 'jira_sprints', sprints)
-        write_file(outdir, 'jira_board_sprint_links', links)
+        write_file(outdir, 'jira_boards', boards, compress_output_files)
+        write_file(outdir, 'jira_sprints', sprints, compress_output_files)
+        write_file(outdir, 'jira_board_sprint_links', links, compress_output_files)
 
         issues = download_issues(
             jira_connection, project_ids, include_fields, exclude_fields, issue_jql
         )
         issue_ids = set([i['id'] for i in issues])
-        write_file(outdir, 'jira_issues', issues)
+        write_file(outdir, 'jira_issues', issues, compress_output_files)
 
-        write_file(outdir, 'jira_worklogs', download_worklogs(jira_connection, issue_ids))
+        write_file(
+            outdir,
+            'jira_worklogs',
+            download_worklogs(jira_connection, issue_ids),
+            compress_output_files,
+        )
     except Exception as e:
         print(f'ERROR: Failed to download jira data:\n{e}')
 
@@ -241,6 +313,7 @@ def load_and_dump_github(
     exclude_repos,
     strip_text_content,
     redact_names_and_urls,
+    compress_output_files,
 ):
     # github must be in whitelist mode
     if exclude_projects or not include_projects:
@@ -250,10 +323,10 @@ def load_and_dump_github(
         return
 
     users = get_gh_users(git_conn, include_projects)
-    write_file(outdir, 'bb_users', users)
+    write_file(outdir, 'bb_users', users, compress_output_files)
 
     projects = get_gh_projects(git_conn, include_projects, redact_names_and_urls)
-    write_file(outdir, 'bb_projects', projects)
+    write_file(outdir, 'bb_projects', projects, compress_output_files)
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_repos, repos = zip(
@@ -261,17 +334,17 @@ def load_and_dump_github(
             git_conn, include_projects, include_repos, exclude_repos, redact_names_and_urls
         )
     )
-    write_file(outdir, 'bb_repos', repos)
+    write_file(outdir, 'bb_repos', repos, compress_output_files)
 
     commits = get_gh_default_branch_commits(
         git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
-    write_file(outdir, 'bb_commits', commits)
+    write_file(outdir, 'bb_commits', commits, compress_output_files)
 
     prs = get_gh_pull_requests(
         git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
-    write_file(outdir, 'bb_prs', prs)
+    write_file(outdir, 'bb_prs', prs, compress_output_files)
 
 
 def load_and_dump_bb(
@@ -285,31 +358,32 @@ def load_and_dump_bb(
     exclude_repos,
     strip_text_content,
     redact_names_and_urls,
+    compress_output_files,
 ):
     users = get_bb_users(bb_conn)
-    write_file(outdir, 'bb_users', users)
+    write_file(outdir, 'bb_users', users, compress_output_files)
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_projects, projects = zip(
         *get_bb_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
     )
-    write_file(outdir, 'bb_projects', projects)
+    write_file(outdir, 'bb_projects', projects, compress_output_files)
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_repos, repos = zip(
         *get_bb_repos(bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls)
     )
-    write_file(outdir, 'bb_repos', repos)
+    write_file(outdir, 'bb_repos', repos, compress_output_files)
 
     commits = get_bb_default_branch_commits(
         bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
-    write_file(outdir, 'bb_commits', commits)
+    write_file(outdir, 'bb_commits', commits, compress_output_files)
 
     prs = get_bb_pull_requests(
         bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
     )
-    write_file(outdir, 'bb_prs', prs)
+    write_file(outdir, 'bb_prs', prs, compress_output_files)
 
 
 def get_git_client(provider, git_url, skip_ssl_verification):
@@ -357,12 +431,16 @@ def get_git_client(provider, git_url, skip_ssl_verification):
     raise ValueError(f'unsupported git provider {provider}')
 
 
-def write_file(outdir, name, results):
+def write_file(outdir, name, results, compress):
     if isinstance(results, GeneratorType):
         results = list(results)
 
-    with open(f'{outdir}/{name}.json', 'w') as outfile:
-        json.dump(results, outfile, indent=2, default=str)
+    if compress:
+        with gzip.open(f'{outdir}/{name}.json.gz', 'wb') as outfile:
+            outfile.write(json.dumps(results, indent=2, default=str).encode('utf-8'))
+    else:
+        with open(f'{outdir}/{name}.json', 'w') as outfile:
+            outfile.write(json.dumps(results, indent=2, default=str))
 
 
 if __name__ == '__main__':
