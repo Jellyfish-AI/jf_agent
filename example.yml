@@ -7,7 +7,7 @@ global:
   no_verify_ssl: False
 
 jira:
-  # URL to jira
+  # URL to Jira
   url: https://jira.yourcompany.com
 
   # Uncomment this to print the list of available fields and exit
@@ -15,10 +15,10 @@ jira:
 
   # GDPR mode: enable this if your Jira instance's API has User
   # endpoints modified in order to support GDPR.  This should be True
-  # for Atlassian Cloud hosted JIRA as of March 30, 2019.
+  # for Atlassian Cloud hosted Jira as of March 30, 2019.
   gdpr_active: False
-  
-  # only pull issues from specific projects.  Comment this out
+
+  # Only pull issues from specific projects.  Comment this out
   # to pull issues from all projects.
   include_projects:
     - PROJ1
@@ -53,28 +53,28 @@ jira:
 git:
   # supported providers are `bitbucket_server` and `github`
   provider: bitbucket_server
-  
-  # URL to bitbucket or github.  For github cloud, this should be https://api.github.com; otherwise, use the URL to your local git server.
+
+  # URL to Bitbucket or GitHub.  For GitHub Cloud, this should be https://api.github.com; otherwise, use the URL to your local git server.
   url: https://bitbucket.yourcompany.com
-  
-  # only pull from specific projects / organizations.  Required for github; comment this out to pull from all projects for bitbucket server.
+
+  # Only pull from specific projects / organizations.  Required for GitHub; comment this out to pull from all projects for Bitbucket Server.
   include_projects:
       - PROJ1
-      
-  # Uncomment this to pull from all but specific projects (not supported for github).
+
+  # Uncomment this to pull from all but specific projects (not supported for GitHub).
   #  exclude_projects:
   #    - PROJ1
-      
-  # only pull from specific repos.  Comment this out to pull from all repos.
+
+  # Only pull from specific repos.  Comment this out to pull from all repos.
   include_repos:
       - my_repository
-      
+
   # Uncomment this to pull from all but specific repos.
   # exclude_repos:
   #    - repo_to_skip
-      
+
   # Strip out long-form text content (commit messages, PR text, etc)
   strip_text_content: False
-  
+
   # Redact names and URLs for projects, repos, branches
   redact_names_and_urls: False
