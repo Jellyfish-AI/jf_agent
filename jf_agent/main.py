@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import pytz
+import requests
+import subprocess
 import sys
 from types import GeneratorType
 import urllib3
@@ -114,6 +116,25 @@ def main():
         return
     print(f'Will write output files into {outdir}')
 
+    api_token = os.environ.get('JELLYFISH_API_TOKEN')
+    if not api_token:
+        print(f'ERROR: JELLYFISH_API_TOKEN not found in the environment.')
+        return
+
+    resp = requests.get(f'https://jellyfish.co/agent/config?api_token={api_token}')
+    if not resp.ok:
+        print(f"ERROR: Couldn't get agent config info from https://jellyfish.co/agent/config "
+              f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})')
+        return
+    agent_config = resp.json()
+
+    s3_uri_prefix = agent_config.get('s3_uri_prefix')
+    aws_access_key_id = agent_config.get('aws_access_key_id')
+    aws_secret_access_key = agent_config.get('aws_secret_access_key')
+    if not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key:
+        print(f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish")
+        return
+
     download_data(
         outdir,
         jira_url,
@@ -126,6 +147,9 @@ def main():
         compress_output_files,
     )
 
+    send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
+
+    print('Done!')
 
 
 def download_data(
@@ -441,6 +465,32 @@ def write_file(outdir, name, results, compress):
     else:
         with open(f'{outdir}/{name}.json', 'w') as outfile:
             outfile.write(json.dumps(results, indent=2, default=str))
+
+
+def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
+    def _s3_cmd(cmd):
+        try:
+            subprocess.check_call(
+                f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
+                f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
+                f'{cmd}', shell=True)
+        except Exception:
+            print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
+            raise
+
+    print('Sending data to Jellyfish... ')
+
+    done_file_path = f'{outdir}/.done'
+    try:
+        # A .done file shouldn't yet exist, but we'll make sure
+        os.remove(done_file_path)
+    except FileNotFoundError:
+        pass
+
+    _s3_cmd(f'aws s3 rm {s3_uri_prefix} --recursive')
+    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix}')
+    os.system(f'touch {done_file_path}')
+    _s3_cmd(f'aws s3 sync {done_file_path} {s3_uri_prefix}')
 
 
 if __name__ == '__main__':
