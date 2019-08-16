@@ -5,7 +5,11 @@ RUN pip install pipenv && \
 
 FROM python:3.7-alpine
 COPY --from=py-deps /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
-RUN addgroup -S jf_agent && adduser -S -G jf_agent jf_agent
+RUN apk add groff && \
+    pip install awscli && \
+    addgroup -S jf_agent && \
+    adduser -S -G jf_agent jf_agent && \
+    rm -rf /var/cache/apk
 COPY --chown=jf_agent:jf_agent . /home/jf_agent
 RUN rm /home/jf_agent/Pipfile /home/jf_agent/Pipfile.lock
 WORKDIR /home/jf_agent
