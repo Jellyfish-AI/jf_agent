@@ -7,7 +7,6 @@ import os
 import pytz
 import requests
 import subprocess
-import sys
 from types import GeneratorType
 import urllib3
 
@@ -75,7 +74,7 @@ def main():
             config = yaml.safe_load(ymlfile)
     except FileNotFoundError:
         print(f'ERROR: Config file not found at "{args.config_file}"')
-        sys.exit(1)
+        return
 
     conf_global = config.get('global', {})
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
@@ -99,7 +98,7 @@ def main():
     if not jira_url and not git_url:
         print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
         parser.print_help()
-        sys.exit(1)
+        return
 
     if skip_ssl_verification:
         print('WARNING: Disabling SSL certificate validation')
