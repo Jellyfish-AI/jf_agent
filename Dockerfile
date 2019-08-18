@@ -13,7 +13,6 @@ RUN apk add groff && \
 COPY --chown=jf_agent:jf_agent . /home/jf_agent
 RUN rm /home/jf_agent/Pipfile /home/jf_agent/Pipfile.lock
 WORKDIR /home/jf_agent
-ENV PYTHONPATH=/home/jf_agent \
-    OUTPUT_BASEDIR=/home/jf_agent/output
+ENV PYTHONPATH=/home/jf_agent
 USER jf_agent
 CMD ["python", "jf_agent/main.py"]

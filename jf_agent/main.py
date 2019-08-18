@@ -52,7 +52,10 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-c', '--config-file', nargs='?', default='jellyfish.yaml', help='Path to config file'
+        '-c', '--config-file', nargs='?', default='./config.yml', help='Path to config file'
+    )
+    parser.add_argument(
+        '-o', '--output-basedir', nargs='?', default='./output', help='Path to output base directory'
     )
     parser.add_argument(
         '-s',
@@ -67,8 +70,12 @@ def main():
 
     args = parser.parse_args()
 
-    with open(args.config_file, 'r') as ymlfile:
-        config = yaml.safe_load(ymlfile)
+    try:
+        with open(args.config_file, 'r') as ymlfile:
+            config = yaml.safe_load(ymlfile)
+    except FileNotFoundError:
+        print(f'ERROR: Config file not found at "{args.config_file}"')
+        sys.exit(1)
 
     conf_global = config.get('global', {})
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
@@ -99,10 +106,7 @@ def main():
         # To silence "Unverified HTTPS request is being made."
         urllib3.disable_warnings()
 
-    output_basedir = os.environ.get('OUTPUT_BASEDIR', None)
-    if not output_basedir:
-        print('ERROR: OUTPUT_BASEDIR not found in the environment.')
-        return
+    output_basedir = args.output_basedir
     outdir = os.path.join(output_basedir, now.strftime('%Y%m%d_%H%M%S'))
     try:
         os.makedirs(outdir, exist_ok=False)
