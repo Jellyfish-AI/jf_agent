@@ -49,16 +49,28 @@ from jf_agent.session import retry_session
 def main():
     logging.basicConfig(level=logging.WARNING)
 
+    valid_run_modes = ('download_and_send', 'download_only', 'send_only')
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-c', '--config-file', nargs='?', default='./config.yml', help='Path to config file'
+        '-m',
+        '--mode',
+        nargs='?',
+        default='download_and_send',
+        help=f'Run mode: {", ".join(valid_run_modes)} (default: download_and_send)',
+    )
+    parser.add_argument(
+        '-c',
+        '--config-file',
+        nargs='?',
+        default='./config.yml',
+        help='Path to config file (default: ./config.yml)',
     )
     parser.add_argument(
         '-o',
         '--output-basedir',
         nargs='?',
         default='./output',
-        help='Path to output base directory',
+        help='Path to output base directory (default: ./output)',
     )
     parser.add_argument(
         '-s',
@@ -72,6 +84,22 @@ def main():
     )
 
     args = parser.parse_args()
+
+    run_mode = args.mode
+    if run_mode not in valid_run_modes:
+        print(f'''ERROR: Mode should be one of "{', '.join(valid_run_modes)}"''')
+        return
+    if run_mode == 'download_and_send':
+        should_download = True
+        should_send = True
+    elif run_mode == 'download_only':
+        should_download = True
+        should_send = False
+    elif run_mode == 'send_only':
+        should_download = False
+        should_send = True
+    else:
+        assert False, "Unexpected run_mode"
 
     try:
         with open(args.config_file, 'r') as ymlfile:
@@ -140,23 +168,27 @@ def main():
     s3_uri_prefix = agent_config.get('s3_uri_prefix')
     aws_access_key_id = agent_config.get('aws_access_key_id')
     aws_secret_access_key = agent_config.get('aws_secret_access_key')
-    if not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key:
-        print(f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish")
+    if should_send and (not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key):
+        print(
+            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
+        )
         return
 
-    download_data(
-        outdir,
-        jira_url,
-        jira_config,
-        skip_ssl_verification,
-        git_url,
-        git_config,
-        pull_since,
-        pull_until,
-        compress_output_files,
-    )
+    if should_download:
+        download_data(
+            outdir,
+            jira_url,
+            jira_config,
+            skip_ssl_verification,
+            git_url,
+            git_config,
+            pull_since,
+            pull_until,
+            compress_output_files,
+        )
 
-    send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
+    if should_send:
+        send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
 
     print('Done!')
 
