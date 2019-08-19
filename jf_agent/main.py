@@ -54,7 +54,11 @@ def main():
         '-c', '--config-file', nargs='?', default='./config.yml', help='Path to config file'
     )
     parser.add_argument(
-        '-o', '--output-basedir', nargs='?', default='./output', help='Path to output base directory'
+        '-o',
+        '--output-basedir',
+        nargs='?',
+        default='./output',
+        help='Path to output base directory',
     )
     parser.add_argument(
         '-s',
@@ -96,7 +100,7 @@ def main():
     pull_until = pull_until.replace(tzinfo=pytz.utc)
 
     if not jira_url and not git_url:
-        print('ERROR: Config file must provide either a Jira or Bitbucket URL.')
+        print('ERROR: Config file must provide either a Jira or Git URL.')
         parser.print_help()
         return
 
@@ -126,8 +130,10 @@ def main():
 
     resp = requests.get(f'https://jellyfish.co/agent/config?api_token={api_token}')
     if not resp.ok:
-        print(f"ERROR: Couldn't get agent config info from https://jellyfish.co/agent/config "
-              f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})')
+        print(
+            f"ERROR: Couldn't get agent config info from https://jellyfish.co/agent/config "
+            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
+        )
         return
     agent_config = resp.json()
 
@@ -476,7 +482,9 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
             subprocess.check_call(
                 f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
                 f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
-                f'{cmd}', shell=True)
+                f'{cmd}',
+                shell=True,
+            )
         except Exception:
             print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
             raise
