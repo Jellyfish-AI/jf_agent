@@ -45,6 +45,8 @@ from jf_agent.jira_download import (
 )
 from jf_agent.session import retry_session
 
+JELLYFISH_API_BASE = 'https://jellyfish.co'
+
 
 def main():
     logging.basicConfig(level=logging.WARNING)
@@ -156,10 +158,10 @@ def main():
         print(f'ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         return
 
-    resp = requests.get(f'https://jellyfish.co/agent/config?api_token={api_token}')
+    resp = requests.get(f'{JELLYFISH_API_BASE}/agent/config?api_token={api_token}')
     if not resp.ok:
         print(
-            f"ERROR: Couldn't get agent config info from https://jellyfish.co/agent/config "
+            f"ERROR: Couldn't get agent config info from {JELLYFISH_API_BASE}/agent/config "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
         return
