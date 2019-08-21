@@ -4,6 +4,7 @@ import gzip
 import json
 import logging
 import os
+from pathlib import Path
 import pytz
 import requests
 import subprocess
@@ -46,6 +47,7 @@ from jf_agent.jira_download import (
 from jf_agent.session import retry_session
 
 JELLYFISH_API_BASE = 'https://jellyfish.co'
+# JELLYFISH_API_BASE = 'https://cf758842.ngrok.io'
 
 
 def main():
@@ -68,11 +70,17 @@ def main():
         help='Path to config file (default: ./config.yml)',
     )
     parser.add_argument(
-        '-o',
+        '-ob',
         '--output-basedir',
         nargs='?',
         default='./output',
         help='Path to output base directory (default: ./output)',
+    )
+    parser.add_argument(
+        '-od',
+        '--prev-output-dir',
+        nargs='?',
+        help='Path to directory containing already-downloaded files',
     )
     parser.add_argument(
         '-s',
@@ -139,19 +147,34 @@ def main():
         # To silence "Unverified HTTPS request is being made."
         urllib3.disable_warnings()
 
-    output_basedir = args.output_basedir
-    outdir = os.path.join(output_basedir, now.strftime('%Y%m%d_%H%M%S'))
-    try:
-        os.makedirs(outdir, exist_ok=False)
-    except FileExistsError:
-        print(f"ERROR: Output dir {outdir} already exists")
-        return
-    except Exception:
-        print(
-            f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
-        )
-        return
-    print(f'Will write output files into {outdir}')
+    if should_download:
+        if args.prev_output_dir:
+            print('ERROR: Provide output_basedir if downloading, not prev_output_dir')
+            return
+
+        output_basedir = args.output_basedir
+        output_dir_timestamp = now.strftime('%Y%m%d_%H%M%S')
+        outdir = os.path.join(output_basedir, output_dir_timestamp)
+        try:
+            os.makedirs(outdir, exist_ok=False)
+        except FileExistsError:
+            print(f"ERROR: Output dir {outdir} already exists")
+            return
+        except Exception:
+            print(
+                f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
+            )
+            return
+        print(f'Will write output files into {outdir}')
+
+    else:
+        if not args.prev_output_dir:
+            print('ERROR: prev_output_dir must be provided if not downloading')
+            return
+        if not os.path.isdir(args.prev_output_dir):
+            print(f'ERROR: prev_output_dir ("{args.prev_output_dir}") is not a directory')
+            return
+        outdir = args.prev_output_dir
 
     api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not api_token:
@@ -191,6 +214,9 @@ def main():
 
     if should_send:
         send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
+    else:
+        print(f'Skipping send_data because run_mode is "{run_mode}"')
+        print(f'To send this data to Jellyfish, use "-m send_only -od {outdir}"')
 
     print('Done!')
 
@@ -525,17 +551,19 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
 
     print('Sending data to Jellyfish... ')
 
-    done_file_path = f'{outdir}/.done'
-    try:
-        # A .done file shouldn't yet exist, but we'll make sure
-        os.remove(done_file_path)
-    except FileNotFoundError:
-        pass
+    output_basedir, output_dir_timestamp = os.path.split(outdir)
+    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
+    done_file_path = f'{os.path.join(outdir, ".done")}'
+    if os.path.exists(done_file_path):
+        print(
+            f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
+        )
+        return
 
-    _s3_cmd(f'aws s3 rm {s3_uri_prefix} --recursive')
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix}')
-    os.system(f'touch {done_file_path}')
-    _s3_cmd(f'aws s3 sync {done_file_path} {s3_uri_prefix}')
+    _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
+    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    Path(done_file_path).touch()
+    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
 
 
 if __name__ == '__main__':

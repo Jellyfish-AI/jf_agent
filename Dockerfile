@@ -15,4 +15,4 @@ RUN rm /home/jf_agent/Pipfile /home/jf_agent/Pipfile.lock
 WORKDIR /home/jf_agent
 ENV PYTHONPATH=/home/jf_agent
 USER jf_agent
-CMD ["python", "jf_agent/main.py"]
+ENTRYPOINT ["python", "jf_agent/main.py"]
