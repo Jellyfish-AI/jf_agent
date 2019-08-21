@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from glob import glob
 import gzip
 import json
 import logging
@@ -7,6 +8,7 @@ import os
 from pathlib import Path
 import pytz
 import requests
+import shutil
 import subprocess
 from types import GeneratorType
 import urllib3
@@ -120,7 +122,6 @@ def main():
 
     conf_global = config.get('global', {})
     skip_ssl_verification = conf_global.get('no_verify_ssl', False)
-    compress_output_files = conf_global.get('compress_output_files', True)
 
     jira_config = config.get('jira', {})
     git_config = config.get('git', config.get('bitbucket', {}))
@@ -199,6 +200,9 @@ def main():
         )
         return
 
+    # If we're only downloading, do not compress the output files (so they can be more easily inspected)
+    compress_output_files = False if (should_download and not should_send) else True
+
     if should_download:
         download_data(
             outdir,
@@ -215,7 +219,8 @@ def main():
     if should_send:
         send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
     else:
-        print(f'Skipping send_data because run_mode is "{run_mode}"')
+        print(f'\nSkipping send_data because run_mode is "{run_mode}"')
+        print(f'You can now inspect the downloaded data in {outdir}')
         print(f'To send this data to Jellyfish, use "-m send_only -od {outdir}"')
 
     print('Done!')
@@ -544,10 +549,19 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
                 f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
                 f'{cmd}',
                 shell=True,
+                stdout=subprocess.DEVNULL,
             )
         except Exception:
             print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
             raise
+
+    # Compress any not yet compressed files before sending
+    for fname in glob(f'{outdir}/*.json'):
+        print(f'Compressing {fname}')
+        with open(fname, 'rb') as f_in:
+            with gzip.open(f'{fname}.gz', 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        os.remove(fname)
 
     print('Sending data to Jellyfish... ')
 
