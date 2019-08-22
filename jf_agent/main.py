@@ -49,7 +49,6 @@ from jf_agent.jira_download import (
 from jf_agent.session import retry_session
 
 JELLYFISH_API_BASE = 'https://jellyfish.co'
-# JELLYFISH_API_BASE = 'https://cf758842.ngrok.io'
 
 
 def main():
