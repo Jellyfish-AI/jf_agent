@@ -55,7 +55,7 @@ JELLYFISH_API_BASE = 'https://jellyfish.co'
 def main():
     logging.basicConfig(level=logging.WARNING)
 
-    valid_run_modes = ('download_and_send', 'download_only', 'send_only')
+    valid_run_modes = ('download_and_send', 'download_only', 'send_only', 'print_all_jira_fields')
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-m',
@@ -101,17 +101,10 @@ def main():
     if run_mode not in valid_run_modes:
         print(f'''ERROR: Mode should be one of "{', '.join(valid_run_modes)}"''')
         return
-    if run_mode == 'download_and_send':
-        should_download = True
-        should_send = True
-    elif run_mode == 'download_only':
-        should_download = True
-        should_send = False
-    elif run_mode == 'send_only':
-        should_download = False
-        should_send = True
-    else:
-        assert False, "Unexpected run_mode"
+
+    run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
+    run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
+    run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
 
     try:
         with open(args.config_file, 'r') as ymlfile:
@@ -148,7 +141,7 @@ def main():
         # To silence "Unverified HTTPS request is being made."
         urllib3.disable_warnings()
 
-    if should_download:
+    if run_mode_includes_download:
         if args.prev_output_dir:
             print('ERROR: Provide output_basedir if downloading, not prev_output_dir')
             return
@@ -168,7 +161,10 @@ def main():
             return
         print(f'Will write output files into {outdir}')
 
-    else:
+    if run_mode_is_print_all_jira_fields and not jira_url:
+        print(f'ERROR: Must provide jira_url for mode {run_mode}')
+
+    if run_mode_includes_send and not run_mode_includes_download:
         if not args.prev_output_dir:
             print('ERROR: prev_output_dir must be provided if not downloading')
             return
@@ -194,29 +190,63 @@ def main():
     s3_uri_prefix = agent_config.get('s3_uri_prefix')
     aws_access_key_id = agent_config.get('aws_access_key_id')
     aws_secret_access_key = agent_config.get('aws_secret_access_key')
-    if should_send and (not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key):
+    if run_mode_includes_send and (
+        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+    ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
         )
         return
 
     # If we're only downloading, do not compress the output files (so they can be more easily inspected)
-    compress_output_files = False if (should_download and not should_send) else True
+    compress_output_files = (
+        False if (run_mode_includes_download and not run_mode_includes_send) else True
+    )
 
-    if should_download:
+    jira_connection = None
+    if jira_url:
+        jira_username = os.environ.get('JIRA_USERNAME', None)
+        jira_password = os.environ.get('JIRA_PASSWORD', None)
+        if jira_username and jira_password:
+            jira_connection = get_basic_jira_connection(
+                jira_url, jira_username, jira_password, skip_ssl_verification
+            )
+        else:
+            print(
+                'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
+            )
+
+    if run_mode_is_print_all_jira_fields:
+        if jira_connection:
+            print_all_jira_fields(jira_connection, jira_config)
+        return
+
+    if git_url:
+        provider = git_config.get('provider', 'bitbucket_server')
+        if provider not in ('bitbucket_server', 'github'):
+            print(
+                f'ERROR: Unsupported Git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
+            )
+            return
+
+        git_connection = get_git_client(provider, git_url, skip_ssl_verification)
+    else:
+        git_connection = None
+
+    if run_mode_includes_download:
         download_data(
             outdir,
-            jira_url,
+            jira_connection,
             jira_config,
             skip_ssl_verification,
-            git_url,
+            git_connection,
             git_config,
             pull_since,
             pull_until,
             compress_output_files,
         )
 
-    if should_send:
+    if run_mode_includes_send:
         send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
     else:
         print(f'\nSkipping send_data because run_mode is "{run_mode}"')
@@ -226,98 +256,76 @@ def main():
     print('Done!')
 
 
+def print_all_jira_fields(jira_connection, jira_config):
+    include_fields = set(jira_config.get('include_fields', []))
+    exclude_fields = set(jira_config.get('exclude_fields', []))
+    for f in download_fields(jira_connection, include_fields, exclude_fields):
+        print(f"{f['key']:30}\t{f['name']}")
+
+
 def download_data(
     outdir,
-    jira_url,
+    jira_connection,
     jira_config,
     skip_ssl_verification,
-    git_url,
+    git_connection,
     git_config,
     pull_since,
     pull_until,
     compress_output_files,
 ):
-    if jira_url:
-        jira_username = os.environ.get('JIRA_USERNAME', None)
-        jira_password = os.environ.get('JIRA_PASSWORD', None)
-        if jira_username and jira_password:
-            jira_connection = get_basic_jira_connection(
-                jira_url, jira_username, jira_password, skip_ssl_verification
-            )
-            if jira_connection:
-                load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files)
-        else:
-            print(
-                'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
-            )
+    if jira_connection:
+        load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files)
 
-    if git_url:
-        provider = git_config.get('provider', 'bitbucket_server')
-        if provider not in ('bitbucket_server', 'github'):
-            print(
-                f'ERROR: unsupported git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
-            )
-            return
+    if git_connection:
+        try:
+            provider = git_config.get('provider', 'bitbucket_server')
+            include_projects = set(git_config.get('include_projects', []))
+            exclude_projects = set(git_config.get('exclude_projects', []))
+            include_repos = set(git_config.get('include_repos', []))
+            exclude_repos = set(git_config.get('exclude_projects', []))
+            strip_text_content = git_config.get('strip_text_content', False)
+            redact_names_and_urls = git_config.get('redact_names_and_urls', False)
 
-        git_conn = get_git_client(provider, git_url, skip_ssl_verification)
-        if git_conn:
-            try:
-                include_projects = set(git_config.get('include_projects', []))
-                exclude_projects = set(git_config.get('exclude_projects', []))
-                include_repos = set(git_config.get('include_repos', []))
-                exclude_repos = set(git_config.get('exclude_projects', []))
-                strip_text_content = git_config.get('strip_text_content', False)
-                redact_names_and_urls = git_config.get('redact_names_and_urls', False)
-
-                if provider == 'bitbucket_server':
-                    load_and_dump_bb(
-                        outdir,
-                        git_conn,
-                        pull_since,
-                        pull_until,
-                        include_projects,
-                        exclude_projects,
-                        include_repos,
-                        exclude_repos,
-                        strip_text_content,
-                        redact_names_and_urls,
-                        compress_output_files,
-                    )
-                elif provider == 'github':
-                    load_and_dump_github(
-                        outdir,
-                        git_conn,
-                        pull_since,
-                        pull_until,
-                        include_projects,
-                        exclude_projects,
-                        include_repos,
-                        exclude_repos,
-                        strip_text_content,
-                        redact_names_and_urls,
-                        compress_output_files,
-                    )
-                print()
-                print(f'Pulled until: {pull_until}')
-            except Exception as e:
-                print(f'ERROR: Failed to download {provider} data:\n{e}')
+            if provider == 'bitbucket_server':
+                load_and_dump_bb(
+                    outdir,
+                    git_connection,
+                    pull_since,
+                    pull_until,
+                    include_projects,
+                    exclude_projects,
+                    include_repos,
+                    exclude_repos,
+                    strip_text_content,
+                    redact_names_and_urls,
+                    compress_output_files,
+                )
+            elif provider == 'github':
+                load_and_dump_github(
+                    outdir,
+                    git_connection,
+                    pull_since,
+                    pull_until,
+                    include_projects,
+                    exclude_projects,
+                    include_repos,
+                    exclude_repos,
+                    strip_text_content,
+                    redact_names_and_urls,
+                    compress_output_files,
+                )
+            print()
+            print(f'Git data pulled until: {pull_until}')
+        except Exception as e:
+            print(f'ERROR: Failed to download {provider} data:\n{e}')
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files):
     try:
         include_fields = set(jira_config.get('include_fields', []))
         exclude_fields = set(jira_config.get('exclude_fields', []))
-
-        fields = download_fields(jira_connection, include_fields, exclude_fields)
-
-        print_fields_only = jira_config.get('print_fields_only', False)
-        if print_fields_only:
-            for f in fields:
-                print(f"{f['key']:30}\t{f['name']}")
-                return
-
         gdpr_active = jira_config.get('gdpr_active', False)
-
         include_projects = set(jira_config.get('include_projects', []))
         exclude_projects = set(jira_config.get('exclude_projects', []))
         include_categories = set(jira_config.get('include_project_categories', []))
@@ -325,6 +333,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
 
         issue_jql = jira_config.get('issue_jql', '')
 
+        fields = download_fields(jira_connection, include_fields, exclude_fields)
         write_file(outdir, 'jira_fields', fields, compress_output_files)
 
         projects_and_versions = download_projects_and_versions(
