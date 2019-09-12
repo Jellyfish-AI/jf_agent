@@ -26,7 +26,7 @@ You'll execute the agent by running a Docker container based on the distributed 
 
 1. Obtain your API token from Jellyfish.
 
-2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with the password for that user.
+2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with the password for that user (for Jira server) or a personal API token for that user (for Jira cloud).
 
 3. For Bitbucket Server: Gather your Bitbucket Server credentials.
 
