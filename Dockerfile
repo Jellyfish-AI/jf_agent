@@ -1,9 +1,9 @@
-FROM python:3.7 AS py-deps
+FROM python:3.7.4 AS py-deps
 COPY ./Pipfile ./Pipfile.lock ./
 RUN pip install pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
 
-FROM python:3.7-alpine
+FROM python:3.7.4-alpine
 COPY --from=py-deps /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
 RUN apk add groff && \
     pip install awscli && \
