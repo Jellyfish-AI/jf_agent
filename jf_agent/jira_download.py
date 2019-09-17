@@ -181,7 +181,7 @@ def download_boards_and_sprints(jira_connection, project_ids):
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
 
-def download_issues(
+def download_issue_batch(
     jira_connection, project_ids, include_fields, exclude_fields, issue_filter=None
 ):
     if not issue_filter:
@@ -213,7 +213,7 @@ def download_issues(
     for t in threads:
         t.start()
 
-    issues = {}
+    encountered_issue_ids = set()
     with tqdm(desc='downloading jira issues', total=issue_count, file=sys.stdout) as prog_bar:
         # Read batches from queue
         finished = 0
@@ -228,18 +228,18 @@ def download_issues(
                 # thread had a problem; rethrow
                 raise batch
 
-            # issues sometimes appear at the end of one batch and again at the beginning of the next; use
-            # the dict to dedupe
-            old_count = len(issues)
-            issues.update({i['id']: i for i in batch})
-            new_count = len(issues) - old_count
+            # issues sometimes appear at the end of one batch and again at the beginning of the next; de-dup them
+            new_issues_this_batch = []
+            for i in batch:
+                if i['id'] not in encountered_issue_ids:
+                    encountered_issue_ids.add(i['id'])
+                    new_issues_this_batch.append(i)
+            prog_bar.update(len(new_issues_this_batch))
 
-            prog_bar.update(new_count)
+            yield new_issues_this_batch
 
     for t in threads:
         t.join()
-
-    return list(issues.values())
 
 
 # Returns a dict with two items: 'existing' gives a list of all worklogs
