@@ -259,9 +259,9 @@ def download_worklogs(jira_connection, issue_ids):
         )
         try:
             worklog_list_json = json_loads(resp)
-        except ValueError as e:
+        except ValueError:
             logger.exception("Couldn't parse JIRA response as JSON: %s", resp.text)
-            raise e
+            raise
 
         updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
         if worklog_ids_json['lastPage']:
