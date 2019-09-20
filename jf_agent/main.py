@@ -11,6 +11,7 @@ import pytz
 import requests
 import shutil
 import subprocess
+import traceback
 from types import GeneratorType
 import urllib3
 
@@ -319,6 +320,7 @@ def download_data(
             print(f'Git data pulled until: {pull_until}')
         except Exception as e:
             print(f'ERROR: Failed to download {provider} data:\n{e}')
+            print(traceback.format_exc())
 
 
 def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files):
@@ -423,6 +425,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
         )
     except Exception as e:
         print(f'ERROR: Failed to download jira data:\n{e}')
+        print(traceback.format_exc())
 
 
 def get_basic_jira_connection(url, username, password, skip_ssl_verification):
@@ -438,6 +441,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         )
     except Exception as e:
         print(f'ERROR: Failed to connect to Jira:\n{e}')
+        print(traceback.format_exc())
 
 
 def load_and_dump_github(
@@ -576,6 +580,7 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             )
         except Exception as e:
             print(f'ERROR: Failed to connect to Bitbucket:\n{e}')
+            print(traceback.format_exc())
             return
 
     elif provider == 'github':
@@ -596,6 +601,7 @@ def get_git_client(provider, git_url, skip_ssl_verification):
 
         except Exception as e:
             print(f'ERROR: Failed to connect to GitHub:\n{e}')
+            print(traceback.format_exc())
             return
 
     raise ValueError(f'unsupported git provider {provider}')
