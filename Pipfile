@@ -13,5 +13,6 @@ tqdm = "*"
 stashy = "*"
 dateparser = "*"
 jsonstreams = "*"
+psutil = "*"
 
 [dev-packages]
