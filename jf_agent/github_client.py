@@ -80,7 +80,11 @@ class GithubClient:
                 result.raise_for_status()
                 return result
             except requests.exceptions.HTTPError as e:
-                if e.response.headers['X-RateLimit-Remaining'] == '0' and i < max_retries:
+                if (
+                    'X-RateLimit-Remaining' in e.response.headers
+                    and e.response.headers['X-RateLimit-Remaining'] == '0'
+                    and i < max_retries
+                ):
                     # rate-limited!  Sleep until it's oK, then try again
                     reset_time = datetime.fromtimestamp(
                         int(e.response.headers['X-RateLimit-Reset']), pytz.utc
