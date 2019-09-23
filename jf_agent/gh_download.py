@@ -1,6 +1,7 @@
-from tqdm import tqdm
 from dateutil import parser
+from tqdm import tqdm
 
+from jf_agent import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 
@@ -150,13 +151,16 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-    client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for repo in api_repos:
+        pull_since = pull_since_date_for_repo(
+            server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
+        )
         try:
             for commit in tqdm(
                 client.get_commits(
-                    repo['full_name'], repo['default_branch'], since=pull_since, until=pull_until
+                    repo['full_name'], repo['default_branch'], since=pull_since, until=None
                 ),
                 desc=f'downloading commits for {repo["name"]}',
                 unit='commits',
@@ -227,10 +231,13 @@ def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
 
 
 def get_pull_requests(
-    client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
 
     for repo in api_repos:
+        pull_since = pull_since_date_for_repo(
+            server_git_instance_info, repo['organization']['login'], repo['id'], 'prs'
+        )
         try:
             for pr in tqdm(
                 client.get_pullrequests(repo['full_name']),
@@ -239,10 +246,7 @@ def get_pull_requests(
             ):
                 updated_at = parser.parse(pr['updated_at'])
 
-                # PRs are ordered newest to oldest; if this isn't old enough, skip it and keep going
-                if updated_at >= pull_until:
-                    continue
-
+                # PRs are ordered newest to oldest
                 # if this is too old, we're done with this repo
                 if pull_since and updated_at < pull_since:
                     break

@@ -3,6 +3,7 @@ import stashy
 import pytz
 from tqdm import tqdm
 
+from jf_agent import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
@@ -136,12 +137,14 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-    client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for api_repo in api_repos:
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
-
+        pull_since = pull_since_date_for_repo(
+            server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
+        )
         try:
             default_branch = api_repo.default_branch['displayId'] if api_repo.default_branch else ''
             commits = api_project.repos[repo['name']].commits(until=default_branch)
@@ -152,11 +155,7 @@ def get_default_branch_commits(
                 normalized_commit = _normalize_commit(
                     commit, repo, strip_text_content, redact_names_and_urls
                 )
-                # commits are ordered newest to oldest; if this isn't
-                # old enough, skip it and keep going
-                if normalized_commit['commit_date'] >= pull_until:
-                    continue
-
+                # commits are ordered newest to oldest
                 # if this is too old, we're done with this repo
                 if pull_since and normalized_commit['commit_date'] < pull_since:
                     break
@@ -187,23 +186,22 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_pull_requests(
-    client, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for api_repo in api_repos:
         repo = api_repo.get()
         api_project = client.projects[repo['project']['key']]
         api_repo = api_project.repos[repo['name']]
-
+        pull_since = pull_since_date_for_repo(
+            server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
+        )
         for pr in tqdm(
             api_repo.pull_requests.all(state='ALL', order='NEWEST'),
             desc=f'downloading PRs for {repo["name"]}',
             unit='prs',
         ):
             updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
-            # PRs are ordered newest to oldest; if this isn't old enough, skip it and keep going
-            if updated_at >= pull_until:
-                continue
-
+            # PRs are ordered newest to oldest
             # if this is too old, we're done with this repo
             if pull_since and updated_at < pull_since:
                 break
