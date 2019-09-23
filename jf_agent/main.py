@@ -7,7 +7,6 @@ import jsonstreams
 import logging
 import os
 from pathlib import Path
-import pytz
 import requests
 import shutil
 import subprocess
@@ -15,7 +14,6 @@ import traceback
 from types import GeneratorType
 import urllib3
 
-import dateparser
 from jira import JIRA
 from jira.resources import GreenHopperResource
 from stashy.client import Stash
@@ -86,14 +84,10 @@ def main():
         help='Path to directory containing already-downloaded files',
     )
     parser.add_argument(
-        '-s',
-        '--since',
-        nargs='?',
-        default=None,
-        help='Pull git activity on or after this timestamp',
+        '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
     parser.add_argument(
-        '-u', '--until', nargs='?', default=None, help='Pull git activity before this timestamp'
+        '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
 
     args = parser.parse_args()
@@ -124,13 +118,16 @@ def main():
 
     git_url = git_config.get('url', None)
 
-    pull_since = dateparser.parse(args.since) if args.since else None
-    if pull_since:
-        pull_since = pull_since.replace(tzinfo=pytz.utc)
+    if args.since:
+        print(
+            f'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
+        )
+    if args.until:
+        print(
+            f'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
+        )
 
     now = datetime.utcnow()
-    pull_until = dateparser.parse(args.until) if args.until else now
-    pull_until = pull_until.replace(tzinfo=pytz.utc)
 
     if not jira_url and not git_url:
         print('ERROR: Config file must provide either a Jira or Git URL.')
@@ -186,11 +183,13 @@ def main():
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
         return
-    agent_config = resp.json()
 
+    agent_config = resp.json()
     s3_uri_prefix = agent_config.get('s3_uri_prefix')
     aws_access_key_id = agent_config.get('aws_access_key_id')
     aws_secret_access_key = agent_config.get('aws_secret_access_key')
+    server_git_instance_info = agent_config.get('git_instance_info')
+
     if run_mode_includes_send and (
         not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
@@ -242,8 +241,7 @@ def main():
             skip_ssl_verification,
             git_connection,
             git_config,
-            pull_since,
-            pull_until,
+            server_git_instance_info,
             compress_output_files,
         )
 
@@ -271,8 +269,7 @@ def download_data(
     skip_ssl_verification,
     git_connection,
     git_config,
-    pull_since,
-    pull_until,
+    server_git_instance_info,
     compress_output_files,
 ):
     if jira_connection:
@@ -292,8 +289,7 @@ def download_data(
                 load_and_dump_bb(
                     outdir,
                     git_connection,
-                    pull_since,
-                    pull_until,
+                    server_git_instance_info,
                     include_projects,
                     exclude_projects,
                     include_repos,
@@ -306,8 +302,7 @@ def download_data(
                 load_and_dump_github(
                     outdir,
                     git_connection,
-                    pull_since,
-                    pull_until,
+                    server_git_instance_info,
                     include_projects,
                     exclude_projects,
                     include_repos,
@@ -316,8 +311,6 @@ def download_data(
                     redact_names_and_urls,
                     compress_output_files,
                 )
-            print()
-            print(f'Git data pulled until: {pull_until}')
         except Exception as e:
             print(f'ERROR: Failed to download {provider} data:\n{e}')
             print(traceback.format_exc())
@@ -447,8 +440,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
 def load_and_dump_github(
     outdir,
     git_conn,
-    pull_since,
-    pull_until,
+    server_git_instance_info,
     include_projects,
     exclude_projects,
     include_repos,
@@ -491,7 +483,7 @@ def load_and_dump_github(
         outdir,
         'bb_commits',
         get_gh_default_branch_commits(
-            git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+            git_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
         ),
         compress_output_files,
     )
@@ -500,7 +492,7 @@ def load_and_dump_github(
         outdir,
         'bb_prs',
         get_gh_pull_requests(
-            git_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+            git_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
         ),
         compress_output_files,
     )
@@ -509,8 +501,7 @@ def load_and_dump_github(
 def load_and_dump_bb(
     outdir,
     bb_conn,
-    pull_since,
-    pull_until,
+    server_git_instance_info,
     include_projects,
     exclude_projects,
     include_repos,
@@ -545,7 +536,7 @@ def load_and_dump_bb(
         outdir,
         'bb_commits',
         get_bb_default_branch_commits(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+            bb_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
         ),
         compress_output_files,
     )
@@ -554,7 +545,7 @@ def load_and_dump_bb(
         outdir,
         'bb_prs',
         get_bb_pull_requests(
-            bb_conn, api_repos, strip_text_content, pull_since, pull_until, redact_names_and_urls
+            bb_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
         ),
         compress_output_files,
     )
