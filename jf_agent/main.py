@@ -16,7 +16,7 @@ from jira.resources import GreenHopperResource
 from stashy.client import Stash
 import yaml
 
-from jf_agent import write_file, download_and_write_streaming
+from jf_agent import diagnostics, write_file, download_and_write_streaming
 from jf_agent.bb_download import (
     get_all_users as get_bb_users,
     get_all_projects as get_bb_projects,
@@ -201,47 +201,57 @@ def main():
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
-    jira_connection = None
-    if jira_url:
-        jira_username = os.environ.get('JIRA_USERNAME', None)
-        jira_password = os.environ.get('JIRA_PASSWORD', None)
-        if jira_username and jira_password:
-            jira_connection = get_basic_jira_connection(
-                jira_url, jira_username, jira_password, skip_ssl_verification
-            )
-        else:
-            print(
-                'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
-            )
+    diagnostics.open_file(outdir)
 
-    if run_mode_is_print_all_jira_fields:
-        if jira_connection:
-            print_all_jira_fields(jira_connection, jira_config)
-        return
+    try:
+        diagnostics.capture_run_args(args.mode, args.config_file, outdir, args.prev_output_dir)
 
-    if git_url:
-        provider = git_config.get('provider', 'bitbucket_server')
-        if provider not in ('bitbucket_server', 'github'):
-            print(
-                f'ERROR: Unsupported Git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
-            )
+        jira_connection = None
+        if jira_url:
+            jira_username = os.environ.get('JIRA_USERNAME', None)
+            jira_password = os.environ.get('JIRA_PASSWORD', None)
+            if jira_username and jira_password:
+                jira_connection = get_basic_jira_connection(
+                    jira_url, jira_username, jira_password, skip_ssl_verification
+                )
+            else:
+                print(
+                    'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
+                )
+
+        if run_mode_is_print_all_jira_fields:
+            if jira_connection:
+                print_all_jira_fields(jira_connection, jira_config)
             return
 
-        git_connection = get_git_client(provider, git_url, skip_ssl_verification)
-    else:
-        git_connection = None
+        if git_url:
+            provider = git_config.get('provider', 'bitbucket_server')
+            if provider not in ('bitbucket_server', 'github'):
+                print(
+                    f'ERROR: Unsupported Git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
+                )
+                return
 
-    if run_mode_includes_download:
-        download_data(
-            outdir,
-            jira_connection,
-            jira_config,
-            skip_ssl_verification,
-            git_connection,
-            git_config,
-            server_git_instance_info,
-            compress_output_files,
-        )
+            git_connection = get_git_client(provider, git_url, skip_ssl_verification)
+        else:
+            git_connection = None
+
+        if run_mode_includes_download:
+            download_data(
+                outdir,
+                jira_connection,
+                jira_config,
+                skip_ssl_verification,
+                git_connection,
+                git_config,
+                server_git_instance_info,
+                compress_output_files,
+            )
+
+        diagnostics.capture_outdir_size(outdir)
+
+    finally:
+        diagnostics.close_file()
 
     if run_mode_includes_send:
         send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
@@ -253,6 +263,7 @@ def main():
     print('Done!')
 
 
+@diagnostics.capture_timing()
 def print_all_jira_fields(jira_connection, jira_config):
     include_fields = set(jira_config.get('include_fields', []))
     exclude_fields = set(jira_config.get('exclude_fields', []))
@@ -260,6 +271,7 @@ def print_all_jira_fields(jira_connection, jira_config):
         print(f"{f['key']:30}\t{f['name']}")
 
 
+@diagnostics.capture_timing()
 def download_data(
     outdir,
     jira_connection,
@@ -314,6 +326,7 @@ def download_data(
             print(traceback.format_exc())
 
 
+@diagnostics.capture_timing()
 def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files):
     try:
         include_fields = set(jira_config.get('include_fields', []))
@@ -335,7 +348,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
 
         project_ids = None
 
-        def _download_and_write_projects_and_versions():
+        def download_and_write_projects_and_versions():
             projects_and_versions = download_projects_and_versions(
                 jira_connection,
                 include_projects,
@@ -349,7 +362,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
                 outdir, 'jira_projects_and_versions', compress_output_files, projects_and_versions
             )
 
-        _download_and_write_projects_and_versions()
+        download_and_write_projects_and_versions()
 
         write_file(
             outdir,
@@ -376,15 +389,16 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
             outdir, 'jira_priorities', compress_output_files, download_priorities(jira_connection)
         )
 
-        def _download_and_write_boards_and_sprints():
+        def download_and_write_boards_and_sprints():
             boards, sprints, links = download_boards_and_sprints(jira_connection, project_ids)
             write_file(outdir, 'jira_boards', compress_output_files, boards)
             write_file(outdir, 'jira_sprints', compress_output_files, sprints)
             write_file(outdir, 'jira_board_sprint_links', compress_output_files, links)
 
-        _download_and_write_boards_and_sprints()
+        download_and_write_boards_and_sprints()
 
-        def _download_and_write_issues():
+        @diagnostics.capture_timing()
+        def download_and_write_issues():
             return download_and_write_streaming(
                 outdir,
                 'jira_issues',
@@ -400,7 +414,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
                 item_id_dict_key='id',
             )
 
-        issue_ids = _download_and_write_issues()
+        issue_ids = download_and_write_issues()
 
         write_file(
             outdir,
@@ -413,6 +427,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
         print(traceback.format_exc())
 
 
+@diagnostics.capture_timing()
 def get_basic_jira_connection(url, username, password, skip_ssl_verification):
     try:
         return JIRA(
@@ -429,6 +444,7 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
         print(traceback.format_exc())
 
 
+@diagnostics.capture_timing()
 def load_and_dump_github(
     outdir,
     git_conn,
@@ -459,7 +475,8 @@ def load_and_dump_github(
 
     api_repos = None
 
-    def _get_and_write_repos():
+    @diagnostics.capture_timing()
+    def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
         api_repos, repos = zip(
@@ -468,10 +485,12 @@ def load_and_dump_github(
             )
         )
         write_file(outdir, 'bb_repos', compress_output_files, repos)
+        return len(api_repos)
 
-    _get_and_write_repos()
+    get_and_write_repos()
 
-    def _download_and_write_commits():
+    @diagnostics.capture_timing()
+    def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
             'bb_commits',
@@ -487,9 +506,10 @@ def load_and_dump_github(
             item_id_dict_key='hash',
         )
 
-    _download_and_write_commits()
+    download_and_write_commits()
 
-    def _download_and_write_prs():
+    @diagnostics.capture_timing()
+    def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
             'bb_prs',
@@ -505,9 +525,10 @@ def load_and_dump_github(
             item_id_dict_key='id',
         )
 
-    _download_and_write_prs()
+    download_and_write_prs()
 
 
+@diagnostics.capture_timing()
 def load_and_dump_bb(
     outdir,
     bb_conn,
@@ -530,7 +551,8 @@ def load_and_dump_bb(
 
     api_repos = None
 
-    def _get_and_write_repos():
+    @diagnostics.capture_timing()
+    def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
         api_repos, repos = zip(
@@ -539,10 +561,12 @@ def load_and_dump_bb(
             )
         )
         write_file(outdir, 'bb_repos', compress_output_files, repos)
+        return len(api_repos)
 
-    _get_and_write_repos()
+    get_and_write_repos()
 
-    def _download_and_write_commits():
+    @diagnostics.capture_timing()
+    def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
             'bb_commits',
@@ -558,9 +582,10 @@ def load_and_dump_bb(
             item_id_dict_key='hash',
         )
 
-    _download_and_write_commits()
+    download_and_write_commits()
 
-    def _download_and_write_prs():
+    @diagnostics.capture_timing()
+    def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
             'bb_prs',
@@ -576,9 +601,10 @@ def load_and_dump_bb(
             item_id_dict_key='id',
         )
 
-    _download_and_write_prs()
+    download_and_write_prs()
 
 
+@diagnostics.capture_timing()
 def get_git_client(provider, git_url, skip_ssl_verification):
     if provider == 'bitbucket_server':
         bb_username = os.environ.get('BITBUCKET_USERNAME', None)

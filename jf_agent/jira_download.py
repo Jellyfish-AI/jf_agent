@@ -10,11 +10,13 @@ from jira.resources import dict2resource
 from jira.exceptions import JIRAError
 from jira.utils import json_loads
 
+from jf_agent import diagnostics
 
 logger = logging.getLogger(__name__)
 
 
 # Returns an array of User dicts
+@diagnostics.capture_timing()
 def download_users(jira_connection, gdpr_active):
     print('downloading jira users... ', end='', flush=True)
 
@@ -31,6 +33,7 @@ def download_users(jira_connection, gdpr_active):
 
 
 # Returns an array of Field dicts
+@diagnostics.capture_timing()
 def download_fields(jira_connection, include_fields, exclude_fields):
 
     print('downloading jira fields... ', end='', flush=True)
@@ -48,6 +51,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
 
 # Returns an array of Resolutions dicts
+@diagnostics.capture_timing()
 def download_resolutions(jira_connection):
     print('downloading jira resolutions... ', end='', flush=True)
     result = [r.raw for r in jira_connection.resolutions()]
@@ -56,6 +60,7 @@ def download_resolutions(jira_connection):
 
 
 # Returns an array of IssueType dicts
+@diagnostics.capture_timing()
 def download_issuetypes(jira_connection, project_ids):
     '''
     For Jira next-gen projects, issue types can be scoped to projects.
@@ -75,6 +80,7 @@ def download_issuetypes(jira_connection, project_ids):
 
 
 # Returns an array of LinkType dicts
+@diagnostics.capture_timing()
 def download_issuelinktypes(jira_connection):
     print('downloading jira issue link types... ', end='', flush=True)
     result = [lt.raw for lt in jira_connection.issue_link_types()]
@@ -83,6 +89,7 @@ def download_issuelinktypes(jira_connection):
 
 
 # Returns an array of Priority dicts
+@diagnostics.capture_timing()
 def download_priorities(jira_connection):
     print('downloading jira priorities... ', end='', flush=True)
     result = [p.raw for p in jira_connection.priorities()]
@@ -92,6 +99,7 @@ def download_priorities(jira_connection):
 
 # Each project has a list of versions.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
+@diagnostics.capture_timing()
 def download_projects_and_versions(
     jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
@@ -126,6 +134,7 @@ def download_projects_and_versions(
 #   - Array of board dicts
 #   - Array of sprint dicts
 #   - Array of board/sprint links
+@diagnostics.capture_timing()
 def download_boards_and_sprints(jira_connection, project_ids):
     b_start_at = 0
     boards = []
@@ -245,6 +254,7 @@ def download_issue_batch(
 # Returns a dict with two items: 'existing' gives a list of all worklogs
 # that currently exist; 'deleted' gives the list of worklogs that
 # existed at some point previously, but have since been deleted
+@diagnostics.capture_timing()
 def download_worklogs(jira_connection, issue_ids):
     print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
