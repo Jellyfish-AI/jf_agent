@@ -2,8 +2,6 @@ import argparse
 from datetime import datetime
 from glob import glob
 import gzip
-import json
-import jsonstreams
 import logging
 import os
 from pathlib import Path
@@ -11,7 +9,6 @@ import requests
 import shutil
 import subprocess
 import traceback
-from types import GeneratorType
 import urllib3
 
 from jira import JIRA
@@ -19,6 +16,7 @@ from jira.resources import GreenHopperResource
 from stashy.client import Stash
 import yaml
 
+from jf_agent import write_file, download_and_write_streaming
 from jf_agent.bb_download import (
     get_all_users as get_bb_users,
     get_all_projects as get_bb_projects,
@@ -331,8 +329,8 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
         write_file(
             outdir,
             'jira_fields',
-            download_fields(jira_connection, include_fields, exclude_fields),
             compress_output_files,
+            download_fields(jira_connection, include_fields, exclude_fields),
         )
 
         project_ids = None
@@ -348,7 +346,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
             nonlocal project_ids
             project_ids = set([proj['id'] for proj in projects_and_versions])
             write_file(
-                outdir, 'jira_projects_and_versions', projects_and_versions, compress_output_files
+                outdir, 'jira_projects_and_versions', compress_output_files, projects_and_versions
             )
 
         _download_and_write_projects_and_versions()
@@ -356,65 +354,59 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
         write_file(
             outdir,
             'jira_users',
-            download_users(jira_connection, gdpr_active),
             compress_output_files,
+            download_users(jira_connection, gdpr_active),
         )
         write_file(
-            outdir, 'jira_resolutions', download_resolutions(jira_connection), compress_output_files
+            outdir, 'jira_resolutions', compress_output_files, download_resolutions(jira_connection)
         )
         write_file(
             outdir,
             'jira_issuetypes',
-            download_issuetypes(jira_connection, project_ids),
             compress_output_files,
+            download_issuetypes(jira_connection, project_ids),
         )
         write_file(
             outdir,
             'jira_linktypes',
-            download_issuelinktypes(jira_connection),
             compress_output_files,
+            download_issuelinktypes(jira_connection),
         )
         write_file(
-            outdir, 'jira_priorities', download_priorities(jira_connection), compress_output_files
+            outdir, 'jira_priorities', compress_output_files, download_priorities(jira_connection)
         )
 
         def _download_and_write_boards_and_sprints():
             boards, sprints, links = download_boards_and_sprints(jira_connection, project_ids)
-            write_file(outdir, 'jira_boards', boards, compress_output_files)
-            write_file(outdir, 'jira_sprints', sprints, compress_output_files)
-            write_file(outdir, 'jira_board_sprint_links', links, compress_output_files)
+            write_file(outdir, 'jira_boards', compress_output_files, boards)
+            write_file(outdir, 'jira_sprints', compress_output_files, sprints)
+            write_file(outdir, 'jira_board_sprint_links', compress_output_files, links)
 
         _download_and_write_boards_and_sprints()
 
-        issue_ids = None
-
-        # We download and write Jira issues using streaming JSON so as to not have to hold them
-        # all in memory before serializing
         def _download_and_write_issues():
-            if compress_output_files:
-                issues_file = gzip.open(f'{outdir}/jira_issues.json.gz', 'wt')
-            else:
-                issues_file = open(f'{outdir}/jira_issues.json', 'w')
+            return download_and_write_streaming(
+                outdir,
+                'jira_issues',
+                compress_output_files,
+                generator_func=download_issue_batch,
+                generator_func_args=(
+                    jira_connection,
+                    project_ids,
+                    include_fields,
+                    exclude_fields,
+                    issue_jql,
+                ),
+                item_id_dict_key='id',
+            )
 
-            nonlocal issue_ids
-            issue_ids = set()
-            with jsonstreams.Stream(jsonstreams.Type.array, fd=issues_file) as s:
-                for issue_batch in download_issue_batch(
-                    jira_connection, project_ids, include_fields, exclude_fields, issue_jql
-                ):
-                    for issue in issue_batch:
-                        s.write(issue)
-                        issue_ids.add(issue['id'])
-
-            issues_file.close()
-
-        _download_and_write_issues()
+        issue_ids = _download_and_write_issues()
 
         write_file(
             outdir,
             'jira_worklogs',
-            download_worklogs(jira_connection, issue_ids),
             compress_output_files,
+            download_worklogs(jira_connection, issue_ids),
         )
     except Exception as e:
         print(f'ERROR: Failed to download jira data:\n{e}')
@@ -456,46 +448,64 @@ def load_and_dump_github(
         )
         return
 
-    write_file(outdir, 'bb_users', get_gh_users(git_conn, include_projects), compress_output_files)
+    write_file(outdir, 'bb_users', compress_output_files, get_gh_users(git_conn, include_projects))
 
     write_file(
         outdir,
         'bb_projects',
-        get_gh_projects(git_conn, include_projects, redact_names_and_urls),
         compress_output_files,
+        get_gh_projects(git_conn, include_projects, redact_names_and_urls),
     )
 
     api_repos = None
 
     def _get_and_write_repos():
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
         nonlocal api_repos
+        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
         api_repos, repos = zip(
             *get_gh_repos(
                 git_conn, include_projects, include_repos, exclude_repos, redact_names_and_urls
             )
         )
-        write_file(outdir, 'bb_repos', repos, compress_output_files)
+        write_file(outdir, 'bb_repos', compress_output_files, repos)
 
     _get_and_write_repos()
 
-    write_file(
-        outdir,
-        'bb_commits',
-        get_gh_default_branch_commits(
-            git_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-        ),
-        compress_output_files,
-    )
+    def _download_and_write_commits():
+        return download_and_write_streaming(
+            outdir,
+            'bb_commits',
+            compress_output_files,
+            generator_func=get_gh_default_branch_commits,
+            generator_func_args=(
+                git_conn,
+                api_repos,
+                strip_text_content,
+                server_git_instance_info,
+                redact_names_and_urls,
+            ),
+            item_id_dict_key='hash',
+        )
 
-    write_file(
-        outdir,
-        'bb_prs',
-        get_gh_pull_requests(
-            git_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-        ),
-        compress_output_files,
-    )
+    _download_and_write_commits()
+
+    def _download_and_write_prs():
+        return download_and_write_streaming(
+            outdir,
+            'bb_prs',
+            compress_output_files,
+            generator_func=get_gh_pull_requests,
+            generator_func_args=(
+                git_conn,
+                api_repos,
+                strip_text_content,
+                server_git_instance_info,
+                redact_names_and_urls,
+            ),
+            item_id_dict_key='id',
+        )
+
+    _download_and_write_prs()
 
 
 def load_and_dump_bb(
@@ -510,13 +520,13 @@ def load_and_dump_bb(
     redact_names_and_urls,
     compress_output_files,
 ):
-    write_file(outdir, 'bb_users', get_bb_users(bb_conn), compress_output_files)
+    write_file(outdir, 'bb_users', compress_output_files, get_bb_users(bb_conn))
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_projects, projects = zip(
         *get_bb_projects(bb_conn, include_projects, exclude_projects, redact_names_and_urls)
     )
-    write_file(outdir, 'bb_projects', projects, compress_output_files)
+    write_file(outdir, 'bb_projects', compress_output_files, projects)
 
     api_repos = None
 
@@ -528,27 +538,45 @@ def load_and_dump_bb(
                 bb_conn, api_projects, include_repos, exclude_repos, redact_names_and_urls
             )
         )
-        write_file(outdir, 'bb_repos', repos, compress_output_files)
+        write_file(outdir, 'bb_repos', compress_output_files, repos)
 
     _get_and_write_repos()
 
-    write_file(
-        outdir,
-        'bb_commits',
-        get_bb_default_branch_commits(
-            bb_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-        ),
-        compress_output_files,
-    )
+    def _download_and_write_commits():
+        return download_and_write_streaming(
+            outdir,
+            'bb_commits',
+            compress_output_files,
+            generator_func=get_bb_default_branch_commits,
+            generator_func_args=(
+                bb_conn,
+                api_repos,
+                strip_text_content,
+                server_git_instance_info,
+                redact_names_and_urls,
+            ),
+            item_id_dict_key='hash',
+        )
 
-    write_file(
-        outdir,
-        'bb_prs',
-        get_bb_pull_requests(
-            bb_conn, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-        ),
-        compress_output_files,
-    )
+    _download_and_write_commits()
+
+    def _download_and_write_prs():
+        return download_and_write_streaming(
+            outdir,
+            'bb_prs',
+            compress_output_files,
+            generator_func=get_bb_pull_requests,
+            generator_func_args=(
+                bb_conn,
+                api_repos,
+                strip_text_content,
+                server_git_instance_info,
+                redact_names_and_urls,
+            ),
+            item_id_dict_key='id',
+        )
+
+    _download_and_write_prs()
 
 
 def get_git_client(provider, git_url, skip_ssl_verification):
@@ -596,18 +624,6 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             return
 
     raise ValueError(f'unsupported git provider {provider}')
-
-
-def write_file(outdir, name, results, compress):
-    if isinstance(results, GeneratorType):
-        results = list(results)
-
-    if compress:
-        with gzip.open(f'{outdir}/{name}.json.gz', 'wb') as outfile:
-            outfile.write(json.dumps(results, indent=2, default=str).encode('utf-8'))
-    else:
-        with open(f'{outdir}/{name}.json', 'w') as outfile:
-            outfile.write(json.dumps(results, indent=2, default=str))
 
 
 def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
