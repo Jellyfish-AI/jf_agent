@@ -4,6 +4,7 @@ import pytz
 from tqdm import tqdm
 
 from jf_agent import pull_since_date_for_repo
+from jf_agent import diagnostics
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
@@ -24,6 +25,7 @@ def _normalize_user(user):
     }
 
 
+@diagnostics.capture_timing()
 def get_all_users(client):
     print('downloading bitbucket users... ', end='', flush=True)
     users = [_normalize_user(user) for user in client.admin.users]
@@ -44,6 +46,7 @@ def _normalize_project(api_project, redact_names_and_urls):
     }
 
 
+@diagnostics.capture_timing()
 def get_all_projects(client, include_projects, exclude_projects, redact_names_and_urls):
     print('downloading bitbucket projects... ', end='', flush=True)
 

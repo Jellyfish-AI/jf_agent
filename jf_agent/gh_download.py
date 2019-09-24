@@ -2,6 +2,7 @@ from dateutil import parser
 from tqdm import tqdm
 
 from jf_agent import pull_since_date_for_repo
+from jf_agent import diagnostics
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 
@@ -27,6 +28,7 @@ def _normalize_user(user):
     return {'id': user['id'], 'login': user['login'], 'name': user['name'], 'email': user['email']}
 
 
+@diagnostics.capture_timing()
 def get_all_users(client, include_orgs):
     print('downloading github users... ', end='', flush=True)
     users = [_normalize_user(user) for org in include_orgs for user in client.get_all_users(org)]
@@ -51,6 +53,7 @@ def _normalize_project(api_org, redact_names_and_urls):
     }
 
 
+@diagnostics.capture_timing()
 def get_all_projects(client, include_orgs, redact_names_and_urls):
     print('downloading github projects... ', end='', flush=True)
     projects = [
