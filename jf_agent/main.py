@@ -196,6 +196,12 @@ def main():
         )
         return
 
+    if git_url and len(server_git_instance_info) != 1:
+        print(
+            f'ERROR: Invalid Git instance info returned from the agent config endpoint -- please contact Jellyfish'
+        )
+        return
+
     # If we're only downloading, do not compress the output files (so they can be more easily inspected)
     compress_output_files = (
         False if (run_mode_includes_download and not run_mode_includes_send) else True
