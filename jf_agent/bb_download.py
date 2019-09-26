@@ -1,11 +1,14 @@
 from datetime import datetime
+import logging
 import stashy
 import pytz
 from tqdm import tqdm
 
-from jf_agent import pull_since_date_for_repo
+from jf_agent import pull_since_date_for_repo, agent_logging
 from jf_agent import diagnostics
 from jf_agent.name_redactor import NameRedactor, sanitize_text
+
+logger = logging.getLogger(__name__)
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -26,6 +29,7 @@ def _normalize_user(user):
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_all_users(client):
     print('downloading bitbucket users... ', end='', flush=True)
     users = [_normalize_user(user) for user in client.admin.users]
@@ -47,6 +51,7 @@ def _normalize_project(api_project, redact_names_and_urls):
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_all_projects(client, include_projects, exclude_projects, redact_names_and_urls):
     print('downloading bitbucket projects... ', end='', flush=True)
 
@@ -103,6 +108,7 @@ def _normalize_repo(api_project, api_repo, redact_names_and_urls):
     }
 
 
+@agent_logging.log_entry_exit(logger)
 def get_all_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     print('downloading bitbucket repositories... ', end='', flush=True)
 
@@ -142,33 +148,38 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 def get_default_branch_commits(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
-    for api_repo in api_repos:
-        repo = api_repo.get()
-        api_project = client.projects[repo['project']['key']]
-        pull_since = pull_since_date_for_repo(
-            server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
-        )
-        try:
-            default_branch = api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-            commits = api_project.repos[repo['name']].commits(until=default_branch)
-
-            for commit in tqdm(
-                commits, desc=f'downloading commits for {repo["name"]}', unit='commits'
-            ):
-                normalized_commit = _normalize_commit(
-                    commit, repo, strip_text_content, redact_names_and_urls
-                )
-                # commits are ordered newest to oldest
-                # if this is too old, we're done with this repo
-                if pull_since and normalized_commit['commit_date'] < pull_since:
-                    break
-
-                yield normalized_commit
-
-        except stashy.errors.NotFoundException as e:
-            print(
-                f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}. Skipping...'
+    for i, api_repo in enumerate(api_repos, start=1):
+        with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+            repo = api_repo.get()
+            api_project = client.projects[repo['project']['key']]
+            pull_since = pull_since_date_for_repo(
+                server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
+            try:
+                default_branch = (
+                    api_repo.default_branch['displayId'] if api_repo.default_branch else ''
+                )
+                commits = api_project.repos[repo['name']].commits(until=default_branch)
+
+                for j, commit in enumerate(
+                    tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
+                    start=1,
+                ):
+                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                        normalized_commit = _normalize_commit(
+                            commit, repo, strip_text_content, redact_names_and_urls
+                        )
+                        # commits are ordered newest to oldest
+                        # if this is too old, we're done with this repo
+                        if pull_since and normalized_commit['commit_date'] < pull_since:
+                            break
+
+                        yield normalized_commit
+
+            except stashy.errors.NotFoundException as e:
+                print(
+                    f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}. Skipping...'
+                )
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
@@ -191,127 +202,136 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
-    for api_repo in api_repos:
-        repo = api_repo.get()
-        api_project = client.projects[repo['project']['key']]
-        api_repo = api_project.repos[repo['name']]
-        pull_since = pull_since_date_for_repo(
-            server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
-        )
-        for pr in tqdm(
-            api_repo.pull_requests.all(state='ALL', order='NEWEST'),
-            desc=f'downloading PRs for {repo["name"]}',
-            unit='prs',
-        ):
-            updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
-            # PRs are ordered newest to oldest
-            # if this is too old, we're done with this repo
-            if pull_since and updated_at < pull_since:
-                break
-
-            api_pr = api_repo.pull_requests[pr['id']]
-
-            try:
-                pr_diffs = api_pr.diff().diffs
-            except TypeError:
-                additions, deletions, changed_files = None, None, None
-            except stashy.errors.NotFoundException:
-                additions, deletions, changed_files = None, None, None
-            else:
-                additions, deletions, changed_files = 0, 0, 0
-
-                for pr_diff in pr_diffs:
-                    changed_files += 1
-                    for hunk in pr_diff.hunks:
-                        for segment in hunk['segments']:
-                            if segment['type'] == 'ADDED':
-                                additions += len(segment['lines'])
-                            if segment['type'] == 'REMOVED':
-                                deletions += len(segment['lines'])
-
-            comments = []
-            approvals = []
-            merge_date = None
-            merged_by = None
-
-            for activity in sorted(
-                [a for a in api_pr.activities()], key=lambda x: x['createdDate']
-            ):
-                if activity['action'] == 'COMMENTED':
-                    comments.append(
-                        {
-                            'user': _normalize_user(activity['comment']['author']),
-                            'body': sanitize_text(activity['comment']['text'], strip_text_content),
-                            'created_at': datetime_from_bitbucket_server_timestamp(
-                                activity['comment']['createdDate']
-                            ),
-                        }
-                    )
-                elif activity['action'] in ('APPROVED', 'REVIEWED'):
-                    approvals.append(
-                        {
-                            'foreign_id': activity['id'],
-                            'user': _normalize_user(activity['user']),
-                            'review_state': activity['action'],
-                        }
-                    )
-                elif activity['action'] == 'MERGED':
-                    merge_date = datetime_from_bitbucket_server_timestamp(activity['createdDate'])
-                    merged_by = _normalize_user(activity['user'])
-
-            closed_date = (
-                datetime_from_bitbucket_server_timestamp(pr['closedDate'])
-                if pr.get('closedDate')
-                else None
+    for i, api_repo in enumerate(api_repos, start=1):
+        with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+            repo = api_repo.get()
+            api_project = client.projects[repo['project']['key']]
+            api_repo = api_project.repos[repo['name']]
+            pull_since = pull_since_date_for_repo(
+                server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
             )
+            for pr in tqdm(
+                api_repo.pull_requests.all(state='ALL', order='NEWEST'),
+                desc=f'downloading PRs for {repo["name"]}',
+                unit='prs',
+            ):
+                updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
+                # PRs are ordered newest to oldest
+                # if this is too old, we're done with this repo
+                if pull_since and updated_at < pull_since:
+                    break
 
-            try:
-                commits = [
-                    _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
-                    for c in tqdm(
-                        api_pr.commits(),
-                        f'downloading commits for PR {pr["id"]}',
-                        leave=False,
-                        unit='commits',
-                    )
-                ]
-            except stashy.errors.NotFoundException:
-                print(
-                    f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
+                api_pr = api_repo.pull_requests[pr['id']]
+
+                try:
+                    pr_diffs = api_pr.diff().diffs
+                except TypeError:
+                    additions, deletions, changed_files = None, None, None
+                except stashy.errors.NotFoundException:
+                    additions, deletions, changed_files = None, None, None
+                else:
+                    additions, deletions, changed_files = 0, 0, 0
+
+                    for pr_diff in pr_diffs:
+                        changed_files += 1
+                        for hunk in pr_diff.hunks:
+                            for segment in hunk['segments']:
+                                if segment['type'] == 'ADDED':
+                                    additions += len(segment['lines'])
+                                if segment['type'] == 'REMOVED':
+                                    deletions += len(segment['lines'])
+
+                comments = []
+                approvals = []
+                merge_date = None
+                merged_by = None
+
+                for activity in sorted(
+                    [a for a in api_pr.activities()], key=lambda x: x['createdDate']
+                ):
+                    if activity['action'] == 'COMMENTED':
+                        comments.append(
+                            {
+                                'user': _normalize_user(activity['comment']['author']),
+                                'body': sanitize_text(
+                                    activity['comment']['text'], strip_text_content
+                                ),
+                                'created_at': datetime_from_bitbucket_server_timestamp(
+                                    activity['comment']['createdDate']
+                                ),
+                            }
+                        )
+                    elif activity['action'] in ('APPROVED', 'REVIEWED'):
+                        approvals.append(
+                            {
+                                'foreign_id': activity['id'],
+                                'user': _normalize_user(activity['user']),
+                                'review_state': activity['action'],
+                            }
+                        )
+                    elif activity['action'] == 'MERGED':
+                        merge_date = datetime_from_bitbucket_server_timestamp(
+                            activity['createdDate']
+                        )
+                        merged_by = _normalize_user(activity['user'])
+
+                closed_date = (
+                    datetime_from_bitbucket_server_timestamp(pr['closedDate'])
+                    if pr.get('closedDate')
+                    else None
                 )
-                commits = []
 
-            normalized_pr = {
-                'id': pr['id'],
-                'author': _normalize_user(pr['author']['user']),
-                'title': sanitize_text(pr['title'], strip_text_content),
-                'body': sanitize_text(pr.get('description'), strip_text_content),
-                'is_closed': pr['state'] != 'OPEN',
-                'is_merged': pr['state'] == 'MERGED',
-                'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
-                'updated_at': updated_at,
-                'closed_date': closed_date,
-                'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
-                'base_repo': _normalize_pr_repo(pr['toRef']['repository'], redact_names_and_urls),
-                'base_branch': (
-                    pr['toRef']['displayId']
-                    if not redact_names_and_urls
-                    else _branch_redactor.redact_name(pr['toRef']['displayId'])
-                ),
-                'head_repo': _normalize_pr_repo(pr['fromRef']['repository'], redact_names_and_urls),
-                'head_branch': (
-                    pr['fromRef']['displayId']
-                    if not redact_names_and_urls
-                    else _branch_redactor.redact_name(pr['fromRef']['displayId'])
-                ),
-                'additions': additions,
-                'deletions': deletions,
-                'changed_files': changed_files,
-                'comments': comments,
-                'approvals': approvals,
-                'merge_date': merge_date,
-                'merged_by': merged_by,
-                'commits': commits,
-            }
+                try:
+                    commits = [
+                        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+                        for c in tqdm(
+                            api_pr.commits(),
+                            f'downloading commits for PR {pr["id"]}',
+                            leave=False,
+                            unit='commits',
+                        )
+                    ]
+                except stashy.errors.NotFoundException:
+                    print(
+                        f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
+                    )
+                    commits = []
 
-            yield normalized_pr
+                normalized_pr = {
+                    'id': pr['id'],
+                    'author': _normalize_user(pr['author']['user']),
+                    'title': sanitize_text(pr['title'], strip_text_content),
+                    'body': sanitize_text(pr.get('description'), strip_text_content),
+                    'is_closed': pr['state'] != 'OPEN',
+                    'is_merged': pr['state'] == 'MERGED',
+                    'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
+                    'updated_at': updated_at,
+                    'closed_date': closed_date,
+                    'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
+                    'base_repo': _normalize_pr_repo(
+                        pr['toRef']['repository'], redact_names_and_urls
+                    ),
+                    'base_branch': (
+                        pr['toRef']['displayId']
+                        if not redact_names_and_urls
+                        else _branch_redactor.redact_name(pr['toRef']['displayId'])
+                    ),
+                    'head_repo': _normalize_pr_repo(
+                        pr['fromRef']['repository'], redact_names_and_urls
+                    ),
+                    'head_branch': (
+                        pr['fromRef']['displayId']
+                        if not redact_names_and_urls
+                        else _branch_redactor.redact_name(pr['fromRef']['displayId'])
+                    ),
+                    'additions': additions,
+                    'deletions': deletions,
+                    'changed_files': changed_files,
+                    'comments': comments,
+                    'approvals': approvals,
+                    'merge_date': merge_date,
+                    'merged_by': merged_by,
+                    'commits': commits,
+                }
+
+                yield normalized_pr

@@ -1,10 +1,12 @@
 from dateutil import parser
+import logging
 from tqdm import tqdm
 
-from jf_agent import pull_since_date_for_repo
+from jf_agent import pull_since_date_for_repo, agent_logging
 from jf_agent import diagnostics
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
+logger = logging.getLogger(__name__)
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -29,6 +31,7 @@ def _normalize_user(user):
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_all_users(client, include_orgs):
     print('downloading github users... ', end='', flush=True)
     users = [_normalize_user(user) for org in include_orgs for user in client.get_all_users(org)]
@@ -54,6 +57,7 @@ def _normalize_project(api_org, redact_names_and_urls):
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_all_projects(client, include_orgs, redact_names_and_urls):
     print('downloading github projects... ', end='', flush=True)
     projects = [
@@ -102,6 +106,7 @@ def _normalize_repo(client, org_name, repo, redact_names_and_urls):
     }
 
 
+@agent_logging.log_entry_exit(logger)
 def get_all_repos(client, include_orgs, include_repos, exclude_repos, redact_names_and_urls):
     print('downloading github repos... ', end='', flush=True)
 
@@ -156,22 +161,29 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 def get_default_branch_commits(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
-    for repo in api_repos:
-        pull_since = pull_since_date_for_repo(
-            server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
-        )
-        try:
-            for commit in tqdm(
-                client.get_commits(
-                    repo['full_name'], repo['default_branch'], since=pull_since, until=None
-                ),
-                desc=f'downloading commits for {repo["name"]}',
-                unit='commits',
-            ):
-                yield _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls)
+    for i, repo in enumerate(api_repos, start=1):
+        with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+            pull_since = pull_since_date_for_repo(
+                server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
+            )
+            try:
+                for j, commit in enumerate(
+                    tqdm(
+                        client.get_commits(
+                            repo['full_name'], repo['default_branch'], since=pull_since, until=None
+                        ),
+                        desc=f'downloading commits for {repo["name"]}',
+                        unit='commits',
+                    ),
+                    start=1,
+                ):
+                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                        yield _normalize_commit(
+                            commit, repo, strip_text_content, redact_names_and_urls
+                        )
 
-        except Exception as e:
-            print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
+            except Exception as e:
+                print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
 
 
 def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
@@ -237,25 +249,30 @@ def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
 
-    for repo in api_repos:
-        pull_since = pull_since_date_for_repo(
-            server_git_instance_info, repo['organization']['login'], repo['id'], 'prs'
-        )
-        try:
-            for pr in tqdm(
-                client.get_pullrequests(repo['full_name']),
-                desc=f'downloading PRs for {repo["name"]}',
-                unit='prs',
-            ):
-                updated_at = parser.parse(pr['updated_at'])
+    for i, repo in enumerate(api_repos, start=1):
+        with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+            pull_since = pull_since_date_for_repo(
+                server_git_instance_info, repo['organization']['login'], repo['id'], 'prs'
+            )
+            try:
+                for j, pr in enumerate(
+                    tqdm(
+                        client.get_pullrequests(repo['full_name']),
+                        desc=f'downloading PRs for {repo["name"]}',
+                        unit='prs',
+                    ),
+                    start=1,
+                ):
+                    with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
+                        updated_at = parser.parse(pr['updated_at'])
 
-                # PRs are ordered newest to oldest
-                # if this is too old, we're done with this repo
-                if pull_since and updated_at < pull_since:
-                    break
+                        # PRs are ordered newest to oldest
+                        # if this is too old, we're done with this repo
+                        if pull_since and updated_at < pull_since:
+                            break
 
-                yield _normalize_pr(client, pr, strip_text_content, redact_names_and_urls)
+                        yield _normalize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
-        except Exception as e:
-            print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
+            except Exception as e:
+                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
     print()

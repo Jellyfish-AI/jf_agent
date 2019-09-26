@@ -1,12 +1,13 @@
-from jf_agent.session import retry_session
-from requests.utils import default_user_agent
-import requests
-
 from collections import deque
 from datetime import datetime
-import time
-import pytz
 import logging
+import pytz
+import requests
+from requests.utils import default_user_agent
+import time
+
+from jf_agent import agent_logging
+from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,10 @@ class GithubClient:
                     )
                     now = datetime.utcnow().replace(tzinfo=pytz.utc)
                     reset_wait = reset_time - now
-                    logger.warn(
-                        f'Github rate limit exceeded.  Trying again in {str(reset_wait)}...'
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.WARNING,
+                        f'Github rate limit exceeded.  Trying again in {str(reset_wait)}...',
                     )
                     time.sleep(reset_wait.seconds)
                     continue

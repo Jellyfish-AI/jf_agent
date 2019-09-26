@@ -10,13 +10,14 @@ from jira.resources import dict2resource
 from jira.exceptions import JIRAError
 from jira.utils import json_loads
 
-from jf_agent import diagnostics
+from jf_agent import diagnostics, agent_logging
 
 logger = logging.getLogger(__name__)
 
 
 # Returns an array of User dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_users(jira_connection, gdpr_active):
     print('downloading jira users... ', end='', flush=True)
 
@@ -34,6 +35,7 @@ def download_users(jira_connection, gdpr_active):
 
 # Returns an array of Field dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_fields(jira_connection, include_fields, exclude_fields):
 
     print('downloading jira fields... ', end='', flush=True)
@@ -52,6 +54,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
 # Returns an array of Resolutions dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_resolutions(jira_connection):
     print('downloading jira resolutions... ', end='', flush=True)
     result = [r.raw for r in jira_connection.resolutions()]
@@ -61,6 +64,7 @@ def download_resolutions(jira_connection):
 
 # Returns an array of IssueType dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_issuetypes(jira_connection, project_ids):
     '''
     For Jira next-gen projects, issue types can be scoped to projects.
@@ -81,6 +85,7 @@ def download_issuetypes(jira_connection, project_ids):
 
 # Returns an array of LinkType dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_issuelinktypes(jira_connection):
     print('downloading jira issue link types... ', end='', flush=True)
     result = [lt.raw for lt in jira_connection.issue_link_types()]
@@ -90,6 +95,7 @@ def download_issuelinktypes(jira_connection):
 
 # Returns an array of Priority dicts
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_priorities(jira_connection):
     print('downloading jira priorities... ', end='', flush=True)
     result = [p.raw for p in jira_connection.priorities()]
@@ -100,6 +106,7 @@ def download_priorities(jira_connection):
 # Each project has a list of versions.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_projects_and_versions(
     jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
@@ -135,6 +142,7 @@ def download_projects_and_versions(
 #   - Array of sprint dicts
 #   - Array of board/sprint links
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_boards_and_sprints(jira_connection, project_ids):
     b_start_at = 0
     boards = []
@@ -175,7 +183,7 @@ def download_boards_and_sprints(jira_connection, project_ids):
                 # misconfigured; "falied to execute search"; etc.  Just
                 # skip and move on
                 if e.status_code == 500 or e.status_code == 404:
-                    logger.warn(f"Couldn't get sprints for board {b.id}.  Skipping...")
+                    print(f"Couldn't get sprints for board {b.id}.  Skipping...")
                 else:
                     raise
 
@@ -255,6 +263,7 @@ def download_issue_batch(
 # that currently exist; 'deleted' gives the list of worklogs that
 # existed at some point previously, but have since been deleted
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_worklogs(jira_connection, issue_ids):
     print(f'downloading jira worklogs... ', end='', flush=True)
     updated = []
@@ -270,7 +279,7 @@ def download_worklogs(jira_connection, issue_ids):
         try:
             worklog_list_json = json_loads(resp)
         except ValueError:
-            logger.exception("Couldn't parse JIRA response as JSON: %s", resp.text)
+            print("Couldn't parse JIRA response as JSON: %s", resp.text)
             raise
 
         updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
@@ -387,6 +396,7 @@ def _search_users(
     ]
 
 
+@agent_logging.log_entry_exit(logger)
 def _download_some_jira_issues(
     i, issue_jql, include_fields, exclude_fields, jira_connection, start_at, end_at, q
 ):
@@ -409,9 +419,11 @@ def _download_some_jira_issues(
             issues_retrieved = len(issues)
             start_at += issues_retrieved
             if issues_retrieved == 0:
-                logger.warn(
-                    f'[Thread {i}] Jira issue downloaded might be stuck; asked for {batch_size} issues starting at {start_at}, '
-                    f'ending at ending at {min(end_at, total_issues)}, got none back.  Trying again...'
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Thread {i} - Jira issue downloaded might be stuck; asked for {batch_size} issues starting at {start_at}, '
+                    f'ending at ending at {min(end_at, total_issues)}, got none back.  Trying again...',
                 )
 
             raw_issues = [i.raw for i in issues]
@@ -424,7 +436,9 @@ def _download_some_jira_issues(
         q.put(None)
 
     except BaseException as e:
-        logger.info(f'[Thread {i}] Jira issue downloader FAILED')
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Thread {i} - Jira issue downloader FAILED', exc_info=True
+        )
         q.put(e)
 
 
@@ -452,7 +466,9 @@ def _get_jira_issues_batch(
                 jira_connection.search_issues(issue_jql, **search_kwargs), jira_connection
             )
         except JIRAError:
-            logger.exception(f'JIRAError, reducing batch size')
+            agent_logging.log_and_print(
+                logger, logging.ERROR, 'JIRAError, reducing batch size', exc_info=True
+            )
             ## back off the max results requested to try and avoid the error
             max_results = int(max_results / 2)
             if max_results == 0:
