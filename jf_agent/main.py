@@ -8,7 +8,6 @@ from pathlib import Path
 import requests
 import shutil
 import subprocess
-import traceback
 import urllib3
 
 from jira import JIRA
@@ -16,7 +15,7 @@ from jira.resources import GreenHopperResource
 from stashy.client import Stash
 import yaml
 
-from jf_agent import diagnostics, write_file, download_and_write_streaming
+from jf_agent import diagnostics, write_file, download_and_write_streaming, agent_logging
 from jf_agent.bb_download import (
     get_all_users as get_bb_users,
     get_all_projects as get_bb_projects,
@@ -46,12 +45,12 @@ from jf_agent.jira_download import (
 )
 from jf_agent.session import retry_session
 
+logger = logging.getLogger(__name__)
+
 JELLYFISH_API_BASE = 'https://jellyfish.co'
 
 
 def main():
-    logging.basicConfig(level=logging.WARNING)
-
     valid_run_modes = ('download_and_send', 'download_only', 'send_only', 'print_all_jira_fields')
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -142,20 +141,20 @@ def main():
             print('ERROR: Provide output_basedir if downloading, not prev_output_dir')
             return
 
-        output_basedir = args.output_basedir
-        output_dir_timestamp = now.strftime('%Y%m%d_%H%M%S')
-        outdir = os.path.join(output_basedir, output_dir_timestamp)
-        try:
-            os.makedirs(outdir, exist_ok=False)
-        except FileExistsError:
-            print(f"ERROR: Output dir {outdir} already exists")
-            return
-        except Exception:
-            print(
-                f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
-            )
-            return
-        print(f'Will write output files into {outdir}')
+    output_basedir = args.output_basedir
+    output_dir_timestamp = now.strftime('%Y%m%d_%H%M%S')
+    outdir = os.path.join(output_basedir, output_dir_timestamp)
+    try:
+        os.makedirs(outdir, exist_ok=False)
+    except FileExistsError:
+        print(f"ERROR: Output dir {outdir} already exists")
+        return
+    except Exception:
+        print(
+            f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
+        )
+        return
+    print(f'Will write output files into {outdir}')
 
     if run_mode_is_print_all_jira_fields and not jira_url:
         print(f'ERROR: Must provide jira_url for mode {run_mode}')
@@ -168,6 +167,8 @@ def main():
             print(f'ERROR: prev_output_dir ("{args.prev_output_dir}") is not a directory')
             return
         outdir = args.prev_output_dir
+
+    agent_logging.configure(outdir)
 
     api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not api_token:
@@ -270,6 +271,7 @@ def main():
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(jira_connection, jira_config):
     include_fields = set(jira_config.get('include_fields', []))
     exclude_fields = set(jira_config.get('exclude_fields', []))
@@ -278,6 +280,7 @@ def print_all_jira_fields(jira_connection, jira_config):
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def download_data(
     outdir,
     jira_connection,
@@ -328,11 +331,13 @@ def download_data(
                     compress_output_files,
                 )
         except Exception as e:
-            print(f'ERROR: Failed to download {provider} data:\n{e}')
-            print(traceback.format_exc())
+            agent_logging.log_and_print(
+                logger, logging.ERROR, f'Failed to download {provider} data:\n{e}', exc_info=True
+            )
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_files):
     try:
         include_fields = set(jira_config.get('include_fields', []))
@@ -404,6 +409,7 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
         download_and_write_boards_and_sprints()
 
         @diagnostics.capture_timing()
+        @agent_logging.log_entry_exit(logger)
         def download_and_write_issues():
             return download_and_write_streaming(
                 outdir,
@@ -429,11 +435,13 @@ def load_and_dump_jira(outdir, jira_config, jira_connection, compress_output_fil
             download_worklogs(jira_connection, issue_ids),
         )
     except Exception as e:
-        print(f'ERROR: Failed to download jira data:\n{e}')
-        print(traceback.format_exc())
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
+        )
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_basic_jira_connection(url, username, password, skip_ssl_verification):
     try:
         return JIRA(
@@ -446,11 +454,13 @@ def get_basic_jira_connection(url, username, password, skip_ssl_verification):
             },
         )
     except Exception as e:
-        print(f'ERROR: Failed to connect to Jira:\n{e}')
-        print(traceback.format_exc())
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
+        )
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def load_and_dump_github(
     outdir,
     git_conn,
@@ -482,6 +492,7 @@ def load_and_dump_github(
     api_repos = None
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
@@ -496,6 +507,7 @@ def load_and_dump_github(
     get_and_write_repos()
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
@@ -515,6 +527,7 @@ def load_and_dump_github(
     download_and_write_commits()
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
@@ -535,6 +548,7 @@ def load_and_dump_github(
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def load_and_dump_bb(
     outdir,
     bb_conn,
@@ -558,6 +572,7 @@ def load_and_dump_bb(
     api_repos = None
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
@@ -572,6 +587,7 @@ def load_and_dump_bb(
     get_and_write_repos()
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
@@ -591,6 +607,7 @@ def load_and_dump_bb(
     download_and_write_commits()
 
     @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
     def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
@@ -611,6 +628,7 @@ def load_and_dump_bb(
 
 
 @diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
 def get_git_client(provider, git_url, skip_ssl_verification):
     if provider == 'bitbucket_server':
         bb_username = os.environ.get('BITBUCKET_USERNAME', None)
@@ -630,8 +648,9 @@ def get_git_client(provider, git_url, skip_ssl_verification):
                 session=retry_session(),
             )
         except Exception as e:
-            print(f'ERROR: Failed to connect to Bitbucket:\n{e}')
-            print(traceback.format_exc())
+            agent_logging.log_and_print(
+                logger, logging.ERROR, f'Failed to connect to Bitbucket:\n{e}', exc_info=True
+            )
             return
 
     elif provider == 'github':
@@ -651,8 +670,9 @@ def get_git_client(provider, git_url, skip_ssl_verification):
             )
 
         except Exception as e:
-            print(f'ERROR: Failed to connect to GitHub:\n{e}')
-            print(traceback.format_exc())
+            agent_logging.log_and_print(
+                logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
+            )
             return
 
     raise ValueError(f'unsupported git provider {provider}')
