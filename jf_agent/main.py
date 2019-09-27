@@ -208,57 +208,64 @@ def main():
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
-    diagnostics.open_file(outdir)
 
-    try:
-        diagnostics.capture_run_args(args.mode, args.config_file, outdir, args.prev_output_dir)
+    if run_mode == 'send_only':
+        # Importantly, don't overwrite the already-existing diagnostics file
+        pass
 
-        jira_connection = None
-        if jira_url:
-            jira_username = os.environ.get('JIRA_USERNAME', None)
-            jira_password = os.environ.get('JIRA_PASSWORD', None)
-            if jira_username and jira_password:
-                jira_connection = get_basic_jira_connection(
-                    jira_url, jira_username, jira_password, skip_ssl_verification
-                )
-            else:
-                print(
-                    'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
-                )
+    else:
+        diagnostics.open_file(outdir)
 
-        if run_mode_is_print_all_jira_fields:
-            if jira_connection:
-                print_all_jira_fields(jira_connection, jira_config)
-            return
+        try:
+            diagnostics.capture_run_args(args.mode, args.config_file, outdir, args.prev_output_dir)
 
-        if git_url:
-            provider = git_config.get('provider', 'bitbucket_server')
-            if provider not in ('bitbucket_server', 'github'):
-                print(
-                    f'ERROR: Unsupported Git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
-                )
+            jira_connection = None
+            if jira_url:
+                jira_username = os.environ.get('JIRA_USERNAME', None)
+                jira_password = os.environ.get('JIRA_PASSWORD', None)
+                if jira_username and jira_password:
+                    jira_connection = get_basic_jira_connection(
+                        jira_url, jira_username, jira_password, skip_ssl_verification
+                    )
+                else:
+                    print(
+                        'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD. Skipping Jira...'
+                    )
+
+            if run_mode_is_print_all_jira_fields:
+                if jira_connection:
+                    print_all_jira_fields(jira_connection, jira_config)
                 return
 
-            git_connection = get_git_client(provider, git_url, skip_ssl_verification)
-        else:
-            git_connection = None
+            if git_url:
+                provider = git_config.get('provider', 'bitbucket_server')
+                if provider not in ('bitbucket_server', 'github'):
+                    print(
+                        f'ERROR: Unsupported Git provider {provider}. Provider should be one of `bitbucket_server` or `github`'
+                    )
+                    return
 
-        if run_mode_includes_download:
-            download_data(
-                outdir,
-                jira_connection,
-                jira_config,
-                skip_ssl_verification,
-                git_connection,
-                git_config,
-                server_git_instance_info,
-                compress_output_files,
-            )
+                git_connection = get_git_client(provider, git_url, skip_ssl_verification)
+            else:
+                git_connection = None
 
-        diagnostics.capture_outdir_size(outdir)
+            if run_mode_includes_download:
+                download_data(
+                    outdir,
+                    jira_connection,
+                    jira_config,
+                    skip_ssl_verification,
+                    git_connection,
+                    git_config,
+                    server_git_instance_info,
+                    compress_output_files,
+                )
 
-    finally:
-        diagnostics.close_file()
+            diagnostics.capture_outdir_size(outdir)
+
+
+        finally:
+            diagnostics.close_file()
 
     if run_mode_includes_send:
         send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key)
