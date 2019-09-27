@@ -27,7 +27,7 @@ def configure(outdir):
         format='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         filename=os.path.join(outdir, 'jf_agent.log'),
-        filemode='w',
+        filemode='a',  # May be adding to a file created in a previous run
     )
 
 
