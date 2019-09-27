@@ -8,6 +8,7 @@ from pathlib import Path
 import requests
 import shutil
 import subprocess
+import threading
 import urllib3
 
 from jira import JIRA
@@ -208,13 +209,20 @@ def main():
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
-
     if run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
 
     else:
         diagnostics.open_file(outdir)
+
+        sys_diag_done_event = threading.Event()
+        sys_diag_collector = threading.Thread(
+            target=diagnostics.continually_gather_system_diagnostics,
+            name='sys_diag_collector',
+            args=(sys_diag_done_event, outdir),
+        )
+        sys_diag_collector.start()
 
         try:
             diagnostics.capture_run_args(args.mode, args.config_file, outdir, args.prev_output_dir)
@@ -263,6 +271,9 @@ def main():
 
             diagnostics.capture_outdir_size(outdir)
 
+            # Kills the sys_diag_collector thread
+            sys_diag_done_event.set()
+            sys_diag_collector.join()
 
         finally:
             diagnostics.close_file()
