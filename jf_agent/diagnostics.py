@@ -1,9 +1,15 @@
-from datetime import datetime
+from collections import namedtuple
+from datetime import datetime, timedelta
 from functools import wraps
 import json
 import os
 import pytz
+import shutil
 import subprocess
+import threading
+import time
+
+import psutil
 
 
 DIAGNOSTICS_FILE = None
@@ -66,6 +72,68 @@ def capture_outdir_size(outdir):
             ),
         }
     )
+
+
+def continually_gather_system_diagnostics(kill_event, outdir):
+    def _flush_cached_readings(cached_readings):
+        if not cached_readings:
+            return
+        _write_diagnostic(
+            {
+                'type': 'sys_resources_60s',
+                'start': pytz.utc.localize(cached_readings[0].time).isoformat(),
+                'end': pytz.utc.localize(cached_readings[-1].time).isoformat(),
+                'cpu_pct': ['%.2f' % r.cpu_pct for r in cached_readings],
+                'mem_used_gb': ['%.2f' % r.memory_used_gb for r in cached_readings],
+                'mem_pct': ['%.2f' % r.memory_pct for r in cached_readings],
+                'disk_used_gb': ['%.2f' % r.disk_used_gb for r in cached_readings],
+                'disk_pct': ['%.2f' % r.disk_pct for r in cached_readings],
+            }
+        )
+
+    SysReading = namedtuple(
+        'SysReading',
+        ('time', 'cpu_pct', 'memory_used_gb', 'memory_pct', 'disk_used_gb', 'disk_pct'),
+    )
+
+    now = datetime.utcnow()
+    readings = threading.local()
+    readings.cached_readings = []
+    readings.last_reading_time = None
+    readings.last_flush_time = now
+
+    while True:
+        if kill_event.is_set():
+            _flush_cached_readings(readings.cached_readings)
+            readings.cached_readings = []
+            return
+        else:
+            now = datetime.utcnow()
+            if not readings.last_reading_time or (now - readings.last_reading_time) > timedelta(
+                seconds=60
+            ):
+                cpu = psutil.cpu_percent()
+                memory = psutil.virtual_memory()
+                disk = shutil.disk_usage(outdir)
+                readings.cached_readings.append(
+                    SysReading(
+                        now,
+                        cpu / 100,
+                        (memory.total - memory.available) / (1024 ** 3),
+                        (memory.total - memory.available) / memory.total,
+                        disk.used / (1024 ** 3),
+                        disk.used / disk.total,
+                    )
+                )
+                readings.last_reading_time = now
+
+            if now - readings.last_flush_time > timedelta(seconds=300):
+                _flush_cached_readings(readings.cached_readings)
+                readings.cached_readings = []
+                readings.last_flush_time = now
+
+            # Keep the sleep short so that the thread's responsive to the kill_event
+            time.sleep(1)
 
 
 def open_file(outdir):
