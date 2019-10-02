@@ -8,7 +8,7 @@ class NameRedactor:
         self.preserve_names = preserve_names or []
 
     def redact_name(self, name):
-        if name in self.preserve_names:
+        if not name or name in self.preserve_names:
             return name
 
         redacted_name = self.redacted_names.get(name)
