@@ -178,7 +178,7 @@ def get_default_branch_commits(
 
             except stashy.errors.NotFoundException as e:
                 print(
-                    f'WARN: Got NotFoundException for branch {repo["default_branch_name"]}: {e}. Skipping...'
+                    f'WARN: Got NotFoundException for branch \"{repo.get("default_branch_name", "")}\": {e}. Skipping...'
                 )
 
 
