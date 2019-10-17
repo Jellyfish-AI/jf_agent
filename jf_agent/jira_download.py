@@ -293,7 +293,7 @@ def download_worklogs(jira_connection, issue_ids):
 
 
 def _jira_user_key(user_dict):
-    return user_dict.get('key', user_dict['accountId'])
+    return user_dict.get('key', user_dict.get('accountId', 'unknown_key'))
 
 
 def _search_all_users(jira_connection, gdpr_active):
