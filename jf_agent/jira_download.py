@@ -292,6 +292,46 @@ def download_worklogs(jira_connection, issue_ids):
     return {'existing': updated, 'deleted': []}
 
 
+# Returns an array of CustomFieldOption items
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def download_customfieldoptions(jira_connection):
+    print('downloading jira custom field options... ', end='', flush=True)
+    try:
+        meta = jira_connection.createmeta(projectIds=None, expand='projects.issuetypes.fields')
+    except JIRAError:
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Error calling createmeta JIRA endpoint', exc_info=True
+        )
+        return []
+
+    # Custom values are buried deep in the createmeta response:
+    #     projects -> issuetypes -> fields -> allowedValues
+    opt_dict = {}
+    for project in meta['projects']:
+        for issue_type in project['issuetypes']:
+            for field in issue_type['fields'].values():
+                field_key = field['key']
+                # same field may end up in multiple issue types (bug, task, etc),
+                # so check if we've already added it
+                if field_key not in opt_dict and _is_option_field(field):
+                    opt_dict[field_key] = field['allowedValues']
+
+    result = [{'field_key': k, 'raw_json': v} for k, v in opt_dict.items()]
+    print('✓')
+    return result
+
+
+# return True if this field is either a single or multi select option
+# field_meta is a dict that comes from raw field json
+def _is_option_field(field_meta):
+    schema = field_meta['schema']
+    is_option_field = schema['type'] == 'option' or (
+        'items' in schema and schema['items'] == 'option'
+    )
+    return is_option_field
+
+
 def _jira_user_key(user_dict):
     return user_dict.get('key', user_dict.get('accountId', 'unknown_key'))
 
