@@ -310,8 +310,10 @@ def download_customfieldoptions(jira_connection):
     opt_dict = {}
     for project in meta['projects']:
         for issue_type in project['issuetypes']:
-            for field in issue_type['fields'].values():
-                field_key = field['key']
+            for field_key, field in issue_type['fields'].items():
+                # we've seen variance in the location of the key field -- use it if it's available (OJ-5279)
+                if 'key' in field:
+                    field_key = field['key']
                 # same field may end up in multiple issue types (bug, task, etc),
                 # so check if we've already added it
                 if field_key not in opt_dict and _is_option_field(field):
