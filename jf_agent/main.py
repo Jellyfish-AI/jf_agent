@@ -44,6 +44,7 @@ from jf_agent.jira_download import (
     download_boards_and_sprints,
     download_issue_batch,
     download_worklogs,
+    download_customfieldoptions,
 )
 from jf_agent.session import retry_session
 
@@ -551,6 +552,12 @@ def load_and_dump_jira(config, jira_connection):
             'jira_worklogs',
             config.compress_output_files,
             download_worklogs(jira_connection, issue_ids),
+        )
+        write_file(
+            config.outdir,
+            'jira_customfieldoptions',
+            config.compress_output_files,
+            download_customfieldoptions(jira_connection),
         )
     except Exception as e:
         agent_logging.log_and_print(
