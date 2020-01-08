@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import threading
 from collections import namedtuple
 from datetime import datetime
@@ -400,6 +399,14 @@ def obtain_jellyfish_endpoint_info(config, creds):
     aws_access_key_id = agent_config.get('aws_access_key_id')
     aws_secret_access_key = agent_config.get('aws_secret_access_key')
     git_instance_info = agent_config.get('git_instance_info')
+
+    # Validate the S3 prefix, bail out if invalid value is found.
+    if not re.fullmatch(r'^s3:\/\/[A-Za-z0-9:\/\-_]+\/[A-Za-z0-9:\/\-_]+$', s3_uri_prefix or ''):
+        print(
+            "ERROR: The S3 bucket information provided by the agent config endpoint is invalid "
+            "-- please contact Jellyfish"
+        )
+        raise BadConfigException()
 
     if config.run_mode_includes_send and (
         not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
