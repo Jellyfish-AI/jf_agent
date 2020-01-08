@@ -1,50 +1,48 @@
 import argparse
-from collections import namedtuple
-from datetime import datetime
-from glob import glob
 import gzip
 import logging
 import os
-from pathlib import Path
-import requests
+import re
 import shutil
 import subprocess
+import sys
 import threading
-import urllib3
+from collections import namedtuple
+from datetime import datetime
+from glob import glob
+from pathlib import Path
 
+import requests
+import urllib3
+import yaml
 from jira import JIRA
 from jira.resources import GreenHopperResource
 from stashy.client import Stash
-import yaml
 
-from jf_agent import diagnostics, write_file, download_and_write_streaming, agent_logging
-from jf_agent.bb_download import (
-    get_all_users as get_bb_users,
-    get_all_projects as get_bb_projects,
-    get_all_repos as get_bb_repos,
-    get_default_branch_commits as get_bb_default_branch_commits,
-    get_pull_requests as get_bb_pull_requests,
-)
-from jf_agent.gh_download import (
-    get_all_users as get_gh_users,
-    get_all_projects as get_gh_projects,
-    get_all_repos as get_gh_repos,
-    get_default_branch_commits as get_gh_default_branch_commits,
-    get_pull_requests as get_gh_pull_requests,
-)
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent.bb_download import get_all_projects as get_bb_projects
+from jf_agent.bb_download import get_all_repos as get_bb_repos
+from jf_agent.bb_download import get_all_users as get_bb_users
+from jf_agent.bb_download import get_default_branch_commits as get_bb_default_branch_commits
+from jf_agent.bb_download import get_pull_requests as get_bb_pull_requests
+from jf_agent.gh_download import get_all_projects as get_gh_projects
+from jf_agent.gh_download import get_all_repos as get_gh_repos
+from jf_agent.gh_download import get_all_users as get_gh_users
+from jf_agent.gh_download import get_default_branch_commits as get_gh_default_branch_commits
+from jf_agent.gh_download import get_pull_requests as get_gh_pull_requests
 from jf_agent.github_client import GithubClient
 from jf_agent.jira_download import (
-    download_users,
+    download_boards_and_sprints,
+    download_customfieldoptions,
     download_fields,
-    download_resolutions,
-    download_issuetypes,
+    download_issue_batch,
     download_issuelinktypes,
+    download_issuetypes,
     download_priorities,
     download_projects_and_versions,
-    download_boards_and_sprints,
-    download_issue_batch,
+    download_resolutions,
+    download_users,
     download_worklogs,
-    download_customfieldoptions,
 )
 from jf_agent.session import retry_session
 
