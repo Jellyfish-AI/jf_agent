@@ -18,7 +18,7 @@ from jira import JIRA
 from jira.resources import GreenHopperResource
 from stashy.client import Stash
 
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file, write_file_txt
 from jf_agent.bb_download import get_all_projects as get_bb_projects
 from jf_agent.bb_download import get_all_repos as get_bb_repos
 from jf_agent.bb_download import get_all_users as get_bb_users
@@ -409,7 +409,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+            not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -431,7 +431,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-        jira_connection, config.jira_include_fields, config.jira_exclude_fields
+            jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
         print(f"{f['key']:30}\t{f['name']}")
 
@@ -565,8 +565,10 @@ def load_and_dump_jira(config, jira_connection):
             download_customfieldoptions(jira_connection),
         )
     except Exception as e:
-        agent_logging.log_and_print(
-            logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
+        write_file_txt(
+            config.outdir,
+            'jira_load_and_dump_exception',
+            e,
         )
 
 
@@ -592,21 +594,28 @@ def get_basic_jira_connection(config, creds):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
-    write_file(
-        config.outdir,
-        'bb_users',
-        config.compress_output_files,
-        get_gh_users(git_conn, config.git_include_projects),
-    )
+    try:
+        write_file(
+            config.outdir,
+            'bb_users',
+            config.compress_output_files,
+            get_gh_users(git_conn, config.git_include_projects),
+        )
 
-    write_file(
-        config.outdir,
-        'bb_projects',
-        config.compress_output_files,
-        get_gh_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
-    )
+        write_file(
+            config.outdir,
+            'bb_projects',
+            config.compress_output_files,
+            get_gh_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
+        )
 
-    api_repos = None
+        api_repos = None
+    except Exception as e:
+        write_file_txt(
+            config.outdir,
+            'github_load_and_dump_exception',
+            e,
+        )
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -671,20 +680,27 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
-    write_file(config.outdir, 'bb_users', config.compress_output_files, get_bb_users(bb_conn))
+    try:
+        write_file(config.outdir, 'bb_users', config.compress_output_files, get_bb_users(bb_conn))
 
-    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-    api_projects, projects = zip(
-        *get_bb_projects(
-            bb_conn,
-            config.git_include_projects,
-            config.git_exclude_projects,
-            config.git_redact_names_and_urls,
+        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+        api_projects, projects = zip(
+            *get_bb_projects(
+                bb_conn,
+                config.git_include_projects,
+                config.git_exclude_projects,
+                config.git_redact_names_and_urls,
+            )
         )
-    )
-    write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
+        write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
 
-    api_repos = None
+        api_repos = None
+    except Exception as e:
+        write_file_txt(
+            config.outdir,
+            'bb_load_and_dump_exception',
+            e,
+        )
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
