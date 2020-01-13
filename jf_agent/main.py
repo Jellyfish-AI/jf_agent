@@ -613,7 +613,7 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
     except Exception as e:
         write_file_txt(
             config.outdir,
-            'github_load_and_dump_exception',
+            'git_load_and_dump_exception',
             e,
         )
 
@@ -698,7 +698,7 @@ def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
     except Exception as e:
         write_file_txt(
             config.outdir,
-            'bb_load_and_dump_exception',
+            'git_load_and_dump_exception',
             e,
         )
 
