@@ -14,5 +14,6 @@ stashy = "*"
 dateparser = "*"
 jsonstreams = "*"
 psutil = "*"
+requests = "*"
 
 [dev-packages]
