@@ -19,7 +19,7 @@ from jira import JIRA
 from jira.resources import GreenHopperResource
 from stashy.client import Stash
 
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file, write_file_txt
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.bb_download import get_all_projects as get_bb_projects
 from jf_agent.bb_download import get_all_repos as get_bb_repos
 from jf_agent.bb_download import get_all_users as get_bb_users
@@ -566,10 +566,13 @@ def load_and_dump_jira(config, jira_connection):
             download_customfieldoptions(jira_connection),
         )
     except Exception as e:
-        traceback.print_exc(file=open(
-            f'{config.outdir}/jira_load_and_dump_exception.txt', 'w'
-            )
-        )
+        body = {
+            "status": "failed",
+            "exception": e.__class__.__name__,
+            "message": e.__str__(),
+            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+        }
+        write_file(config.outdir, 'jira_load_and_dump_exception', config.compress_output_files, body)
 
 
 @diagnostics.capture_timing()
@@ -611,10 +614,13 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
 
         api_repos = None
     except Exception as e:
-        traceback.print_exc(file=open(
-            f'{config.outdir}/git_load_and_dump_exception.txt', 'w'
-            )
-        )
+        body = {
+            "status": "failed",
+            "exception": e.__class__.__name__,
+            "message": e.__str__(),
+            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+        }
+        write_file(config.outdir, 'git_load_and_dump_exception', config.compress_output_files, body)
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -695,10 +701,14 @@ def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
 
         api_repos = None
     except Exception as e:
-        traceback.print_exc(file=open(
-            f'{config.outdir}/git_load_and_dump_exception.txt', 'w'
-            )
-        )
+        body = {
+            "status": "failed",
+            "exception": e.__class__.__name__,
+            "message": e.__str__(),
+            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+        }
+        write_file(config.outdir, 'git_load_and_dump_exception', config.compress_output_files, body)
+
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
