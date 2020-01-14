@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import threading
+import traceback
 from collections import namedtuple
 from datetime import datetime
 from glob import glob
@@ -565,10 +566,9 @@ def load_and_dump_jira(config, jira_connection):
             download_customfieldoptions(jira_connection),
         )
     except Exception as e:
-        write_file_txt(
-            config.outdir,
-            'jira_load_and_dump_exception',
-            e,
+        traceback.print_exc(file=open(
+            f'{config.outdir}/jira_load_and_dump_exception.txt', 'w'
+            )
         )
 
 
@@ -611,10 +611,9 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
 
         api_repos = None
     except Exception as e:
-        write_file_txt(
-            config.outdir,
-            'git_load_and_dump_exception',
-            e,
+        traceback.print_exc(file=open(
+            f'{config.outdir}/git_load_and_dump_exception.txt', 'w'
+            )
         )
 
     @diagnostics.capture_timing()
@@ -696,10 +695,9 @@ def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
 
         api_repos = None
     except Exception as e:
-        write_file_txt(
-            config.outdir,
-            'git_load_and_dump_exception',
-            e,
+        traceback.print_exc(file=open(
+            f'{config.outdir}/git_load_and_dump_exception.txt', 'w'
+            )
         )
 
     @diagnostics.capture_timing()

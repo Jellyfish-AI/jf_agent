@@ -49,11 +49,6 @@ def write_file(outdir, filename_prefix, compress, results):
             outfile.write(json.dumps(results, indent=2, default=str))
 
 
-def write_file_txt(outdir, filename_prefix, results):
-    with open(f'{outdir}/{filename_prefix}.txt', 'w') as outfile:
-        outfile.write(results)
-
-
 class StrDefaultEncoder(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
         kwargs.update({'default': str})
