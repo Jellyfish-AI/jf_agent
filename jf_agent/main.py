@@ -567,12 +567,13 @@ def load_and_dump_jira(config, jira_connection):
         )
     except Exception as e:
         body = {
-            "status": "failed",
-            "exception": e.__class__.__name__,
-            "message": e.__str__(),
-            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+            'type': 'Jira - S3 upload error',
+            'status': 'failed',
+            'exception': e.__class__.__name__,
+            'message': e.__str__(),
+            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
         }
-        write_file(config.outdir, 'jira_load_and_dump_exception', config.compress_output_files, body)
+        diagnostics._write_diagnostic(body)
 
 
 @diagnostics.capture_timing()
@@ -615,12 +616,13 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
         api_repos = None
     except Exception as e:
         body = {
-            "status": "failed",
-            "exception": e.__class__.__name__,
-            "message": e.__str__(),
-            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+            'type': 'Git - S3 upload error',
+            'status': 'failed',
+            'exception': e.__class__.__name__,
+            'message': e.__str__(),
+            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
         }
-        write_file(config.outdir, 'git_load_and_dump_exception', config.compress_output_files, body)
+        diagnostics._write_diagnostic(body)
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -702,12 +704,13 @@ def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
         api_repos = None
     except Exception as e:
         body = {
-            "status": "failed",
-            "exception": e.__class__.__name__,
-            "message": e.__str__(),
-            "stackTrace": ''.join(traceback.format_tb(e.__traceback__))
+            'type': 'Git - S3 upload error',
+            'status': 'failed',
+            'exception': e.__class__.__name__,
+            'message': e.__str__(),
+            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
         }
-        write_file(config.outdir, 'git_load_and_dump_exception', config.compress_output_files, body)
+        diagnostics._write_diagnostic(body)
 
 
     @diagnostics.capture_timing()
