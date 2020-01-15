@@ -450,13 +450,14 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
         except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.ERROR,
-                f'Failed to download {config.git_provider} data:\n{e}',
-                exc_info=True,
-            )
-
+            body = {
+                'type': 'Git - S3 upload error',
+                'status': 'failed',
+                'exception': e.__class__.__name__,
+                'message': e.__str__(),
+                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+            }
+            diagnostics._write_diagnostic(body)
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -590,39 +591,35 @@ def get_basic_jira_connection(config, creds):
             },
         )
     except Exception as e:
-        agent_logging.log_and_print(
-            logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
-        )
-
-
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
-    try:
-        write_file(
-            config.outdir,
-            'bb_users',
-            config.compress_output_files,
-            get_gh_users(git_conn, config.git_include_projects),
-        )
-
-        write_file(
-            config.outdir,
-            'bb_projects',
-            config.compress_output_files,
-            get_gh_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
-        )
-
-        api_repos = None
-    except Exception as e:
         body = {
-            'type': 'Git - S3 upload error',
+            'type': 'Jira - failed to connect to Jira',
             'status': 'failed',
             'exception': e.__class__.__name__,
             'message': e.__str__(),
             'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
         }
         diagnostics._write_diagnostic(body)
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
+    write_file(
+        config.outdir,
+        'bb_users',
+        config.compress_output_files,
+        get_gh_users(git_conn, config.git_include_projects),
+    )
+
+    write_file(
+        config.outdir,
+        'bb_projects',
+        config.compress_output_files,
+        get_gh_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
+    )
+
+    api_repos = None
+
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -687,30 +684,20 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
-    try:
-        write_file(config.outdir, 'bb_users', config.compress_output_files, get_bb_users(bb_conn))
+    write_file(config.outdir, 'bb_users', config.compress_output_files, get_bb_users(bb_conn))
 
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_projects, projects = zip(
-            *get_bb_projects(
-                bb_conn,
-                config.git_include_projects,
-                config.git_exclude_projects,
-                config.git_redact_names_and_urls,
-            )
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+    api_projects, projects = zip(
+        *get_bb_projects(
+            bb_conn,
+            config.git_include_projects,
+            config.git_exclude_projects,
+            config.git_redact_names_and_urls,
         )
-        write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
+    )
+    write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
 
-        api_repos = None
-    except Exception as e:
-        body = {
-            'type': 'Git - S3 upload error',
-            'status': 'failed',
-            'exception': e.__class__.__name__,
-            'message': e.__str__(),
-            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
-        }
-        diagnostics._write_diagnostic(body)
+    api_repos = None
 
 
     @diagnostics.capture_timing()
@@ -786,9 +773,17 @@ def get_git_client(config, creds):
                 session=retry_session(),
             )
         except Exception as e:
-            agent_logging.log_and_print(
-                logger, logging.ERROR, f'Failed to connect to Bitbucket:\n{e}', exc_info=True
-            )
+            # agent_logging.log_and_print(
+            #     logger, logging.ERROR, f'Failed to connect to Bitbucket:\n{e}', exc_info=True
+            # )
+            body = {
+                'type': 'Git - Failed to connect to Bitbuck',
+                'status': 'failed',
+                'exception': e.__class__.__name__,
+                'message': e.__str__(),
+                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+            }
+            diagnostics._write_diagnostic(body)
             return
 
     elif config.git_provider == 'github':
@@ -801,9 +796,17 @@ def get_git_client(config, creds):
             )
 
         except Exception as e:
-            agent_logging.log_and_print(
-                logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
-            )
+            # agent_logging.log_and_print(
+            #     logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
+            # )
+            body = {
+                'type': 'Git - Failed to connect to Github',
+                'status': 'failed',
+                'exception': e.__class__.__name__,
+                'message': e.__str__(),
+                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+            }
+            diagnostics._write_diagnostic(body)
             return
 
     raise ValueError(f'unsupported git provider {config.git_provider}')
