@@ -40,13 +40,17 @@ def pull_since_date_for_repo(server_git_instance_info, org_login, repo_id, commi
         return instance_pull_from_dt
 
 
-def write_file(outdir, filename_prefix, compress, results):
+def write_file(outdir, filename_prefix, compress, results, append=False):
     if compress:
         with gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wb') as outfile:
             outfile.write(json.dumps(results, indent=2, default=str).encode('utf-8'))
     else:
-        with open(f'{outdir}/{filename_prefix}.json', 'w') as outfile:
-            outfile.write(json.dumps(results, indent=2, default=str))
+        if append:
+            with open(f'{outdir}/{filename_prefix}.json', 'a') as outfile:
+                outfile.write(json.dumps(results, indent=2, default=str))
+        else:
+            with open(f'{outdir}/{filename_prefix}.json', 'w') as outfile:
+                outfile.write(json.dumps(results, indent=2, default=str))   
 
 
 class StrDefaultEncoder(json.JSONEncoder):

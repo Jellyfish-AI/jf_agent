@@ -447,17 +447,24 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
         try:
             if config.git_provider == 'bitbucket_server':
                 load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
+                body = {
+                    'type': 'Git',
+                    'status': 'success'
+                } 
+                write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
+                body = {
+                    'type': 'Git',
+                    'status': 'success'
+                } 
+                write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
         except Exception as e:
             body = {
-                'type': 'ERROR: Git - S3 upload error',
-                'status': 'failed',
-                'exception': e.__class__.__name__,
-                'message': e.__str__(),
-                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+                'type': 'Git',
+                'status': 'failed'
             }
-            diagnostics._write_diagnostic(body)
+            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -566,15 +573,18 @@ def load_and_dump_jira(config, jira_connection):
             config.compress_output_files,
             download_customfieldoptions(jira_connection),
         )
+
+        body = {
+            'type': 'Jira',
+            'status': 'success'
+        }
+        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
     except Exception as e:
         body = {
-            'type': 'ERROR: Jira - S3 upload error',
+            'type': 'Jira',
             'status': 'failed',
-            'exception': e.__class__.__name__,
-            'message': e.__str__(),
-            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
         }
-        diagnostics._write_diagnostic(body)
+        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
 
 
 @diagnostics.capture_timing()
@@ -592,13 +602,10 @@ def get_basic_jira_connection(config, creds):
         )
     except Exception as e:
         body = {
-            'type': 'ERROR: Jira - failed to connect to Jira',
-            'status': 'failed',
-            'exception': e.__class__.__name__,
-            'message': e.__str__(),
-            'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+            'type': 'Jira',
+            'status': 'failed'
         }
-        diagnostics._write_diagnostic(body)
+        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
 
 
 @diagnostics.capture_timing()
@@ -774,13 +781,10 @@ def get_git_client(config, creds):
             )
         except Exception as e:
             body = {
-                'type': 'ERROR: Git - Failed to connect to Bitbuck',
-                'status': 'failed',
-                'exception': e.__class__.__name__,
-                'message': e.__str__(),
-                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+                'type': 'Git',
+                'status': 'failed'
             }
-            diagnostics._write_diagnostic(body)
+            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
             return
 
     elif config.git_provider == 'github':
@@ -794,13 +798,10 @@ def get_git_client(config, creds):
 
         except Exception as e:
             body = {
-                'type': 'ERROR: Git - Failed to connect to Github',
-                'status': 'failed',
-                'exception': e.__class__.__name__,
-                'message': e.__str__(),
-                'stack_trace': ''.join(traceback.format_tb(e.__traceback__))
+                'type': 'Git',
+                'status': 'failed'
             }
-            diagnostics._write_diagnostic(body)
+            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
             return
 
     raise ValueError(f'unsupported git provider {config.git_provider}')
