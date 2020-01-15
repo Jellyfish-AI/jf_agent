@@ -451,7 +451,7 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
         except Exception as e:
             body = {
-                'type': 'Git - S3 upload error',
+                'type': 'ERROR: Git - S3 upload error',
                 'status': 'failed',
                 'exception': e.__class__.__name__,
                 'message': e.__str__(),
@@ -568,7 +568,7 @@ def load_and_dump_jira(config, jira_connection):
         )
     except Exception as e:
         body = {
-            'type': 'Jira - S3 upload error',
+            'type': 'ERROR: Jira - S3 upload error',
             'status': 'failed',
             'exception': e.__class__.__name__,
             'message': e.__str__(),
@@ -592,7 +592,7 @@ def get_basic_jira_connection(config, creds):
         )
     except Exception as e:
         body = {
-            'type': 'Jira - failed to connect to Jira',
+            'type': 'ERROR: Jira - failed to connect to Jira',
             'status': 'failed',
             'exception': e.__class__.__name__,
             'message': e.__str__(),
@@ -773,11 +773,8 @@ def get_git_client(config, creds):
                 session=retry_session(),
             )
         except Exception as e:
-            # agent_logging.log_and_print(
-            #     logger, logging.ERROR, f'Failed to connect to Bitbucket:\n{e}', exc_info=True
-            # )
             body = {
-                'type': 'Git - Failed to connect to Bitbuck',
+                'type': 'ERROR: Git - Failed to connect to Bitbuck',
                 'status': 'failed',
                 'exception': e.__class__.__name__,
                 'message': e.__str__(),
@@ -796,11 +793,8 @@ def get_git_client(config, creds):
             )
 
         except Exception as e:
-            # agent_logging.log_and_print(
-            #     logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
-            # )
             body = {
-                'type': 'Git - Failed to connect to Github',
+                'type': 'ERROR: Git - Failed to connect to Github',
                 'status': 'failed',
                 'exception': e.__class__.__name__,
                 'message': e.__str__(),
