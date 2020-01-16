@@ -456,7 +456,7 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                         'status': 'success'
                     }
                     status_json.append(body)
-                    write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+                    write_file(config.outdir, 'status', config.compress_output_files, status_json)
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
                 with open(f'{config.outdir}/status.json', 'r') as status:
@@ -466,8 +466,15 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                         'status': 'success'
                     }
                     status_json.append(body)
-                    write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+                    write_file(config.outdir, 'status', config.compress_output_files, status_json)
         except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Failed to download {config.git_provider} data:\n{e}',
+                exc_info=True
+            )
+
             with open(f'{config.outdir}/status.json', 'r') as status:
                 status_json = json.load(status)
                 body = {
@@ -475,7 +482,7 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                     'status': 'failed'
                 }
                 status_json.append(body)
-                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json)
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -592,8 +599,15 @@ def load_and_dump_jira(config, jira_connection):
                 'status': 'success'
             }
             status_json.append(body)
-            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json)
     except Exception as e:
+        agent_logging.log_and_print(
+            logger,
+            logging.ERROR,
+            f'Failed to connect to Jira:\n{e}',
+            exc_info=True
+        )
+
         with open(f'{config.outdir}/status.json', 'r') as status:
             status_json = json.load(status)
             body = {
@@ -601,7 +615,7 @@ def load_and_dump_jira(config, jira_connection):
                 'status': 'failed'
             }
             status_json.append(body)
-            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json)
 
 
 @diagnostics.capture_timing()
@@ -618,14 +632,21 @@ def get_basic_jira_connection(config, creds):
             },
         )
     except Exception as e:
-       with open(f'{config.outdir}/status.json', 'r') as status:
+        agent_logging.log_and_print(
+            logger,
+            logging.ERROR,
+            f'Failed to connect to Jira:\n{e}',
+            exc_info=True
+        )
+
+        with open(f'{config.outdir}/status.json', 'r') as status:
             status_json = json.load(status)
             body = {
                 'type': 'Jira',
                 'status': 'failed'
             }
             status_json.append(body)
-            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json)
 
 
 @diagnostics.capture_timing()
@@ -646,7 +667,6 @@ def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
     )
 
     api_repos = None
-
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -726,7 +746,6 @@ def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
 
     api_repos = None
 
-
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_and_write_repos():
@@ -800,6 +819,13 @@ def get_git_client(config, creds):
                 session=retry_session(),
             )
         except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Failed to connect to Bitbucket:\n{e}',
+                exc_info=True
+            )
+
             with open(f'{config.outdir}/status.json', 'r') as status:
                 status_json = json.load(status)
                 body = {
@@ -807,7 +833,7 @@ def get_git_client(config, creds):
                     'status': 'failed'
                 }
                 status_json.append(body)
-                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json)
             return
 
     elif config.git_provider == 'github':
@@ -820,6 +846,13 @@ def get_git_client(config, creds):
             )
 
         except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Failed to connect to Github:\n{e}',
+                exc_info=True
+            )
+
             with open(f'{config.outdir}/status.json', 'r') as status:
                 status_json = json.load(status)
                 body = {
@@ -827,7 +860,7 @@ def get_git_client(config, creds):
                     'status': 'failed'
                 }
                 status_json.append(body)
-                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json)
             return
 
     raise ValueError(f'unsupported git provider {config.git_provider}')
