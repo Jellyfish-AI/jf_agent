@@ -1,5 +1,6 @@
 import argparse
 import gzip
+import json
 import logging
 import os
 import re
@@ -440,6 +441,7 @@ def print_all_jira_fields(config, jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
+    write_file(config.outdir, 'status', config.compress_output_files, [])
     if jira_connection:
         load_and_dump_jira(config, jira_connection)
 
@@ -447,24 +449,33 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
         try:
             if config.git_provider == 'bitbucket_server':
                 load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
-                body = {
-                    'type': 'Git',
-                    'status': 'success'
-                } 
-                write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+                with open(f'{config.outdir}/status.json', 'r') as status:
+                    status_json = json.load(status)
+                    body = {
+                        'type': 'Git',
+                        'status': 'success'
+                    }
+                    status_json.append(body)
+                    write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
+                with open(f'{config.outdir}/status.json', 'r') as status:
+                    status_json = json.load(status)
+                    body = {
+                        'type': 'Git',
+                        'status': 'success'
+                    }
+                    status_json.append(body)
+                    write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
+        except Exception as e:
+            with open(f'{config.outdir}/status.json', 'r') as status:
+                status_json = json.load(status)
                 body = {
                     'type': 'Git',
-                    'status': 'success'
-                } 
-                write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
-        except Exception as e:
-            body = {
-                'type': 'Git',
-                'status': 'failed'
-            }
-            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+                    'status': 'failed'
+                }
+                status_json.append(body)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -574,17 +585,23 @@ def load_and_dump_jira(config, jira_connection):
             download_customfieldoptions(jira_connection),
         )
 
-        body = {
-            'type': 'Jira',
-            'status': 'success'
-        }
-        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+        with open(f'{config.outdir}/status.json', 'r') as status:
+            status_json = json.load(status)
+            body = {
+                'type': 'Jira',
+                'status': 'success'
+            }
+            status_json.append(body)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
     except Exception as e:
-        body = {
-            'type': 'Jira',
-            'status': 'failed',
-        }
-        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+        with open(f'{config.outdir}/status.json', 'r') as status:
+            status_json = json.load(status)
+            body = {
+                'type': 'Jira',
+                'status': 'failed'
+            }
+            status_json.append(body)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
 
 
 @diagnostics.capture_timing()
@@ -601,11 +618,14 @@ def get_basic_jira_connection(config, creds):
             },
         )
     except Exception as e:
-        body = {
-            'type': 'Jira',
-            'status': 'failed'
-        }
-        write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+       with open(f'{config.outdir}/status.json', 'r') as status:
+            status_json = json.load(status)
+            body = {
+                'type': 'Jira',
+                'status': 'failed'
+            }
+            status_json.append(body)
+            write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
 
 
 @diagnostics.capture_timing()
@@ -780,11 +800,14 @@ def get_git_client(config, creds):
                 session=retry_session(),
             )
         except Exception as e:
-            body = {
-                'type': 'Git',
-                'status': 'failed'
-            }
-            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+            with open(f'{config.outdir}/status.json', 'r') as status:
+                status_json = json.load(status)
+                body = {
+                    'type': 'Git',
+                    'status': 'failed'
+                }
+                status_json.append(body)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
             return
 
     elif config.git_provider == 'github':
@@ -797,11 +820,14 @@ def get_git_client(config, creds):
             )
 
         except Exception as e:
-            body = {
-                'type': 'Git',
-                'status': 'failed'
-            }
-            write_file(config.outdir, 'status', config.compress_output_files, body, append=True)
+            with open(f'{config.outdir}/status.json', 'r') as status:
+                status_json = json.load(status)
+                body = {
+                    'type': 'Git',
+                    'status': 'failed'
+                }
+                status_json.append(body)
+                write_file(config.outdir, 'status', config.compress_output_files, status_json, append=False)
             return
 
     raise ValueError(f'unsupported git provider {config.git_provider}')
