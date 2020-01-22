@@ -48,15 +48,6 @@ def write_file(outdir, filename_prefix, compress, results):
         with open(f'{outdir}/{filename_prefix}.json', 'w') as outfile:
             outfile.write(json.dumps(results, indent=2, default=str))
 
-def write_status_file(outdir, type, status):
-    with open(f'{outdir}/status.json', 'r') as status_file:
-        status_json = json.load(status_file)
-        body = {
-            'type': type,
-            'status': status
-        }
-        status_json.append(body)
-        write_file(outdir, 'status', False, status_json)
 
 class StrDefaultEncoder(json.JSONEncoder):
     def __init__(self, *args, **kwargs):

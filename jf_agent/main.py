@@ -20,7 +20,7 @@ from jira import JIRA
 from jira.resources import GreenHopperResource
 from stashy.client import Stash
 
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file, write_status_file
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.bb_download import get_all_projects as get_bb_projects
 from jf_agent.bb_download import get_all_repos as get_bb_repos
 from jf_agent.bb_download import get_all_users as get_bb_users
@@ -48,6 +48,7 @@ from jf_agent.jira_download import (
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
+status_json = []
 
 JELLYFISH_API_BASE = 'https://jellyfish.co'
 VALID_RUN_MODES = ('download_and_send', 'download_only', 'send_only', 'print_all_jira_fields')
@@ -144,6 +145,7 @@ def main():
             sys_diag_collector.join()
 
         finally:
+            write_file(config.outdir, 'status', config.compress_output_files, status_json)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
@@ -441,7 +443,6 @@ def print_all_jira_fields(config, jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
-    write_file(config.outdir, 'status', config.compress_output_files, [])
     if jira_connection:
         load_and_dump_jira(config, jira_connection)
 
@@ -449,10 +450,16 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
         try:
             if config.git_provider == 'bitbucket_server':
                 load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
-                write_status_file(config.outdir, 'Git', 'success')
+                status_json.append({
+                    'type': 'Git',
+                    'status': 'success'
+                })
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
-                write_status_file(config.outdir, 'Git', 'success')
+                status_json.append({
+                    'type': 'Git',
+                    'status': 'success'
+                })
         except Exception as e:
             agent_logging.log_and_print(
                 logger,
@@ -461,7 +468,10 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                 exc_info=True
             )
 
-            write_status_file(config.outdir, 'Git', 'failed')
+            status_json.append({
+                'type': 'Git',
+                'status': 'failed'
+            })
 
 
 @diagnostics.capture_timing()
@@ -572,7 +582,10 @@ def load_and_dump_jira(config, jira_connection):
             download_customfieldoptions(jira_connection),
         )
 
-        write_status_file(config.outdir, 'Jira', 'success')
+        status_json.append({
+            'type': 'Jira',
+            'status': 'success'
+        })
     except Exception as e:
         agent_logging.log_and_print(
             logger,
@@ -581,8 +594,10 @@ def load_and_dump_jira(config, jira_connection):
             exc_info=True
         )
 
-        write_status_file(config.outdir, 'Jira', 'failed')
-
+        status_json.append({
+            'type': 'Jira',
+            'status': 'failed'
+        })
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -605,7 +620,10 @@ def get_basic_jira_connection(config, creds):
             exc_info=True
         )
 
-        write_status_file(config.outdir, 'Jira', 'failed')
+        status_json.append({
+            'type': 'Jira',
+            'status': 'failed'
+        })
 
 
 @diagnostics.capture_timing()
@@ -785,7 +803,10 @@ def get_git_client(config, creds):
                 exc_info=True
             )
 
-            write_status_file(config.outdir, 'Git', 'failed')
+            status_json.append({
+                'type': 'Git',
+                'status': 'failed'
+            })
             return
 
     elif config.git_provider == 'github':
@@ -805,7 +826,10 @@ def get_git_client(config, creds):
                 exc_info=True
             )
 
-            write_status_file(config.outdir, 'Git', 'failed')
+            status_json.append({
+                'type': 'Git',
+                'status': 'failed'
+            })
             return
 
     raise ValueError(f'unsupported git provider {config.git_provider}')
