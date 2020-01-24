@@ -1,11 +1,13 @@
 import argparse
 import gzip
+import json
 import logging
 import os
 import re
 import shutil
 import subprocess
 import threading
+import traceback
 from collections import namedtuple
 from datetime import datetime
 from glob import glob
@@ -92,7 +94,8 @@ def main():
     creds = obtain_creds(config)
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
-
+    status_json = []
+    
     if config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
@@ -117,6 +120,8 @@ def main():
             jira_connection = None
             if config.jira_url:
                 jira_connection = get_basic_jira_connection(config, creds)
+                if jira_connection is None:
+                    status_json.append({'type': 'Jira', 'status': 'failed'})
 
             if config.run_mode_is_print_all_jira_fields:
                 print_all_jira_fields(config, jira_connection)
@@ -124,16 +129,21 @@ def main():
 
             if config.git_url:
                 git_connection = get_git_client(config, creds)
+                if git_connection is None:
+                    status_json.append({'type': 'Git', 'status': 'failed'})
             else:
                 git_connection = None
 
             if config.run_mode_includes_download:
-                download_data(
+                download_data_status = download_data(
                     config,
                     jellyfish_endpoint_info.git_instance_info,
                     jira_connection,
                     git_connection,
                 )
+
+                for item in download_data_status:
+                    status_json.append(item)
 
             diagnostics.capture_outdir_size(config.outdir)
 
@@ -142,6 +152,7 @@ def main():
             sys_diag_collector.join()
 
         finally:
+            write_file(config.outdir, 'status', config.compress_output_files, status_json)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
@@ -439,15 +450,18 @@ def print_all_jira_fields(config, jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
+    download_data_status = []
     if jira_connection:
-        load_and_dump_jira(config, jira_connection)
+        download_data_status.append(load_and_dump_jira(config, jira_connection))
 
     if git_connection:
         try:
             if config.git_provider == 'bitbucket_server':
                 load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
+                download_data_status.append({'type': 'Git', 'status': 'success'})
             elif config.git_provider == 'github':
                 load_and_dump_github(config, endpoint_git_instance_info, git_connection)
+                download_data_status.append({'type': 'Git', 'status': 'success'})
         except Exception as e:
             agent_logging.log_and_print(
                 logger,
@@ -455,6 +469,10 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
                 f'Failed to download {config.git_provider} data:\n{e}',
                 exc_info=True,
             )
+
+            download_data_status.append({'type': 'Git', 'status': 'failed'})
+
+    return download_data_status
 
 
 @diagnostics.capture_timing()
@@ -564,10 +582,14 @@ def load_and_dump_jira(config, jira_connection):
             config.compress_output_files,
             download_customfieldoptions(jira_connection),
         )
+
+        return {'type': 'Jira', 'status': 'success'}
     except Exception as e:
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
         )
+
+        return {'type': 'Jira', 'status': 'failed'}
 
 
 @diagnostics.capture_timing()
