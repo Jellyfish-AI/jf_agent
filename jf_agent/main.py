@@ -471,8 +471,7 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
             )
 
             download_data_status.append({'type': 'Git', 'status': 'failed'})
-        finally:
-            return download_data_status
+
     return download_data_status
 
 
