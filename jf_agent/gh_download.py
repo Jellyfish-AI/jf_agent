@@ -37,9 +37,6 @@ def get_all_users(client, include_orgs):
     users = [_normalize_user(user) for org in include_orgs for user in client.get_all_users(org)]
     print('✓')
 
-    if not users:
-        raise ValueError('No users found.  Make sure your token has appropriate access to GitHub.')
-
     return users
 
 
