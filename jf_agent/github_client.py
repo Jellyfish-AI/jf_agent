@@ -37,8 +37,21 @@ class GithubClient:
 
     def get_all_repos(self, org):
         url = f'{self.base_url}/orgs/{org}/repos'
-        result = (self.get_json(m['url']) for m in self.get_all_pages(url))
-        return result
+        for m in self.get_all_pages(url):
+            try:
+                yield self.get_json(m['url'])
+            except requests.exceptions.HTTPError as e:
+                # non-403 should bubble up
+                if e.response.status_code != 403:
+                    raise
+
+                # we've seen some strange behavior with ghe, where we can get a 403 for
+                # a repo that comes back in the list.  SKip them.
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
+                )
 
     def get_branches(self, full_repo):
         url = f'{self.base_url}/repos/{full_repo}/branches'
