@@ -12,13 +12,15 @@ jira:
   # for Atlassian Cloud hosted Jira as of March 30, 2019.
   gdpr_active: False
 
-  # Only pull issues from specific projects.  Comment this out
-  # to pull issues from all projects.
+  # Only pull issues from specific projects.
+  # Comment this out to pull issues from all projects.
+  # Note: use project keys, not names.
   include_projects:
     - PROJ1
     - PROJ2
 
   # Uncomment this to pull issues from all but specific projects.
+  # Note: use project keys, not names.
   # exclude_projects:
   #   - PROJ1
 
@@ -45,17 +47,23 @@ jira:
 
 
 git:
-  # supported providers are `bitbucket_server` and `github`
+  # Supported providers are `bitbucket_server` and `github`.
   provider: bitbucket_server
 
-  # URL to Bitbucket or GitHub.  For GitHub Cloud, this should be https://api.github.com; otherwise, use the URL to your local git server.
+  # URL to Bitbucket or GitHub.
+  # For GitHub Cloud, this should be https://api.github.com
+  # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
+  # Otherwise, use the URL to your local git server.
   url: https://bitbucket.yourcompany.com
 
-  # Only pull from specific projects / organizations.  Required for GitHub; comment this out to pull from all projects for Bitbucket Server.
+  # Only pull from specific projects / organizations.
+  # Required for GitHub; comment this out to pull from all projects for Bitbucket Server.
+  # Note: use project keys, not names.
   include_projects:
       - PROJ1
 
   # Uncomment this to pull from all but specific projects (not supported for GitHub).
+  # Note: use project keys, not names.
   #  exclude_projects:
   #    - PROJ1
 
@@ -67,8 +75,8 @@ git:
   # exclude_repos:
   #    - repo_to_skip
 
-  # Strip out long-form text content (commit messages, PR text, etc)
+  # Strip out long-form text content (commit messages, PR text, etc).
   strip_text_content: False
 
-  # Redact names and URLs for projects, repos, branches
+  # Redact names and URLs for projects, repos, branches.
   redact_names_and_urls: False
