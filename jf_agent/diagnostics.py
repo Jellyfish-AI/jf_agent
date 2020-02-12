@@ -17,6 +17,7 @@ DIAGNOSTICS_FILE = None
 
 def _write_diagnostic(obj):
     json.dump(obj, DIAGNOSTICS_FILE)
+    DIAGNOSTICS_FILE.write('\n')  # facilitate parsing
     DIAGNOSTICS_FILE.flush()
 
 
