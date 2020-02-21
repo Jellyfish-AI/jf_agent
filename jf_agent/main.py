@@ -44,6 +44,7 @@ from jf_agent.jira_download import (
     download_resolutions,
     download_users,
     download_worklogs,
+    download_project_components,
 )
 from jf_agent.session import retry_session
 
@@ -581,6 +582,12 @@ def load_and_dump_jira(config, jira_connection):
             'jira_customfieldoptions',
             config.compress_output_files,
             download_customfieldoptions(jira_connection),
+        )
+        write_file(
+            config.outdir,
+            'jira_components',
+            config.compress_output_files,
+            download_project_components(jira_connection),
         )
 
         return {'type': 'Jira', 'status': 'success'}
