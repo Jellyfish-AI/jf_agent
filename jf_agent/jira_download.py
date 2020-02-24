@@ -127,6 +127,15 @@ def download_projects_and_versions(
 
     print('✓')
 
+    print(f'downloading jira project components... ', end='', flush=True)
+    components = []
+    for p in projects:
+        proj_comp = jira_connection.project_components(p)
+        for c in proj_comp:
+            components.append(c.raw)
+        p.raw.update({'components': components})
+    print('✓')
+
     print('downloading jira versions... ', end='', flush=True)
     result = [
         p.raw.update({'versions': [v.raw for v in jira_connection.project_versions(p)]}) or p.raw
@@ -291,17 +300,6 @@ def download_worklogs(jira_connection, issue_ids):
 
     return {'existing': updated, 'deleted': []}
 
-
-def download_project_components(jira_connection):
-    print(f'downloading jira project components... ', end='', flush=True)
-    projects = jira_connection.projects()
-    components = []
-    for p in projects:
-        proj_comp = jira_connection.project_components(p)
-        for c in proj_comp:
-            components.append(c.raw)
-    print('✓')
-    return components
 
 # Returns an array of CustomFieldOption items
 @diagnostics.capture_timing()
