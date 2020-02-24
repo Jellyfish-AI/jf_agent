@@ -299,7 +299,7 @@ def download_project_components(jira_connection):
     for p in projects:
         proj_comp = jira_connection.project_components(p)
         for c in proj_comp:
-            components.append(c)
+            components.append(c.raw)
     print('✓')
     return components
 
