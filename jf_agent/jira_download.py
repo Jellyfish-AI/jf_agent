@@ -127,6 +127,11 @@ def download_projects_and_versions(
 
     print('✓')
 
+    print(f'downloading jira project components... ', end='', flush=True)
+    for p in projects:
+        p.raw.update({'components': [c.raw for c in jira_connection.project_components(p)]})
+    print('✓')
+
     print('downloading jira versions... ', end='', flush=True)
     result = [
         p.raw.update({'versions': [v.raw for v in jira_connection.project_versions(p)]}) or p.raw
