@@ -1,13 +1,11 @@
 import argparse
 import gzip
-import json
 import logging
 import os
 import re
 import shutil
 import subprocess
 import threading
-import traceback
 from collections import namedtuple
 from datetime import datetime
 from glob import glob
@@ -32,6 +30,7 @@ from jf_agent.gh_download import get_all_users as get_gh_users
 from jf_agent.gh_download import get_default_branch_commits as get_gh_default_branch_commits
 from jf_agent.gh_download import get_pull_requests as get_gh_pull_requests
 from jf_agent.github_client import GithubClient
+from jf_agent.gitlab import load_and_dump_gitlab, GitLabClient
 from jf_agent.jira_download import (
     download_boards_and_sprints,
     download_customfieldoptions,
@@ -95,7 +94,7 @@ def main():
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
     status_json = []
-    
+
     if config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
@@ -263,9 +262,9 @@ def obtain_config(args):
     git_strip_text_content = git_config.get('strip_text_content', False)
     git_redact_names_and_urls = git_config.get('redact_names_and_urls', False)
 
-    if git_provider not in ('bitbucket_server', 'github'):
+    if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
-            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server` or `github`'
+            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
         )
         raise BadConfigException()
 
@@ -330,6 +329,13 @@ def obtain_config(args):
         )
         raise BadConfigException()
 
+    # gitlab must be in whitelist mode
+    if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
+        print(
+            'ERROR: GitLab Cloud requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
+        )
+        raise BadConfigException()
+
     # If we're only downloading, do not compress the output files (so they can be more easily inspected)
     compress_output_files = (
         False if (run_mode_includes_download and not run_mode_includes_send) else True
@@ -374,6 +380,7 @@ def obtain_creds(config):
     bb_username = os.environ.get('BITBUCKET_USERNAME', None)
     bb_password = os.environ.get('BITBUCKET_PASSWORD', None)
     github_token = os.environ.get('GITHUB_TOKEN', None)
+    gitlab_token = os.environ.get('GITLAB_TOKEN', None)
 
     if config.jira_url and not (jira_username and jira_password):
         print(
@@ -389,6 +396,10 @@ def obtain_creds(config):
 
     if config.git_provider == 'github' and not github_token:
         print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
+        raise BadConfigException()
+
+    if config.git_provider == 'gitlab' and not gitlab_token:
+        print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
         raise BadConfigException()
 
     return UserProvidedCreds(
@@ -420,7 +431,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+            not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -442,7 +453,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-        jira_connection, config.jira_include_fields, config.jira_exclude_fields
+            jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
         print(f"{f['key']:30}\t{f['name']}")
 
@@ -451,26 +462,30 @@ def print_all_jira_fields(config, jira_connection):
 @agent_logging.log_entry_exit(logger)
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
     download_data_status = []
+
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, jira_connection))
 
-    if git_connection:
-        try:
-            if config.git_provider == 'bitbucket_server':
-                load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
-                download_data_status.append({'type': 'Git', 'status': 'success'})
-            elif config.git_provider == 'github':
-                load_and_dump_github(config, endpoint_git_instance_info, git_connection)
-                download_data_status.append({'type': 'Git', 'status': 'success'})
-        except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.ERROR,
-                f'Failed to download {config.git_provider} data:\n{e}',
-                exc_info=True,
-            )
+    if not git_connection:
+        return download_data_status
 
-            download_data_status.append({'type': 'Git', 'status': 'failed'})
+    try:
+        if config.git_provider == 'bitbucket_server':
+            load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
+        elif config.git_provider == 'github':
+            load_and_dump_github(config, endpoint_git_instance_info, git_connection)
+        elif config.git_provider == 'gitlab':
+            load_and_dump_gitlab(config, endpoint_git_instance_info, git_connection)
+    except Exception as e:
+        agent_logging.log_and_print(
+            logger,
+            logging.ERROR,
+            f'Failed to download {config.git_provider} data:\n{e}',
+            exc_info=True,
+        )
+        download_data_status.append({'type': 'Git', 'status': 'failed'})
+    else:
+        download_data_status.append({'type': 'Git', 'status': 'success'})
 
     return download_data_status
 
@@ -798,6 +813,20 @@ def get_git_client(config, creds):
         except Exception as e:
             agent_logging.log_and_print(
                 logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
+            )
+            return
+
+    elif config.git_provider == 'gitlab':
+        try:
+            return GitLabClient(
+                server_url=config.git_url,
+                private_token=creds.gitlab_token,
+                per_page_override=config.gitlab_per_page_override,
+                session=retry_session()
+            )
+        except Exception as e:
+            agent_logging.log_and_print(
+                logger, logging.ERROR, f'Failed to connect to GitLab:\n{e}', exc_info=True
             )
             return
 

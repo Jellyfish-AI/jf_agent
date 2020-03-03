@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
 import gzip
 import json
 import jsonstreams
 import pytz
+from typing import List
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 
 def pull_since_date_for_repo(server_git_instance_info, org_login, repo_id, commits_or_prs):
@@ -56,7 +58,7 @@ class StrDefaultEncoder(json.JSONEncoder):
 
 
 def download_and_write_streaming(
-    outdir, filename_prefix, compress, generator_func, generator_func_args, item_id_dict_key
+        outdir, filename_prefix, compress, generator_func, generator_func_args, item_id_dict_key
 ):
     if compress:
         outfile = gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wt')
@@ -76,3 +78,103 @@ def download_and_write_streaming(
 
     outfile.close()
     return item_ids
+
+
+@dataclass
+class NormalizedUser:
+    id: str
+    name: str
+    login: str
+    email: str = None
+
+
+@dataclass
+class NormalizedBranch:
+    name: str
+    sha: str
+
+
+@dataclass
+class NormalizedProject:
+    id: str
+    name: str
+    login: str
+    url: str
+
+
+@dataclass
+class NormalizedRepository:
+    id: int
+    name: str
+    full_name: str
+    url: str
+    is_fork: bool
+    default_branch_name: str
+    project: NormalizedProject
+    branches: List[NormalizedBranch]
+
+
+@dataclass
+class NormalizedCommit:
+    hash: str
+    url: str
+    message: str
+    commit_date: str
+    author_date: str
+    author: NormalizedUser
+    repo: NormalizedRepository
+    is_merge: bool
+
+
+@dataclass
+class NormalizedComment:
+    user: NormalizedUser
+    body: str
+    created_at: str
+
+
+@dataclass
+class NormalizedReview:
+    foreign_id: any
+    review_state: str
+    user: NormalizedUser
+
+
+@dataclass
+class NormalizedPullRequest:
+    id = any
+    additions = int
+    deletions = int
+    changed_files: int
+    is_closed: bool
+    is_merged: bool
+    created_at: str
+    updated_at: str
+    merge_date: str
+    closed_date: str
+    title: str
+    body: str
+    url: str
+    author: NormalizedUser
+    merged_by: NormalizedUser
+    base_branch: NormalizedBranch
+    head_branch: NormalizedBranch
+    comments: List[NormalizedComment]
+    commits: List[NormalizedCommit]
+    approvals: List[NormalizedReview]
+    base_repo: NormalizedRepository
+    head_repo: NormalizedRepository
+
+
+@dataclass
+class NormalizedPullRequestComment:
+    user: NormalizedUser
+    body: str
+    created_at: str
+
+
+@dataclass
+class NormalizedPullRequestReview:
+    user: NormalizedUser
+    foreign_id: int
+    review_state: str
