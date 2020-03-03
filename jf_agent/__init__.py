@@ -21,7 +21,7 @@ class StrDefaultEncoder(json.JSONEncoder):
 
 
 def download_and_write_streaming(
-    outdir, filename_prefix, compress, generator_func, generator_func_args, item_id_dict_key
+        outdir, filename_prefix, compress, generator_func, generator_func_args, item_id_dict_key
 ):
     if compress:
         outfile = gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wt')
