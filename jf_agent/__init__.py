@@ -3,7 +3,6 @@ import json
 import jsonstreams
 import dataclasses
 
-
 def write_file(outdir, filename_prefix, compress, results):
     if compress:
         with gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wb') as outfile:
