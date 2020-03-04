@@ -1,98 +1,8 @@
 import gitlab
 import logging
 import requests
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
-from jf_agent.gitlab.download import (
-    get_all_users,
-    get_all_projects,
-    get_default_branch_commits,
-    get_pull_requests,
-    get_all_repos
-)
 
 logger = logging.getLogger(__name__)
-
-
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def load_and_dump_gitlab(config, endpoint_git_instance_info, git_conn):
-    # obtain whitelisted groups gitlab_groups <> projects
-    group_ids = config.git_include_projects
-    groups = [git_conn.get_group(group_id) for group_id in group_ids]
-
-    write_file(
-        config.outdir,
-        'bb_users',
-        config.compress_output_files,
-        get_all_users(git_conn, groups),
-    )
-
-    write_file(
-        config.outdir,
-        'bb_projects',
-        config.compress_output_files,
-        get_all_projects(git_conn, groups, config.git_redact_names_and_urls),
-    )
-
-    api_repos = None
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def get_and_write_repos():
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_repos, repos = zip(
-            *get_all_repos(
-                git_conn,
-                include_groups=groups,
-                include_repos=config.git_include_repos,
-                exclude_repos=config.git_exclude_repos,
-                redact_names_and_urls=config.git_redact_names_and_urls,
-            )
-        )
-        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
-        return len(api_repos)
-
-    get_and_write_repos()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_commits():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_commits',
-            config.compress_output_files,
-            generator_func=get_default_branch_commits,
-            generator_func_args=(
-                git_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='hash',
-        )
-
-    download_and_write_commits()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_prs():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_prs',
-            config.compress_output_files,
-            generator_func=get_pull_requests,
-            generator_func_args=(
-                git_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='id',
-        )
-
-    download_and_write_prs()
 
 
 class GitLabClient:
@@ -167,10 +77,12 @@ class GitLabClient:
     def get_project(self, project_id):
         return self.client.projects.get(project_id)
 
-    def list_group_projects(self, group):
+    def list_group_projects(self, group_id):
+        group = self.get_group(group_id)
         return group.projects.list(as_list=False, include_subgroups=True)
 
-    def list_group_members(self, group):
+    def list_group_members(self, group_id):
+        group = self.get_group(group_id)
         return group.members.list(as_list=False)
 
     def list_project_branches(self, project_id):

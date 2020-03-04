@@ -1,10 +1,11 @@
 import gitlab
-import tqdm
+from tqdm import tqdm
 import requests
 from dateutil import parser
 from typing import List
 import logging
-from jf_agent import (
+from jf_agent.git import (
+    GitAdapter,
     NormalizedUser,
     NormalizedProject,
     NormalizedBranch,
@@ -13,8 +14,8 @@ from jf_agent import (
     NormalizedPullRequest,
     NormalizedPullRequestComment,
     NormalizedPullRequestReview,
+    NormalizedPullRequestRepository
 )
-
 from jf_agent import pull_since_date_for_repo, agent_logging
 from jf_agent import diagnostics
 from jf_agent.name_redactor import NameRedactor, sanitize_text
@@ -25,18 +26,6 @@ _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
 
-
-def get_attribute(object, property, default=None):
-    """
-    Obtain a class attribute safely
-    """
-    try:
-        value = getattr(object, property)
-        return value if value else default
-    except AttributeError:
-        return default
-
-
 '''
     
     Data Fetching
@@ -44,116 +33,125 @@ def get_attribute(object, property, default=None):
 '''
 
 
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def get_all_users(client, include_groups) -> List[NormalizedUser]:
-    print('downloading gitlab users... ', end='', flush=True)
-    users = [_normalize_user(user) for group in include_groups for user in client.list_group_members(group)]
-    print('✓')
-    return users
+class GitLabAdapter(GitAdapter):
 
+    def __init__(self, client: gitlab.Gitlab):
+        self.client = client
 
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def get_all_projects(client, include_groups, redact_names_and_urls) -> List[NormalizedProject]:
-    print('downloading gitlab projects... ', end='', flush=True)
-    projects = [
-        _normalize_project(group, redact_names_and_urls)
-        for group in include_groups
-    ]
-    print('✓')
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_users(self, include_group_ids) -> List[NormalizedUser]:
+        print('downloading gitlab users... ', end='', flush=True)
+        users = [
+            _normalize_user(user)
+            for group_id in include_group_ids
+            for user in self.self.client.list_group_members(group_id)
+        ]
+        print('✓')
+        return users
 
-    if not projects:
-        raise ValueError(
-            'No projects found.  Make sure your token has appropriate access to GitLab.'
-        )
-    return projects
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_projects(self, include_groups, redact_names_and_urls) -> List[NormalizedProject]:
+        print('downloading gitlab projects... ', end='', flush=True)
+        projects = [
+            _normalize_project(group, redact_names_and_urls)
+            for group in include_groups
+        ]
+        print('✓')
 
-
-@agent_logging.log_entry_exit(logger)
-def get_all_repos(client, include_groups, include_repos, exclude_repos, redact_names_and_urls) \
-        -> List[NormalizedRepository]:
-    print('downloading gitlab repos... ', end='', flush=True)
-
-    filters = []
-    if include_repos:
-        filters.append(lambda r: r.name in include_repos)
-    if exclude_repos:
-        filters.append(lambda r: r.name not in exclude_repos)
-
-    forks = client.list_project_forks()
-    repos = [
-        (repo, _normalize_repo(client, repo, group, redact_names_and_urls))
-        for group in include_groups
-        for repo in client.list_group_projects(group)  # gitlab project == repo
-        if all(filt(repo) for filt in filters)
-    ]
-    print('✓')
-    if not repos:
-        raise ValueError(
-            'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
-        )
-    return repos
-
-
-def get_default_branch_commits(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-) -> List[NormalizedCommit]:
-    for i, api_repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
-            pull_since = pull_since_date_for_repo(
-                server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+        if not projects:
+            raise ValueError(
+                'No projects found.  Make sure your token has appropriate access to GitLab.'
             )
-            try:
-                for j, commit in enumerate(
-                        tqdm(
-                            client.list_project_commits(api_repo.id, pull_since),
-                            desc=f'downloading commits for {api_repo.name}',
-                            unit='commits',
-                        ),
-                        start=1,
-                ):
-                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
-                        yield _normalize_commit(
-                            commit, api_repo, strip_text_content, redact_names_and_urls
-                        )
+        return projects
 
-            except Exception as e:
-                print(f':WARN: Got exception for branch {api_repo.default_branch}: {e}. Skipping...')
+    @agent_logging.log_entry_exit(logger)
+    def get_repos(
+            self, include_groups_ids, include_repos, exclude_repos, redact_names_and_urls
+    ) -> List[NormalizedRepository]:
+        print('downloading gitlab repos... ', end='', flush=True)
 
+        filters = []
+        if include_repos:
+            filters.append(lambda r: r.name in include_repos)
+        if exclude_repos:
+            filters.append(lambda r: r.name not in exclude_repos)
 
-def get_pull_requests(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-) -> List[NormalizedPullRequest]:
-    for i, api_repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
-            pull_since = pull_since_date_for_repo(
-                server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+        repos = [
+            (repo, _normalize_repo(self, repo, group, redact_names_and_urls))
+            for group_id in include_groups
+            for repo in self.client.list_group_projects(group)  # gitlab project == repo
+            if all(filt(repo) for filt in filters)
+        ]
+        print('✓')
+        if not repos:
+            raise ValueError(
+                'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
             )
-            try:
-                for j, api_pr in enumerate(
-                        tqdm(
-                            client.list_project_merge_requests(api_repo.id),
-                            desc=f'downloading PRs for {api_repo.name}',
-                            unit='prs',
-                        ),
-                        start=1,
-                ):
-                    with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
-                        updated_at = parser.parse(api_pr.updated_at)
+        return repos
 
-                        # PRs are ordered newest to oldest
-                        # if this is too old, we're done with this repo
-                        if pull_since and updated_at < pull_since:
-                            break
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_default_branch_commits(
+            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    ) -> List[NormalizedCommit]:
+        for i, api_repo in enumerate(api_repos, start=1):
+            with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+                pull_since = pull_since_date_for_repo(
+                    server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+                )
+                try:
+                    for j, commit in enumerate(
+                            tqdm(
+                                self.client.list_project_commits(api_repo.id, pull_since),
+                                desc=f'downloading commits for {api_repo.name}',
+                                unit='commits',
+                            ),
+                            start=1,
+                    ):
+                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                            yield _normalize_commit(
+                                commit, api_repo, strip_text_content, redact_names_and_urls
+                            )
 
-                        yield _normalize_pr(client, api_pr, strip_text_content, redact_names_and_urls)
+                except Exception as e:
+                    print(f':WARN: Got exception for branch {api_repo.default_branch}: {e}. Skipping...')
 
-            except Exception as e:
-                print(f':WARN: Exception getting PRs for repo {api_repo.name}: {e}. Skipping...')
-    print()
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_pull_requests(
+            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    ) -> List[NormalizedPullRequest]:
+        for i, api_repo in enumerate(api_repos, start=1):
+            with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+                pull_since = pull_since_date_for_repo(
+                    server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+                )
+                try:
+                    for j, api_pr in enumerate(
+                            tqdm(
+                                self.client.list_project_merge_requests(api_repo.id),
+                                desc=f'downloading PRs for {api_repo.name}',
+                                unit='prs',
+                            ),
+                            start=1,
+                    ):
+                        with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
+                            updated_at = parser.parse(api_pr.updated_at)
 
-    return
+                            # PRs are ordered newest to oldest
+                            # if this is too old, we're done with this repo
+                            if pull_since and updated_at < pull_since:
+                                break
+
+                            yield _normalize_pr(self, api_pr, strip_text_content, redact_names_and_urls)
+
+                except Exception as e:
+                    print(f':WARN: Exception getting PRs for repo {api_repo.name}: {e}. Skipping...')
+        print()
+
+        return
 
 
 '''
@@ -191,13 +189,13 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
     )
 
 
-def _normalize_repo(client, api_repo, api_group, redact_names_and_urls: bool) -> NormalizedRepository:
+def _normalize_repo(self, api_repo, api_group, redact_names_and_urls: bool) -> NormalizedRepository:
     repo_name = api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
     url = api_repo.web_url if not redact_names_and_urls else None
 
     branches: List[NormalizedBranch] = [
         _normalize_branch(branch, redact_names_and_urls)
-        for branch in client.get_branches()
+        for branch in self.client.get_branches()
     ]
     project: NormalizedProject = _normalize_project(api_group, redact_names_and_urls)
 
@@ -206,8 +204,8 @@ def _normalize_repo(client, api_repo, api_group, redact_names_and_urls: bool) ->
         name=repo_name,
         full_name=repo_name,
         url=url,
-        default_branch_name=get_attribute(api_repo, 'default_branch', default=''),
-        is_fork=True if get_attribute(api_repo, 'forked_from_project') else False,
+        default_branch_name=_get_attribute(api_repo, 'default_branch', default=''),
+        is_fork=True if _get_attribute(api_repo, 'forked_from_project') else False,
         branches=branches,
         project=project,
     )
@@ -233,14 +231,11 @@ def _normalize_commit(commit, repo, strip_text_content: bool, redact_names_and_u
 
 
 def _normalize_pr_repo(api_repo, redact_names_and_urls):
-    repo_name = api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
-    repo_url = api_repo.web_url if not redact_names_and_urls else None
-
-    return {
-        'id': api_repo.id,
-        'name': repo_name,
-        'url': repo_url
-    }
+    return NormalizedPullRequestRepository(
+        id=api_repo.id,
+        name=api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name),
+        url=api_repo.web_url if not redact_names_and_urls else None
+    )
 
 
 def _get_normalized_pr_comments(merge_request, strip_text_content) -> List[NormalizedPullRequestComment]:
@@ -276,8 +271,8 @@ def _get_normalized_approvals(merge_request):
         return []
 
 
-def _normalize_pr(client, merge_request, strip_text_content, redact_names_and_urls):
-    merge_request = client.expand_merge_request_data(merge_request)
+def _normalize_pr(self, merge_request, strip_text_content, redact_names_and_urls):
+    merge_request = self.client.expand_merge_request_data(merge_request)
 
     base_branch_name = merge_request.source_branch['name']
     head_branch_name = merge_request.target_branch['name']
@@ -315,6 +310,13 @@ def _normalize_pr(client, merge_request, strip_text_content, redact_names_and_ur
     )
 
 
+'''
+
+    Helpers 
+    
+'''
+
+
 def _calculate_diff_counts(diff):
     additions, deletions = 0, 0
     changed_files = None
@@ -341,3 +343,14 @@ def _calculate_diff_counts(diff):
         additions, deletions, changed_files = None, None, None
 
     return additions, deletions, changed_files
+
+
+def _get_attribute(object, property, default=None):
+    """
+    Obtain a class attribute safely
+    """
+    try:
+        value = getattr(object, property)
+        return value if value else default
+    except AttributeError:
+        return default
