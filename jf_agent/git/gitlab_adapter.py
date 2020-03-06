@@ -173,7 +173,6 @@ class GitLabAdapter(GitAdapter):
 
                 except Exception as e:
                     print(f':WARN: Exception getting PRs for repo {nrm_repo.name}: {e}. Skipping...')
-                    raise
         print()
 
 

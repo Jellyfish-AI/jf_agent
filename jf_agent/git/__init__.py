@@ -84,17 +84,17 @@ class NormalizedCommit:
 
 
 @dataclass
-class NormalizedComment:
+class NormalizedPullRequestComment:
     user: NormalizedUser
     body: str
     created_at: str
 
 
 @dataclass
-class NormalizedReview:
-    foreign_id: any
-    review_state: str
+class NormalizedPullRequestReview:
     user: NormalizedUser
+    foreign_id: int
+    review_state: str
 
 
 @dataclass
@@ -116,25 +116,11 @@ class NormalizedPullRequest:
     head_branch: str
     author: NormalizedUser
     merged_by: NormalizedUser
-    comments: List[NormalizedComment]
     commits: List[NormalizedCommit]
-    approvals: List[NormalizedReview]
+    comments: List[NormalizedPullRequestComment]
+    approvals: List[NormalizedPullRequestReview]
     base_repo: NormalizedShortRepository
     head_repo: NormalizedShortRepository
-
-
-@dataclass
-class NormalizedPullRequestComment:
-    user: NormalizedUser
-    body: str
-    created_at: str
-
-
-@dataclass
-class NormalizedPullRequestReview:
-    user: NormalizedUser
-    foreign_id: int
-    review_state: str
 
 
 class GitAdapter(ABC):
