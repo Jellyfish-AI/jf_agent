@@ -20,6 +20,9 @@ def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
 
 
 def _normalize_user(user):
+    if not user:
+        return None
+    
     return {
         'id': user.get('id', ''),
         'login': user.get('name', ''),
