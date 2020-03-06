@@ -14,10 +14,11 @@ from jf_agent.git import (
     NormalizedPullRequest,
     NormalizedPullRequestComment,
     NormalizedPullRequestReview,
-    NormalizedPullRequestRepository
+    NormalizedShortRepository,
+    pull_since_date_for_repo
 )
-from jf_agent import pull_since_date_for_repo, agent_logging
-from jf_agent import diagnostics
+from jf_agent.git.gitlab_client import GitLabClient
+from jf_agent import diagnostics, agent_logging
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 logger = logging.getLogger(__name__)
@@ -35,28 +36,19 @@ _repo_redactor = NameRedactor()
 
 class GitLabAdapter(GitAdapter):
 
-    def __init__(self, client: gitlab.Gitlab):
+    def __init__(self, client: GitLabClient):
         self.client = client
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_users(self, include_group_ids) -> List[NormalizedUser]:
-        print('downloading gitlab users... ', end='', flush=True)
-        users = [
-            _normalize_user(user)
-            for group_id in include_group_ids
-            for user in self.self.client.list_group_members(group_id)
-        ]
-        print('✓')
-        return users
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def get_projects(self, include_groups, redact_names_and_urls) -> List[NormalizedProject]:
+    def get_projects(self, include_project_ids: List[int], redact_names_and_urls: bool) -> List[NormalizedProject]:
         print('downloading gitlab projects... ', end='', flush=True)
         projects = [
-            _normalize_project(group, redact_names_and_urls)
-            for group in include_groups
+            _normalize_project(
+                self.client.get_group(project_id),  # are group_ids
+                redact_names_and_urls
+            )
+            for project_id in include_project_ids
         ]
         print('✓')
 
@@ -66,73 +58,99 @@ class GitLabAdapter(GitAdapter):
             )
         return projects
 
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_users(self, include_project_ids: List[int]) -> List[NormalizedUser]:
+        print('downloading gitlab users... ', end='', flush=True)
+        users = [
+            _normalize_user(user)
+            for project_id in include_project_ids
+            for user in self.client.list_group_members(project_id)
+        ]
+        print('✓')
+        return users
+
     @agent_logging.log_entry_exit(logger)
     def get_repos(
-            self, include_groups_ids, include_repos, exclude_repos, redact_names_and_urls
+            self,
+            normalized_projects: List[NormalizedProject],
+            include_repos_ids: List[int],
+            exclude_repos_ids: List[int],
+            redact_names_and_urls: bool
     ) -> List[NormalizedRepository]:
         print('downloading gitlab repos... ', end='', flush=True)
 
-        filters = []
-        if include_repos:
-            filters.append(lambda r: r.name in include_repos)
-        if exclude_repos:
-            filters.append(lambda r: r.name not in exclude_repos)
+        nrm_repos: List[NormalizedRepository] = []
+        for nrm_project in normalized_projects:
+            api_repos = self.client.list_group_projects(nrm_project.id)
 
-        repos = [
-            (repo, _normalize_repo(self, repo, group, redact_names_and_urls))
-            for group_id in include_groups
-            for repo in self.client.list_group_projects(group)  # gitlab project == repo
-            if all(filt(repo) for filt in filters)
-        ]
+            for api_repo in api_repos:
+                if len(include_repos_ids) > 0 and api_repo.id not in include_repos_ids:
+                    continue  # skip this repo
+                if len(exclude_repos_ids) > 0 and api_repo.id in exclude_repos_ids:
+                    continue  # skip this repo
+
+                nrm_branches = [
+                    _normalize_branch(api_branch, redact_names_and_urls)
+                    for api_branch in self.client.list_project_branches(api_repo.id)
+                ]
+                nrm_repos.append(_normalize_repo(api_repo, nrm_branches, nrm_project, redact_names_and_urls))
+
         print('✓')
-        if not repos:
+        if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
             )
-        return repos
+        return nrm_repos
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_default_branch_commits(
-            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+            self,
+            normalized_repos: List[NormalizedRepository],
+            server_git_instance_info,
+            strip_text_content: bool,
+            redact_names_and_urls: bool
     ) -> List[NormalizedCommit]:
-        for i, api_repo in enumerate(api_repos, start=1):
+        for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
-                    server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+                    server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
                 )
                 try:
                     for j, commit in enumerate(
                             tqdm(
-                                self.client.list_project_commits(api_repo.id, pull_since),
-                                desc=f'downloading commits for {api_repo.name}',
+                                self.client.list_project_commits(nrm_repo.id, pull_since),
+                                desc=f'downloading commits for {nrm_repo.name}',
                                 unit='commits',
                             ),
                             start=1,
                     ):
                         with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                             yield _normalize_commit(
-                                commit, api_repo, strip_text_content, redact_names_and_urls
+                                commit, nrm_repo, strip_text_content, redact_names_and_urls
                             )
 
                 except Exception as e:
-                    print(f':WARN: Got exception for branch {api_repo.default_branch}: {e}. Skipping...')
+                    print(f':WARN: Got exception for branch {nrm_repo.default_branch_name}: {e}. Skipping...')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
-            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+            self, normalized_repos: List[NormalizedRepository],
+            server_git_instance_info, strip_text_content: bool, redact_names_and_urls: bool
     ) -> List[NormalizedPullRequest]:
-        for i, api_repo in enumerate(api_repos, start=1):
+
+        for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 pull_since = pull_since_date_for_repo(
-                    server_git_instance_info, api_repo.group['id'], api_repo.id, 'commits'
+                    server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                 )
                 try:
                     for j, api_pr in enumerate(
                             tqdm(
-                                self.client.list_project_merge_requests(api_repo.id),
-                                desc=f'downloading PRs for {api_repo.name}',
+                                self.client.list_project_merge_requests(nrm_repo.id),
+                                desc=f'downloading PRs for {nrm_repo.name}',
                                 unit='prs',
                             ),
                             start=1,
@@ -145,13 +163,18 @@ class GitLabAdapter(GitAdapter):
                             if pull_since and updated_at < pull_since:
                                 break
 
-                            yield _normalize_pr(self, api_pr, strip_text_content, redact_names_and_urls)
+                            api_pr = self.client.expand_merge_request_data(api_pr)
+                            nrm_commits: List[NormalizedCommit] = [
+                                _normalize_commit(commit, nrm_repo, strip_text_content, redact_names_and_urls)
+                                for commit in api_pr.commit_list
+                            ]
+
+                            yield _normalize_pr(api_pr, nrm_commits, strip_text_content, redact_names_and_urls)
 
                 except Exception as e:
-                    print(f':WARN: Exception getting PRs for repo {api_repo.name}: {e}. Skipping...')
+                    print(f':WARN: Exception getting PRs for repo {nrm_repo.name}: {e}. Skipping...')
+                    raise
         print()
-
-        return
 
 
 '''
@@ -165,11 +188,19 @@ def _normalize_user(api_user) -> NormalizedUser:
     if not api_user:
         return None
 
+    if isinstance(api_user, dict):
+        return NormalizedUser(
+            id=api_user['id'],
+            login=api_user['username'],
+            name=api_user['name'],
+            email=None  # no email available
+        )
+
     return NormalizedUser(
         id=api_user.id,
         login=api_user.username,
         name=api_user.name,
-        email=None
+        email=None  # no email available
     )
 
 
@@ -178,7 +209,7 @@ def _normalize_project(api_group, redact_names_and_urls: bool) -> NormalizedProj
         id=api_group.id,
         login=api_group.id,
         name=api_group.name if not redact_names_and_urls else _project_redactor.redact_name(api_group.name),
-        url=None  # todo, is this availiable?
+        url=None
     )
 
 
@@ -189,15 +220,14 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
     )
 
 
-def _normalize_repo(self, api_repo, api_group, redact_names_and_urls: bool) -> NormalizedRepository:
+def _normalize_repo(
+        api_repo,
+        normalized_branches: List[NormalizedBranch],
+        normalized_project: NormalizedProject,
+        redact_names_and_urls: bool,
+) -> NormalizedRepository:
     repo_name = api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
     url = api_repo.web_url if not redact_names_and_urls else None
-
-    branches: List[NormalizedBranch] = [
-        _normalize_branch(branch, redact_names_and_urls)
-        for branch in self.client.get_branches()
-    ]
-    project: NormalizedProject = _normalize_project(api_group, redact_names_and_urls)
 
     return NormalizedRepository(
         id=api_repo.id,
@@ -206,35 +236,36 @@ def _normalize_repo(self, api_repo, api_group, redact_names_and_urls: bool) -> N
         url=url,
         default_branch_name=_get_attribute(api_repo, 'default_branch', default=''),
         is_fork=True if _get_attribute(api_repo, 'forked_from_project') else False,
-        branches=branches,
-        project=project,
+        branches=normalized_branches,
+        project=normalized_project,
     )
 
 
-def _normalize_commit(commit, repo, strip_text_content: bool, redact_names_and_urls: bool):
-    author = NormalizedUser(
-        id=f'{commit.author_name}<{commit.author_email}>',
-        login=commit.author_email,
-        name=commit.author_name,
-        email=commit.author_email,
-    )
-    commit_url = f'{repo.url}/commit/{commit.id}' if not redact_names_and_urls else None
-    return NormalizedCommit(
-        hash=commit.id,
-        author=author,
-        url=commit_url,
-        commit_date=commit.committed_date,
-        author_date=commit.committed_date,
-        message=sanitize_text(commit.message, strip_text_content),
-        is_merge=len(commit.parent_ids) > 1,
-    )
-
-
-def _normalize_pr_repo(api_repo, redact_names_and_urls):
-    return NormalizedPullRequestRepository(
+def _normalize_short_form_repo(api_repo, redact_names_and_urls):
+    return NormalizedShortRepository(
         id=api_repo.id,
         name=api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name),
         url=api_repo.web_url if not redact_names_and_urls else None
+    )
+
+
+def _normalize_commit(api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool):
+    author = NormalizedUser(
+        id=f'{api_commit.author_name}<{api_commit.author_email}>',
+        login=api_commit.author_email,
+        name=api_commit.author_name,
+        email=api_commit.author_email,
+    )
+    commit_url = f'{normalized_repo.url}/commit/{api_commit.id}' if not redact_names_and_urls else None
+    return NormalizedCommit(
+        hash=api_commit.id,
+        author=author,
+        url=commit_url,
+        commit_date=api_commit.committed_date,
+        author_date=api_commit.committed_date,
+        message=sanitize_text(api_commit.message, strip_text_content),
+        is_merge=len(api_commit.parent_ids) > 1,
+        repo=normalized_repo.short()  # use short form of repo
     )
 
 
@@ -259,9 +290,11 @@ def _get_normalized_pr_comments(merge_request, strip_text_content) -> List[Norma
 def _get_normalized_approvals(merge_request):
     try:
         return [
-            NormalizedPullRequestReview(user=_normalize_user(approver), foreign_id=approver.user_id,
-                                        review_state='approved')
-            for approver in merge_request.approved_by
+            NormalizedPullRequestReview(
+                user=_normalize_user(approval['user']),
+                foreign_id=approval['user']['id'],
+                review_state='approved'
+            ) for approval in merge_request.approved_by
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
         logger.warning(
@@ -271,14 +304,16 @@ def _get_normalized_approvals(merge_request):
         return []
 
 
-def _normalize_pr(self, merge_request, strip_text_content, redact_names_and_urls):
-    merge_request = self.client.expand_merge_request_data(merge_request)
-
-    base_branch_name = merge_request.source_branch['name']
-    head_branch_name = merge_request.target_branch['name']
+def _normalize_pr(
+        merge_request,
+        normalized_commits: List[NormalizedCommit],
+        strip_text_content: bool,
+        redact_names_and_urls: bool
+):
+    base_branch_name = merge_request.source_branch
+    head_branch_name = merge_request.target_branch
 
     # normalize comments, approvals, and commits
-    commits = [_normalize_commit(commit) for commit in merge_request.commit_list]
     additions, deletions, changed_files = _calculate_diff_counts(merge_request.diff)
 
     return NormalizedPullRequest(
@@ -300,13 +335,13 @@ def _normalize_pr(self, merge_request, strip_text_content, redact_names_and_urls
         title=sanitize_text(merge_request.title, strip_text_content),
         body=sanitize_text(merge_request.description, strip_text_content),
         # normalized fields
-        commits=commits,
+        commits=normalized_commits,
         author=_normalize_user(merge_request.author),
         merged_by=_normalize_user(merge_request.merged_by),
         approvals=_get_normalized_approvals(merge_request),
         comments=_get_normalized_pr_comments(merge_request, strip_text_content),
-        base_repo=_normalize_pr_repo(merge_request.source_project, redact_names_and_urls),
-        head_repo=_normalize_pr_repo(merge_request.target_project, redact_names_and_urls),
+        base_repo=_normalize_short_form_repo(merge_request.source_project, redact_names_and_urls),
+        head_repo=_normalize_short_form_repo(merge_request.target_project, redact_names_and_urls),
     )
 
 

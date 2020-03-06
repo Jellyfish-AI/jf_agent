@@ -9,9 +9,6 @@ from stashy.client import Stash
 from jf_agent.session import retry_session
 from jf_agent.git.github_client import GithubClient
 from jf_agent.git.gitlab_client import GitLabClient
-from jf_agent.git.gitlab_adapter import GitLabAdapter
-from jf_agent.git.github import load_and_dump as load_and_dump_gh
-from jf_agent.git.bitbucket_server import load_and_dump as load_and_dump_bbs
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 
@@ -52,6 +49,13 @@ class NormalizedProject:
 
 
 @dataclass
+class NormalizedShortRepository:
+    id: int
+    name: str
+    url: str
+
+
+@dataclass
 class NormalizedRepository:
     id: int
     name: str
@@ -62,6 +66,10 @@ class NormalizedRepository:
     project: NormalizedProject
     branches: List[NormalizedBranch]
 
+    def short(self):
+        # return the short form of Normalized Repository
+        return NormalizedShortRepository(id=self.id, name=self.name, url=self.url)
+
 
 @dataclass
 class NormalizedCommit:
@@ -71,7 +79,7 @@ class NormalizedCommit:
     commit_date: str
     author_date: str
     author: NormalizedUser
-    repo: NormalizedRepository
+    repo: NormalizedShortRepository
     is_merge: bool
 
 
@@ -91,9 +99,9 @@ class NormalizedReview:
 
 @dataclass
 class NormalizedPullRequest:
-    id = any
-    additions = int
-    deletions = int
+    id: any
+    additions: int
+    deletions: int
     changed_files: int
     is_closed: bool
     is_merged: bool
@@ -104,15 +112,15 @@ class NormalizedPullRequest:
     title: str
     body: str
     url: str
+    base_branch: str
+    head_branch: str
     author: NormalizedUser
     merged_by: NormalizedUser
-    base_branch: NormalizedBranch
-    head_branch: NormalizedBranch
     comments: List[NormalizedComment]
     commits: List[NormalizedCommit]
     approvals: List[NormalizedReview]
-    base_repo: NormalizedRepository
-    head_repo: NormalizedRepository
+    base_repo: NormalizedShortRepository
+    head_repo: NormalizedShortRepository
 
 
 @dataclass
@@ -127,13 +135,6 @@ class NormalizedPullRequestReview:
     user: NormalizedUser
     foreign_id: int
     review_state: str
-
-
-@dataclass
-class NormalizedPullRequestRepository:
-    id: int
-    name: str
-    url: str
 
 
 class GitAdapter(ABC):
@@ -164,40 +165,37 @@ class GitAdapter(ABC):
         pass
 
     def load_and_dump_git(self, config, endpoint_git_instance_info):
-        write_file(
-            config.outdir,
-            'bb_users',
-            config.compress_output_files,
-            self.get_users(include_projects=config.git_include_projects)
-        )
-
+        nrm_projects: List[NormalizedProject] = self.get_projects(config.git_include_projects,
+                                                                  config.git_redact_names_and_urls)
         write_file(
             config.outdir,
             'bb_projects',
             config.compress_output_files,
-            self.get_projects(
-                include_projects=config.git_include_projects,
-                redact_names_and_urls=config.git_redact_names_and_urls
-            ),
+            nrm_projects
         )
 
-        api_repos = None
+        write_file(
+            config.outdir,
+            'bb_users',
+            config.compress_output_files,
+            self.get_users(config.git_include_projects)
+        )
+        nrm_repos = None
 
         @diagnostics.capture_timing()
         @agent_logging.log_entry_exit(logger)
         def get_and_write_repos():
-            nonlocal api_repos
-            # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-            api_repos, repos = zip(
-                *self.get_repos(
-                    include_projects=config.git_include_projects,
-                    include_repos=config.git_include_repos,
-                    exclude_repos=config.git_exclude_repos,
-                    redact_names_and_urls=config.git_redact_names_and_urls,
-                )
+            nonlocal nrm_repos
+
+            nrm_repos = self.get_repos(
+                nrm_projects,
+                config.git_include_repos,
+                config.git_exclude_repos,
+                config.git_redact_names_and_urls,
             )
-            write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
-            return len(api_repos)
+
+            write_file(config.outdir, 'bb_repos', config.compress_output_files, nrm_repos)
+            return len(nrm_repos)
 
         get_and_write_repos()
 
@@ -210,9 +208,9 @@ class GitAdapter(ABC):
                 config.compress_output_files,
                 generator_func=self.get_default_branch_commits,
                 generator_func_args=(
-                    api_repos,
-                    config.git_strip_text_content,
+                    nrm_repos,
                     endpoint_git_instance_info,
+                    config.git_strip_text_content,
                     config.git_redact_names_and_urls,
                 ),
                 item_id_dict_key='hash',
@@ -229,9 +227,9 @@ class GitAdapter(ABC):
                 config.compress_output_files,
                 generator_func=self.get_pull_requests,
                 generator_func_args=(
-                    api_repos,
-                    config.git_strip_text_content,
+                    nrm_repos,
                     endpoint_git_instance_info,
+                    config.git_strip_text_content,
                     config.git_redact_names_and_urls,
                 ),
                 item_id_dict_key='id',
@@ -259,7 +257,7 @@ def get_git_client(config, creds):
                 verify=not config.skip_ssl_verification,
                 session=retry_session(),
             )
-        if config.git_provider == GH_PROVIDER:
+        if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
                 private_token=creds.gitlab_token,
@@ -282,11 +280,14 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
     try:
         if config.git_provider == 'bitbucket_server':
             # using old func method, todo: refactor to use GitAdapter
+            from jf_agent.git.bitbucket_server import load_and_dump as load_and_dump_bbs
             load_and_dump_bbs(config, endpoint_git_instance_info, git_connection)
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
+            from jf_agent.git.github import load_and_dump as load_and_dump_gh
             load_and_dump_gh(config, endpoint_git_instance_info, git_connection)
         elif config.git_provider == 'gitlab':
+            from jf_agent.git.gitlab_adapter import GitLabAdapter
             GitLabAdapter(git_connection).load_and_dump_git(config, endpoint_git_instance_info)
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
