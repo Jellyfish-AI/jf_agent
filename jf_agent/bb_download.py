@@ -20,10 +20,13 @@ def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
 
 
 def _normalize_user(user):
+    if not user:
+        return None
+    
     return {
-        'id': user['id'],
-        'login': user['name'],
-        'name': user['displayName'],
+        'id': user.get('id', ''),
+        'login': user.get('name', ''),
+        'name': user.get('displayName', ''),
         'email': user.get('emailAddress', ''),
     }
 
