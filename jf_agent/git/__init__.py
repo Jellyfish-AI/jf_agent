@@ -14,6 +14,11 @@ from jf_agent import agent_logging, diagnostics, download_and_write_streaming, w
 
 logger = logging.getLogger(__name__)
 
+'''
+    
+    Constants
+    
+'''
 BBS_PROVIDER = 'bitbucket_server'
 GH_PROVIDER = 'github'
 GL_PROVIDER = 'gitlab'
@@ -24,14 +29,13 @@ PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER]
     Normalized Structure
 
 '''
-
-
 @dataclass
 class NormalizedUser:
     id: str
     name: str
     login: str
     email: str = None
+    url: str = None
 
 
 @dataclass

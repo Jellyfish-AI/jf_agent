@@ -4,6 +4,7 @@ import requests
 from dateutil import parser
 from typing import List
 import logging
+
 from jf_agent.git import (
     GitAdapter,
     NormalizedUser,
@@ -15,7 +16,7 @@ from jf_agent.git import (
     NormalizedPullRequestComment,
     NormalizedPullRequestReview,
     NormalizedShortRepository,
-    pull_since_date_for_repo
+    pull_since_date_for_repo,
 )
 from jf_agent.git.gitlab_client import GitLabClient
 from jf_agent import diagnostics, agent_logging
@@ -82,18 +83,18 @@ class GitLabAdapter(GitAdapter):
 
         nrm_repos: List[NormalizedRepository] = []
         for nrm_project in normalized_projects:
-            api_repos = self.client.list_group_projects(nrm_project.id)
 
-            for api_repo in api_repos:
+            for i, api_repo in enumerate(tqdm(
+                    self.client.list_group_projects(nrm_project.id),
+                    desc=f'downloading repos for {nrm_project.name}',
+                    unit='commits'
+            ), start=1):
                 if len(include_repos_ids) > 0 and api_repo.id not in include_repos_ids:
                     continue  # skip this repo
                 if len(exclude_repos_ids) > 0 and api_repo.id in exclude_repos_ids:
                     continue  # skip this repo
 
-                nrm_branches = [
-                    _normalize_branch(api_branch, redact_names_and_urls)
-                    for api_branch in self.client.list_project_branches(api_repo.id)
-                ]
+                nrm_branches = self.get_branches(api_repo, redact_names_and_urls)
                 nrm_repos.append(_normalize_repo(api_repo, nrm_branches, nrm_project, redact_names_and_urls))
 
         print('✓')
@@ -102,6 +103,22 @@ class GitLabAdapter(GitAdapter):
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
             )
         return nrm_repos
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_branches(self, api_repo, redact_names_and_urls) -> List[NormalizedBranch]:
+        try:
+            return [
+                _normalize_branch(api_branch, redact_names_and_urls)
+                for api_branch in self.client.list_project_branches(api_repo.id)
+            ]
+        except requests.exceptions.RetryError as e:
+            repo_name = api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
+            logging.warning(
+                f"Received a RetryError {e} when pulling branches from '{repo_name}'"
+                "This is most likely because no repo setup to pull branches from GitlabProject -- will treat like there are no branches"
+            )
+            return []
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -140,7 +157,6 @@ class GitLabAdapter(GitAdapter):
             self, normalized_repos: List[NormalizedRepository],
             server_git_instance_info, strip_text_content: bool, redact_names_and_urls: bool
     ) -> List[NormalizedPullRequest]:
-
         for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -192,14 +208,16 @@ def _normalize_user(api_user) -> NormalizedUser:
             id=api_user['id'],
             login=api_user['username'],
             name=api_user['name'],
-            email=None  # no email available
+            url=api_user['web_url'],
+            email=None,  # no email available
         )
 
     return NormalizedUser(
         id=api_user.id,
         login=api_user.username,
         name=api_user.name,
-        email=None  # no email available
+        url=api_user.web_url,
+        email=None,  # no email available
     )
 
 
@@ -292,7 +310,7 @@ def _get_normalized_approvals(merge_request):
             NormalizedPullRequestReview(
                 user=_normalize_user(approval['user']),
                 foreign_id=approval['user']['id'],
-                review_state='approved'
+                review_state='APPROVED'
             ) for approval in merge_request.approved_by
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:

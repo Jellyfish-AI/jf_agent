@@ -237,6 +237,7 @@ def get_default_branch_commits(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
             try:
+
                 default_branch = (
                     api_repo.default_branch['displayId'] if api_repo.default_branch else ''
                 )
