@@ -363,7 +363,6 @@ def obtain_config(args):
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
-    if not jellyfish_api_token:
         print(f'ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         raise BadConfigException()
 
