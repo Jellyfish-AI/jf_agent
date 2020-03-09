@@ -29,8 +29,6 @@ PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER]
     Normalized Structure
 
 '''
-
-
 @dataclass
 class NormalizedUser:
     id: str
