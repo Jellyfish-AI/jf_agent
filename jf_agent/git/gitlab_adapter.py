@@ -383,12 +383,16 @@ def _normalize_pr(
         is_merged=merge_request.state == 'merged',
         # redacted fields
         url=merge_request.web_url if not redact_names_and_urls else None,
-        base_branch=base_branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(base_branch_name),
-        head_branch=head_branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(head_branch_name),
+        base_branch=(
+            base_branch_name
+            if not redact_names_and_urls
+            else _branch_redactor.redact_name(base_branch_name)
+        ),
+        head_branch=(
+            head_branch_name
+            if not redact_names_and_urls
+            else _branch_redactor.redact_name(head_branch_name)
+        ),
         # sanitized fields
         title=sanitize_text(merge_request.title, strip_text_content),
         body=sanitize_text(merge_request.description, strip_text_content),
