@@ -126,7 +126,7 @@ class GitLabAdapter(GitAdapter):
             )
             print(
                 f"Received a RetryError {e} when pulling branches from '{repo_name}'"
-                "This is most likely because no repo setup to pull branches from GitlabProject -- will treat like there are no branches"
+                "This is most likely because no repo was in the GitlabProject -- will treat like there are no branches"
             )
             return []
 
