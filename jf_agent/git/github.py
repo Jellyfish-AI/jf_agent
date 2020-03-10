@@ -2,15 +2,94 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent import pull_since_date_for_repo, agent_logging
-from jf_agent import diagnostics
+from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 
 logger = logging.getLogger(__name__)
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def load_and_dump(config, endpoint_git_instance_info, git_conn):
+    write_file(
+        config.outdir,
+        'bb_users',
+        config.compress_output_files,
+        get_users(git_conn, config.git_include_projects),
+    )
+
+    write_file(
+        config.outdir,
+        'bb_projects',
+        config.compress_output_files,
+        get_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
+    )
+
+    api_repos = None
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_and_write_repos():
+        nonlocal api_repos
+        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+        api_repos, repos = zip(
+            *get_repos(
+                git_conn,
+                config.git_include_projects,
+                config.git_include_repos,
+                config.git_exclude_repos,
+                config.git_redact_names_and_urls,
+            )
+        )
+        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
+        return len(api_repos)
+
+    get_and_write_repos()
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def download_and_write_commits():
+        return download_and_write_streaming(
+            config.outdir,
+            'bb_commits',
+            config.compress_output_files,
+            generator_func=get_default_branch_commits,
+            generator_func_args=(
+                git_conn,
+                api_repos,
+                config.git_strip_text_content,
+                endpoint_git_instance_info,
+                config.git_redact_names_and_urls,
+            ),
+            item_id_dict_key='hash',
+        )
+
+    download_and_write_commits()
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def download_and_write_prs():
+        return download_and_write_streaming(
+            config.outdir,
+            'bb_prs',
+            config.compress_output_files,
+            generator_func=get_pull_requests,
+            generator_func_args=(
+                git_conn,
+                api_repos,
+                config.git_strip_text_content,
+                endpoint_git_instance_info,
+                config.git_redact_names_and_urls,
+            ),
+            item_id_dict_key='id',
+        )
+
+    download_and_write_prs()
 
 
 def _normalize_user(user):
@@ -32,9 +111,9 @@ def _normalize_user(user):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_all_users(client, include_orgs):
+def get_users(client, include_orgs):
     print('downloading github users... ', end='', flush=True)
-    users = [_normalize_user(user) for org in include_orgs for user in client.get_all_users(org)]
+    users = [_normalize_user(user) for org in include_orgs for user in client.get_users(org)]
     print('✓')
 
     return users
@@ -55,7 +134,7 @@ def _normalize_project(api_org, redact_names_and_urls):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_all_projects(client, include_orgs, redact_names_and_urls):
+def get_projects(client, include_orgs, redact_names_and_urls):
     print('downloading github projects... ', end='', flush=True)
     projects = [
         _normalize_project(client.get_organization_by_name(org), redact_names_and_urls)
@@ -104,7 +183,7 @@ def _normalize_repo(client, org_name, repo, redact_names_and_urls):
 
 
 @agent_logging.log_entry_exit(logger)
-def get_all_repos(client, include_orgs, include_repos, exclude_repos, redact_names_and_urls):
+def get_repos(client, include_orgs, include_repos, exclude_repos, redact_names_and_urls):
     print('downloading github repos... ', end='', flush=True)
 
     filters = []
@@ -116,7 +195,7 @@ def get_all_repos(client, include_orgs, include_repos, exclude_repos, redact_nam
     repos = [
         (r, _normalize_repo(client, org, r, redact_names_and_urls))
         for org in include_orgs
-        for r in client.get_all_repos(org)
+        for r in client.get_repos(org)
         if all(filt(r) for filt in filters)
     ]
     print('✓')
@@ -245,7 +324,6 @@ def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
 def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
-
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
             pull_since = pull_since_date_for_repo(

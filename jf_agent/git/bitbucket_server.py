@@ -4,15 +4,93 @@ import stashy
 import pytz
 from tqdm import tqdm
 
-from jf_agent import pull_since_date_for_repo, agent_logging
-from jf_agent import diagnostics
+from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
+from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 
 logger = logging.getLogger(__name__)
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def load_and_dump(config, endpoint_git_instance_info, bb_conn):
+    write_file(config.outdir, 'bb_users', config.compress_output_files, get_users(bb_conn))
+
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+    api_projects, projects = zip(
+        *get_projects(
+            bb_conn,
+            config.git_include_projects,
+            config.git_exclude_projects,
+            config.git_redact_names_and_urls,
+        )
+    )
+    write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
+
+    api_repos = None
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_and_write_repos():
+        nonlocal api_repos
+        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
+        api_repos, repos = zip(
+            *get_repos(
+                bb_conn,
+                api_projects,
+                config.git_include_repos,
+                config.git_exclude_repos,
+                config.git_redact_names_and_urls,
+            )
+        )
+        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
+        return len(api_repos)
+
+    get_and_write_repos()
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def download_and_write_commits():
+        return download_and_write_streaming(
+            config.outdir,
+            'bb_commits',
+            config.compress_output_files,
+            generator_func=get_default_branch_commits,
+            generator_func_args=(
+                bb_conn,
+                api_repos,
+                config.git_strip_text_content,
+                endpoint_git_instance_info,
+                config.git_redact_names_and_urls,
+            ),
+            item_id_dict_key='hash',
+        )
+
+    download_and_write_commits()
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def download_and_write_prs():
+        return download_and_write_streaming(
+            config.outdir,
+            'bb_prs',
+            config.compress_output_files,
+            generator_func=get_pull_requests,
+            generator_func_args=(
+                bb_conn,
+                api_repos,
+                config.git_strip_text_content,
+                endpoint_git_instance_info,
+                config.git_redact_names_and_urls,
+            ),
+            item_id_dict_key='id',
+        )
+
+    download_and_write_prs()
 
 
 def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
@@ -22,7 +100,7 @@ def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
 def _normalize_user(user):
     if not user:
         return None
-    
+
     return {
         'id': user.get('id', ''),
         'login': user.get('name', ''),
@@ -33,7 +111,7 @@ def _normalize_user(user):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_all_users(client):
+def get_users(client):
     print('downloading bitbucket users... ', end='', flush=True)
     users = [_normalize_user(user) for user in client.admin.users]
     print('✓')
@@ -55,7 +133,7 @@ def _normalize_project(api_project, redact_names_and_urls):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_all_projects(client, include_projects, exclude_projects, redact_names_and_urls):
+def get_projects(client, include_projects, exclude_projects, redact_names_and_urls):
     print('downloading bitbucket projects... ', end='', flush=True)
 
     filters = []
@@ -112,7 +190,7 @@ def _normalize_repo(api_project, api_repo, redact_names_and_urls):
 
 
 @agent_logging.log_entry_exit(logger)
-def get_all_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
+def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     print('downloading bitbucket repositories... ', end='', flush=True)
 
     filters = []
@@ -159,6 +237,7 @@ def get_default_branch_commits(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
             try:
+
                 default_branch = (
                     api_repo.default_branch['displayId'] if api_repo.default_branch else ''
                 )

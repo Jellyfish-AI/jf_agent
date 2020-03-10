@@ -1,13 +1,11 @@
 import argparse
 import gzip
-import json
 import logging
 import os
 import re
 import shutil
 import subprocess
 import threading
-import traceback
 from collections import namedtuple
 from datetime import datetime
 from glob import glob
@@ -18,20 +16,9 @@ import urllib3
 import yaml
 from jira import JIRA
 from jira.resources import GreenHopperResource
-from stashy.client import Stash
+from jf_agent.git import load_and_dump_git, get_git_client
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
-from jf_agent.bb_download import get_all_projects as get_bb_projects
-from jf_agent.bb_download import get_all_repos as get_bb_repos
-from jf_agent.bb_download import get_all_users as get_bb_users
-from jf_agent.bb_download import get_default_branch_commits as get_bb_default_branch_commits
-from jf_agent.bb_download import get_pull_requests as get_bb_pull_requests
-from jf_agent.gh_download import get_all_projects as get_gh_projects
-from jf_agent.gh_download import get_all_repos as get_gh_repos
-from jf_agent.gh_download import get_all_users as get_gh_users
-from jf_agent.gh_download import get_default_branch_commits as get_gh_default_branch_commits
-from jf_agent.gh_download import get_pull_requests as get_gh_pull_requests
-from jf_agent.github_client import GithubClient
 from jf_agent.jira_download import (
     download_boards_and_sprints,
     download_customfieldoptions,
@@ -45,7 +32,6 @@ from jf_agent.jira_download import (
     download_users,
     download_worklogs,
 )
-from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +81,7 @@ def main():
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
     status_json = []
-    
+
     if config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
@@ -199,6 +185,7 @@ ValidatedConfig = namedtuple(
         'git_exclude_repos',
         'git_strip_text_content',
         'git_redact_names_and_urls',
+        'gitlab_per_page_override',
         'outdir',
         'compress_output_files',
     ],
@@ -213,6 +200,7 @@ UserProvidedCreds = namedtuple(
         'bb_username',
         'bb_password',
         'github_token',
+        'gitlab_token',
     ],
 )
 
@@ -262,10 +250,11 @@ def obtain_config(args):
     git_exclude_repos = set(git_config.get('exclude_repos', []))
     git_strip_text_content = git_config.get('strip_text_content', False)
     git_redact_names_and_urls = git_config.get('redact_names_and_urls', False)
+    gitlab_per_page_override = git_config.get('gitlab_per_page_override', None)
 
-    if git_provider not in ('bitbucket_server', 'github'):
+    if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
-            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server` or `github`'
+            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
         )
         raise BadConfigException()
 
@@ -330,6 +319,13 @@ def obtain_config(args):
         )
         raise BadConfigException()
 
+    # gitlab must be in whitelist mode
+    if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
+        print(
+            'ERROR: GitLab requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
+        )
+        raise BadConfigException()
+
     # If we're only downloading, do not compress the output files (so they can be more easily inspected)
     compress_output_files = (
         False if (run_mode_includes_download and not run_mode_includes_send) else True
@@ -358,6 +354,7 @@ def obtain_config(args):
         git_exclude_repos,
         git_strip_text_content,
         git_redact_names_and_urls,
+        gitlab_per_page_override,
         outdir,
         compress_output_files,
     )
@@ -374,6 +371,7 @@ def obtain_creds(config):
     bb_username = os.environ.get('BITBUCKET_USERNAME', None)
     bb_password = os.environ.get('BITBUCKET_PASSWORD', None)
     github_token = os.environ.get('GITHUB_TOKEN', None)
+    gitlab_token = os.environ.get('GITLAB_TOKEN', None)
 
     if config.jira_url and not (jira_username and jira_password):
         print(
@@ -391,8 +389,18 @@ def obtain_creds(config):
         print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
         raise BadConfigException()
 
+    if config.git_provider == 'gitlab' and not gitlab_token:
+        print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
+        raise BadConfigException()
+
     return UserProvidedCreds(
-        jellyfish_api_token, jira_username, jira_password, bb_username, bb_password, github_token
+        jellyfish_api_token,
+        jira_username,
+        jira_password,
+        bb_username,
+        bb_password,
+        github_token,
+        gitlab_token,
     )
 
 
@@ -451,26 +459,14 @@ def print_all_jira_fields(config, jira_connection):
 @agent_logging.log_entry_exit(logger)
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
     download_data_status = []
+
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, jira_connection))
 
     if git_connection:
-        try:
-            if config.git_provider == 'bitbucket_server':
-                load_and_dump_bb(config, endpoint_git_instance_info, git_connection)
-                download_data_status.append({'type': 'Git', 'status': 'success'})
-            elif config.git_provider == 'github':
-                load_and_dump_github(config, endpoint_git_instance_info, git_connection)
-                download_data_status.append({'type': 'Git', 'status': 'success'})
-        except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.ERROR,
-                f'Failed to download {config.git_provider} data:\n{e}',
-                exc_info=True,
-            )
-
-            download_data_status.append({'type': 'Git', 'status': 'failed'})
+        download_data_status.append(
+            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+        )
 
     return download_data_status
 
@@ -609,199 +605,6 @@ def get_basic_jira_connection(config, creds):
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
         )
-
-
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def load_and_dump_github(config, endpoint_git_instance_info, git_conn):
-    write_file(
-        config.outdir,
-        'bb_users',
-        config.compress_output_files,
-        get_gh_users(git_conn, config.git_include_projects),
-    )
-
-    write_file(
-        config.outdir,
-        'bb_projects',
-        config.compress_output_files,
-        get_gh_projects(git_conn, config.git_include_projects, config.git_redact_names_and_urls),
-    )
-
-    api_repos = None
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def get_and_write_repos():
-        nonlocal api_repos
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_repos, repos = zip(
-            *get_gh_repos(
-                git_conn,
-                config.git_include_projects,
-                config.git_include_repos,
-                config.git_exclude_repos,
-                config.git_redact_names_and_urls,
-            )
-        )
-        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
-        return len(api_repos)
-
-    get_and_write_repos()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_commits():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_commits',
-            config.compress_output_files,
-            generator_func=get_gh_default_branch_commits,
-            generator_func_args=(
-                git_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='hash',
-        )
-
-    download_and_write_commits()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_prs():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_prs',
-            config.compress_output_files,
-            generator_func=get_gh_pull_requests,
-            generator_func_args=(
-                git_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='id',
-        )
-
-    download_and_write_prs()
-
-
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def load_and_dump_bb(config, endpoint_git_instance_info, bb_conn):
-    write_file(config.outdir, 'bb_users', config.compress_output_files, get_bb_users(bb_conn))
-
-    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-    api_projects, projects = zip(
-        *get_bb_projects(
-            bb_conn,
-            config.git_include_projects,
-            config.git_exclude_projects,
-            config.git_redact_names_and_urls,
-        )
-    )
-    write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
-
-    api_repos = None
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def get_and_write_repos():
-        nonlocal api_repos
-        # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-        api_repos, repos = zip(
-            *get_bb_repos(
-                bb_conn,
-                api_projects,
-                config.git_include_repos,
-                config.git_exclude_repos,
-                config.git_redact_names_and_urls,
-            )
-        )
-        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
-        return len(api_repos)
-
-    get_and_write_repos()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_commits():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_commits',
-            config.compress_output_files,
-            generator_func=get_bb_default_branch_commits,
-            generator_func_args=(
-                bb_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='hash',
-        )
-
-    download_and_write_commits()
-
-    @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
-    def download_and_write_prs():
-        return download_and_write_streaming(
-            config.outdir,
-            'bb_prs',
-            config.compress_output_files,
-            generator_func=get_bb_pull_requests,
-            generator_func_args=(
-                bb_conn,
-                api_repos,
-                config.git_strip_text_content,
-                endpoint_git_instance_info,
-                config.git_redact_names_and_urls,
-            ),
-            item_id_dict_key='id',
-        )
-
-    download_and_write_prs()
-
-
-@diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
-def get_git_client(config, creds):
-    if config.git_provider == 'bitbucket_server':
-        try:
-            return Stash(
-                base_url=config.git_url,
-                username=creds.bb_username,
-                password=creds.bb_password,
-                verify=not config.skip_ssl_verification,
-                session=retry_session(),
-            )
-        except Exception as e:
-            agent_logging.log_and_print(
-                logger, logging.ERROR, f'Failed to connect to Bitbucket:\n{e}', exc_info=True
-            )
-            return
-
-    elif config.git_provider == 'github':
-        try:
-            return GithubClient(
-                base_url=config.git_url,
-                token=creds.github_token,
-                verify=not config.skip_ssl_verification,
-                session=retry_session(),
-            )
-
-        except Exception as e:
-            agent_logging.log_and_print(
-                logger, logging.ERROR, f'Failed to connect to GitHub:\n{e}', exc_info=True
-            )
-            return
-
-    raise ValueError(f'unsupported git provider {config.git_provider}')
 
 
 def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
