@@ -57,21 +57,27 @@ git:
   url: https://bitbucket.yourcompany.com
 
   # Only pull from specific projects / organizations / groups.
-  # Required for GitHub; comment this out to pull from all projects for Bitbucket Server.
-  # Note: use project keys, not names.
+  # Bitbucket Server: use project keys, not names. comment this out to pull from all projects.
+  # GitHub (required): use project keys, not names (ex: PROJ1)
+  # Gitlab (required): use the top-level "Group ID" (ex: 123)
   include_projects:
       - PROJ1
 
   # Uncomment this to pull from all but specific projects (not supported for GitHub).
-  # Note: use project keys, not names.
+  # Bitbucket Server: use project keys, not names (ex: PROJ1)
+  # Gitlab: use the top-level Group ID (ex: 123)
   #  exclude_projects:
   #    - PROJ1
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
+  # Bitbucket Server or GitHub: use repository name (ex: my_repository)
+  # GitLab: use the GitLab "Project ID" (ex: 123)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
+  # Bitbucket Server or GitHub: use repository name (ex: my_repository)
+  # GitLab: use the GitLab "Project ID" (ex: 123)
   # exclude_repos:
   #    - repo_to_skip
 
