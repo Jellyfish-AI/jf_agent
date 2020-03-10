@@ -29,6 +29,8 @@ PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER]
     Normalized Structure
 
 '''
+
+
 @dataclass
 class NormalizedUser:
     id: str
@@ -128,7 +130,6 @@ class NormalizedPullRequest:
 
 
 class GitAdapter(ABC):
-
     @abstractmethod
     def get_users(self, include_projects) -> List[NormalizedUser]:
         pass
@@ -139,36 +140,32 @@ class GitAdapter(ABC):
 
     @abstractmethod
     def get_repos(
-            self, include_projects, include_repos, exclude_repos, redact_names_and_urls
+        self, include_projects, include_repos, exclude_repos, redact_names_and_urls
     ) -> List[NormalizedRepository]:
         pass
 
     @abstractmethod
     def get_default_branch_commits(
-            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+        self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
     ) -> List[NormalizedCommit]:
         pass
 
     def get_pull_requests(
-            self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+        self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
     ) -> List[NormalizedPullRequest]:
         pass
 
     def load_and_dump_git(self, config, endpoint_git_instance_info):
-        nrm_projects: List[NormalizedProject] = self.get_projects(config.git_include_projects,
-                                                                  config.git_redact_names_and_urls)
-        write_file(
-            config.outdir,
-            'bb_projects',
-            config.compress_output_files,
-            nrm_projects
+        nrm_projects: List[NormalizedProject] = self.get_projects(
+            config.git_include_projects, config.git_redact_names_and_urls
         )
+        write_file(config.outdir, 'bb_projects', config.compress_output_files, nrm_projects)
 
         write_file(
             config.outdir,
             'bb_users',
             config.compress_output_files,
-            self.get_users(config.git_include_projects)
+            self.get_users(config.git_include_projects),
         )
         nrm_repos = None
 
@@ -252,11 +249,14 @@ def get_git_client(config, creds):
                 server_url=config.git_url,
                 private_token=creds.gitlab_token,
                 per_page_override=config.gitlab_per_page_override,
-                session=retry_session()
+                session=retry_session(),
             )
     except Exception as e:
         agent_logging.log_and_print(
-            logger, logging.ERROR, f'Failed to connect to {config.git_provider}:\n{e}', exc_info=True
+            logger,
+            logging.ERROR,
+            f'Failed to connect to {config.git_provider}:\n{e}',
+            exc_info=True,
         )
         return
 
@@ -271,13 +271,16 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
         if config.git_provider == 'bitbucket_server':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.bitbucket_server import load_and_dump as load_and_dump_bbs
+
             load_and_dump_bbs(config, endpoint_git_instance_info, git_connection)
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
+
             load_and_dump_gh(config, endpoint_git_instance_info, git_connection)
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
+
             GitLabAdapter(git_connection).load_and_dump_git(config, endpoint_git_instance_info)
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')

@@ -235,7 +235,7 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
@@ -244,14 +244,14 @@ def get_default_branch_commits(
             )
             try:
                 for j, commit in enumerate(
-                        tqdm(
-                            client.get_commits(
-                                repo['full_name'], repo['default_branch'], since=pull_since, until=None
-                            ),
-                            desc=f'downloading commits for {repo["name"]}',
-                            unit='commits',
+                    tqdm(
+                        client.get_commits(
+                            repo['full_name'], repo['default_branch'], since=pull_since, until=None
                         ),
-                        start=1,
+                        desc=f'downloading commits for {repo["name"]}',
+                        unit='commits',
+                    ),
+                    start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                         yield _normalize_commit(
@@ -322,7 +322,7 @@ def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
 
 
 def get_pull_requests(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
@@ -331,12 +331,12 @@ def get_pull_requests(
             )
             try:
                 for j, pr in enumerate(
-                        tqdm(
-                            client.get_pullrequests(repo['full_name']),
-                            desc=f'downloading PRs for {repo["name"]}',
-                            unit='prs',
-                        ),
-                        start=1,
+                    tqdm(
+                        client.get_pullrequests(repo['full_name']),
+                        desc=f'downloading PRs for {repo["name"]}',
+                        unit='prs',
+                    ),
+                    start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
                         updated_at = parser.parse(pr['updated_at'])

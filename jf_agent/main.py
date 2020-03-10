@@ -394,7 +394,13 @@ def obtain_creds(config):
         raise BadConfigException()
 
     return UserProvidedCreds(
-        jellyfish_api_token, jira_username, jira_password, bb_username, bb_password, github_token, gitlab_token
+        jellyfish_api_token,
+        jira_username,
+        jira_password,
+        bb_username,
+        bb_password,
+        github_token,
+        gitlab_token,
     )
 
 
@@ -422,7 +428,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     if config.run_mode_includes_send and (
-            not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -444,7 +450,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-            jira_connection, config.jira_include_fields, config.jira_exclude_fields
+        jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
         print(f"{f['key']:30}\t{f['name']}")
 
@@ -458,7 +464,9 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
         download_data_status.append(load_and_dump_jira(config, jira_connection))
 
     if git_connection:
-        download_data_status.append(load_and_dump_git(config, endpoint_git_instance_info, git_connection))
+        download_data_status.append(
+            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+        )
 
     return download_data_status
 

@@ -6,7 +6,6 @@ logger = logging.getLogger(__name__)
 
 
 class GitLabClient:
-
     def __init__(self, server_url, private_token, per_page_override, session):
         kwargs = {'private_token': private_token, 'session': session}
         if per_page_override is not None:
