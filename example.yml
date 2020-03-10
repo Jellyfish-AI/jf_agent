@@ -50,7 +50,7 @@ git:
   # Supported providers are `bitbucket_server`, 'gitlab' and `github`.
   provider: bitbucket_server
 
-  # URL to Bitbucket, Gitlab, or GitHub.
+  # URL to Bitbucket, GitLab, or GitHub.
   # For GitHub Cloud, this should be https://api.github.com
   # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
   # Otherwise, use the URL to your local git server.
@@ -59,13 +59,13 @@ git:
   # Only pull from specific projects / organizations / groups.
   # Bitbucket Server: use project keys, not names. comment this out to pull from all projects.
   # GitHub (required): use project keys, not names (ex: PROJ1)
-  # Gitlab (required): use the top-level "Group ID" (ex: 123)
+  # GitLab (required): use the top-level GitLab "Group ID" (ex: 123)
   include_projects:
       - PROJ1
 
   # Uncomment this to pull from all but specific projects (not supported for GitHub).
   # Bitbucket Server: use project keys, not names (ex: PROJ1)
-  # Gitlab: use the top-level Group ID (ex: 123)
+  # GitLab: use the top-level GitLab "Group ID" (ex: 123)
   #  exclude_projects:
   #    - PROJ1
 
