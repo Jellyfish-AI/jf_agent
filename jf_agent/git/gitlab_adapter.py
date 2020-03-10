@@ -71,6 +71,7 @@ class GitLabAdapter(GitAdapter):
         print('✓')
         return users
 
+    @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_repos(
         self,
@@ -123,7 +124,7 @@ class GitLabAdapter(GitAdapter):
                 if not redact_names_and_urls
                 else _repo_redactor.redact_name(api_repo.name)
             )
-            logging.warning(
+            print(
                 f"Received a RetryError {e} when pulling branches from '{repo_name}'"
                 "This is most likely because no repo setup to pull branches from GitlabProject -- will treat like there are no branches"
             )
@@ -333,7 +334,7 @@ def _get_normalized_pr_comments(
             for note in merge_request.note_list
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-        logger.warning(
+        print(
             f'Got {type(e)} ({e}) when standardizing PR comments for merge_request {merge_request.id} -- '
             f'handling it as if it has no comments'
         )
@@ -351,7 +352,7 @@ def _get_normalized_approvals(merge_request):
             for approval in merge_request.approved_by
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-        logger.warning(
+        print(
             f'Got {type(e)} ({e}) when standardizing PR approvals for merge_request {merge_request.id} -- '
             f'handling it as if it has no approvals'
         )

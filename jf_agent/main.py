@@ -322,7 +322,7 @@ def obtain_config(args):
     # gitlab must be in whitelist mode
     if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
         print(
-            'ERROR: GitLab Cloud requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
+            'ERROR: GitLab requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
         )
         raise BadConfigException()
 
