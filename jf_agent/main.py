@@ -69,6 +69,12 @@ def main():
         help='Path to directory containing already-downloaded files',
     )
     parser.add_argument(
+        '-debug',
+        '--debug',
+        action="store_true",
+        help='Debug mode (for Jellyfish developers only)'
+    )
+    parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
     parser.add_argument(
@@ -188,6 +194,9 @@ ValidatedConfig = namedtuple(
         'gitlab_per_page_override',
         'outdir',
         'compress_output_files',
+        'debug',
+        'debug_slug',
+        'debug_base_url'
     ],
 )
 
@@ -219,6 +228,7 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
+    debug = args.debug
 
     try:
         with open(args.config_file, 'r') as ymlfile:
@@ -251,6 +261,14 @@ def obtain_config(args):
     git_strip_text_content = git_config.get('strip_text_content', False)
     git_redact_names_and_urls = git_config.get('redact_names_and_urls', False)
     gitlab_per_page_override = git_config.get('gitlab_per_page_override', None)
+
+    debug_config = yaml_config.get('debug', {})
+    debug_slug = debug_config.get('slug', None)
+    debug_base_url = debug_config.get('base_url', None)
+
+    if debug and not (debug_slug and debug_base_url):
+        print(f'ERROR: Should provide debug slug, and debug base_url for debug mode')
+        raise BadConfigException()
 
     if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
@@ -357,6 +375,9 @@ def obtain_config(args):
         gitlab_per_page_override,
         outdir,
         compress_output_files,
+        debug,
+        debug_slug,
+        debug_base_url
     )
 
 
@@ -405,7 +426,12 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
-    resp = requests.get(f'{JELLYFISH_API_BASE}/agent/config?api_token={creds.jellyfish_api_token}')
+    if config.debug:
+        resp = requests.get(
+            f'{config.debug_base_url}/agent/config?api_token={creds.jellyfish_api_token}?debug=True?slug={config.debug_slug}')
+    else:
+        resp = requests.get(f'{JELLYFISH_API_BASE}/agent/config?api_token={creds.jellyfish_api_token}')
+
     if not resp.ok:
         print(
             f"ERROR: Couldn't get agent config info from {JELLYFISH_API_BASE}/agent/config "
@@ -428,7 +454,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+            not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -450,7 +476,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-        jira_connection, config.jira_include_fields, config.jira_exclude_fields
+            jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
         print(f"{f['key']:30}\t{f['name']}")
 
