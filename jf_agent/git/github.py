@@ -2,6 +2,7 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
+from jf_agent.git import GithubClient
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -111,9 +112,9 @@ def _normalize_user(user):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_users(client, include_orgs):
+def get_users(client: GithubClient, include_orgs):
     print('downloading github users... ', end='', flush=True)
-    users = [_normalize_user(user) for org in include_orgs for user in client.get_users(org)]
+    users = [_normalize_user(user) for org in include_orgs for user in client.get_all_users(org)]
     print('✓')
 
     return users
@@ -134,7 +135,7 @@ def _normalize_project(api_org, redact_names_and_urls):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_projects(client, include_orgs, redact_names_and_urls):
+def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
     print('downloading github projects... ', end='', flush=True)
     projects = [
         _normalize_project(client.get_organization_by_name(org), redact_names_and_urls)
@@ -149,7 +150,7 @@ def get_projects(client, include_orgs, redact_names_and_urls):
     return projects
 
 
-def _normalize_repo(client, org_name, repo, redact_names_and_urls):
+def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls):
     return {
         'id': repo['id'],
         'name': (
@@ -183,7 +184,9 @@ def _normalize_repo(client, org_name, repo, redact_names_and_urls):
 
 
 @agent_logging.log_entry_exit(logger)
-def get_repos(client, include_orgs, include_repos, exclude_repos, redact_names_and_urls):
+def get_repos(
+    client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
+):
     print('downloading github repos... ', end='', flush=True)
 
     filters = []
@@ -195,7 +198,7 @@ def get_repos(client, include_orgs, include_repos, exclude_repos, redact_names_a
     repos = [
         (r, _normalize_repo(client, org, r, redact_names_and_urls))
         for org in include_orgs
-        for r in client.get_repos(org)
+        for r in client.get_all_repos(org)
         if all(filt(r) for filt in filters)
     ]
     print('✓')
@@ -235,7 +238,11 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client: GithubClient,
+    api_repos,
+    strip_text_content,
+    server_git_instance_info,
+    redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
@@ -262,7 +269,7 @@ def get_default_branch_commits(
                 print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
 
 
-def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
+def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
     return {
         'id': pr['number'],
         'author': _normalize_user(client.get_json(pr['user']['url'])),
@@ -322,7 +329,11 @@ def _normalize_pr(client, pr, strip_text_content, redact_names_and_urls):
 
 
 def get_pull_requests(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client: GithubClient,
+    api_repos,
+    strip_text_content,
+    server_git_instance_info,
+    redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
