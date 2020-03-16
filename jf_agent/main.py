@@ -195,7 +195,6 @@ ValidatedConfig = namedtuple(
         'outdir',
         'compress_output_files',
         'debug',
-        'debug_slug',
         'debug_base_url'
     ],
 )
@@ -263,11 +262,10 @@ def obtain_config(args):
     gitlab_per_page_override = git_config.get('gitlab_per_page_override', None)
 
     debug_config = yaml_config.get('debug', {})
-    debug_slug = debug_config.get('slug', None)
     debug_base_url = debug_config.get('base_url', None)
 
-    if debug and not (debug_slug and debug_base_url):
-        print(f'ERROR: Should provide debug slug, and debug base_url for debug mode')
+    if debug and not debug_base_url:
+        print(f'ERROR: Should provide debug_base_url for debug mode')
         raise BadConfigException()
 
     if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
@@ -376,7 +374,6 @@ def obtain_config(args):
         outdir,
         compress_output_files,
         debug,
-        debug_slug,
         debug_base_url
     )
 
@@ -426,15 +423,13 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
-    if config.debug:
-        resp = requests.get(
-            f'{config.debug_base_url}/agent/config?api_token={creds.jellyfish_api_token}?debug=True?slug={config.debug_slug}')
-    else:
-        resp = requests.get(f'{JELLYFISH_API_BASE}/agent/config?api_token={creds.jellyfish_api_token}')
+
+    base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+    resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
 
     if not resp.ok:
         print(
-            f"ERROR: Couldn't get agent config info from {JELLYFISH_API_BASE}/agent/config "
+            f"ERROR: Couldn't get agent config info from {base_url}/agent/config "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
         raise BadConfigException()
