@@ -69,10 +69,7 @@ def main():
         help='Path to directory containing already-downloaded files',
     )
     parser.add_argument(
-        '-debug',
-        '--debug',
-        action="store_true",
-        help='Debug mode (for Jellyfish developers only)'
+        '-debug', '--debug', action="store_true", help='Debug mode (for Jellyfish developers only)'
     )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
@@ -195,7 +192,7 @@ ValidatedConfig = namedtuple(
         'outdir',
         'compress_output_files',
         'debug',
-        'debug_base_url'
+        'debug_base_url',
     ],
 )
 
@@ -374,7 +371,7 @@ def obtain_config(args):
         outdir,
         compress_output_files,
         debug,
-        debug_base_url
+        debug_base_url,
     )
 
 
@@ -449,7 +446,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     if config.run_mode_includes_send and (
-            not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -471,7 +468,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @agent_logging.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-            jira_connection, config.jira_include_fields, config.jira_exclude_fields
+        jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
         print(f"{f['key']:30}\t{f['name']}")
 
