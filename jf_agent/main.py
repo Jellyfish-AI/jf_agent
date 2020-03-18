@@ -306,7 +306,7 @@ def obtain_config(args):
         raise BadConfigException()
     except Exception:
         print(
-            f"ERROR: Couldn't create output dir {outdir} -- bad OUTPUT_BASEDIR ({output_basedir})?"
+            f"ERROR: Couldn't create output dir {outdir}.  Make sure the output directory you mapped as a docker volume exists on your host."
         )
         raise BadConfigException()
 
@@ -394,19 +394,20 @@ def obtain_creds(config):
         )
         raise BadConfigException()
 
-    if config.git_provider == 'bitbucket_server' and not (bb_username and bb_password):
-        print(
-            'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
-        )
-        raise BadConfigException()
+    if config.git_url:
+        if config.git_provider == 'bitbucket_server' and not (bb_username and bb_password):
+            print(
+                'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
+            )
+            raise BadConfigException()
 
-    if config.git_provider == 'github' and not github_token:
-        print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
-        raise BadConfigException()
+        if config.git_provider == 'github' and not github_token:
+            print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
+            raise BadConfigException()
 
-    if config.git_provider == 'gitlab' and not gitlab_token:
-        print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
-        raise BadConfigException()
+        if config.git_provider == 'gitlab' and not gitlab_token:
+            print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
+            raise BadConfigException()
 
     return UserProvidedCreds(
         jellyfish_api_token,
@@ -502,26 +503,21 @@ def load_and_dump_jira(config, jira_connection):
             ),
         )
 
-        project_ids = None
+        projects_and_versions = download_projects_and_versions(
+            jira_connection,
+            config.jira_include_projects,
+            config.jira_exclude_projects,
+            config.jira_include_project_categories,
+            config.jira_exclude_project_categories,
+        )
 
-        def download_and_write_projects_and_versions():
-            projects_and_versions = download_projects_and_versions(
-                jira_connection,
-                config.jira_include_projects,
-                config.jira_exclude_projects,
-                config.jira_include_project_categories,
-                config.jira_exclude_project_categories,
-            )
-            nonlocal project_ids
-            project_ids = set([proj['id'] for proj in projects_and_versions])
-            write_file(
-                config.outdir,
-                'jira_projects_and_versions',
-                config.compress_output_files,
-                projects_and_versions,
-            )
-
-        download_and_write_projects_and_versions()
+        project_ids = {proj['id'] for proj in projects_and_versions}
+        write_file(
+            config.outdir,
+            'jira_projects_and_versions',
+            config.compress_output_files,
+            projects_and_versions,
+        )
 
         write_file(
             config.outdir,
