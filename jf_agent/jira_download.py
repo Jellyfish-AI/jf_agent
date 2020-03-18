@@ -123,7 +123,12 @@ def download_projects_and_versions(
     if exclude_categories:
         filters.append(lambda proj: proj.projectCategory.name not in exclude_categories)
 
-    projects = [proj for proj in jira_connection.projects() if all(filt(proj) for filt in filters)]
+    all_projects = jira_connection.projects()
+    projects = [proj for proj in all_projects if all(filt(proj) for filt in filters)]
+    if not projects:
+        raise Exception(
+            'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
+        )
 
     print('✓')
 
