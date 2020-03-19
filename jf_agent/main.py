@@ -247,8 +247,8 @@ def obtain_config(args):
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
     jira_issue_jql = jira_config.get('issue_jql', '')
 
-    git_config = yaml_config.get('git', yaml_config.get('bitbucket', {}))
-    git_provider = git_config.get('provider', 'bitbucket_server')
+    git_config = yaml_config.get('git', {})
+    git_provider = git_config.get('provider', None)
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
@@ -265,7 +265,7 @@ def obtain_config(args):
         print(f'ERROR: Should provide debug_base_url for debug mode')
         raise BadConfigException()
 
-    if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
+    if git_provider and git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
             f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
         )
