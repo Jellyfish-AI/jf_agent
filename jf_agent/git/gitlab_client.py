@@ -5,6 +5,22 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+class MissingSourceProjectException(Exception):
+    pass
+
+
+def log_and_print_request_error(e, action='making request'):
+    try:
+        response_code = e.response_code
+    except AttributeError:
+        # if the request error is a retry error, we won't have the code
+        response_code = ''
+
+    error_name = type(e).__name__
+    logger.warning(f'Got {error_name} {response_code} when {action}')
+    print(f'Got {error_name} ({e}) when {action}')
+
+
 class GitLabClient:
     def __init__(self, server_url, private_token, per_page_override, session):
         kwargs = {'private_token': private_token, 'session': session}
@@ -18,7 +34,7 @@ class GitLabClient:
         diffs = [change['diff'] for change in changes['changes']]
         return '\n'.join(diffs)
 
-    def expand_merge_request_data(self, merge_request, target_project=None):
+    def expand_merge_request_data(self, merge_request):
         """
         Modifies the merge_request object by obtaining and adding the following attributes:
             - 'approved_by'     [object]
@@ -29,41 +45,55 @@ class GitLabClient:
             - 'target_project'  object
             - 'diff'            string
         """
-        try:
-            merge_request.note_list = merge_request.notes.list(as_list=False)
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-            logger.warning(
-                f'Got {type(e)} ({e}) when fetching notes for merge_request {merge_request.id} -- '
-                f'handling it as if it has no notes'
-            )
-            merge_request.note_list = []
 
-        try:
-            merge_request.diff = GitLabClient._get_diff_string(merge_request)
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-            logger.warning(
-                f'Got {type(e)} ({e}) when fetching changes for merge_request {merge_request.id} -- '
-                f'handling it as if it has no diffs'
-            )
-            merge_request.diff = ''
-
-        approvals = merge_request.approvals.get()
-        merge_request.approved_by = approvals.approved_by
-        merge_request.approvers = approvals.approvers
-
-        # some usages already have the target project handy, in which case we can save a request
-        # to the server, if not we'll go ahead and fetch it
-        if target_project is None:
-            target_project = self.get_project(merge_request.target_project_id)
+        target_project = self.get_project(merge_request.target_project_id)
         merge_request.target_project = target_project
 
         # the source project will be the same if the request is made from the same project
         # however, if the merge request is from a fork the source will be different and we'll
         # need to fetch its details
         if target_project.id != merge_request.source_project_id:
-            merge_request.source_project = self.get_project(merge_request.source_project_id)
+            try:
+                merge_request.source_project = self.get_project(merge_request.source_project_id)
+            except gitlab.exceptions.GitlabGetError as e:
+                if e.response_code == 404:
+                    raise MissingSourceProjectException()
+                raise
         else:
             merge_request.source_project = target_project
+
+        try:
+            merge_request.note_list = merge_request.notes.list(as_list=False)
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+            log_and_print_request_error(
+                e,
+                f'fetching notes for merge_request {merge_request.id} -- '
+                f'handling it as if it has no notes',
+            )
+            merge_request.note_list = []
+
+        try:
+            merge_request.diff = GitLabClient._get_diff_string(merge_request)
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+            log_and_print_request_error(
+                e,
+                f'fetching changes for merge_request {merge_request.id} -- '
+                f'handling it as if it has no diffs',
+            )
+            merge_request.diff = ''
+
+        try:
+            approvals = merge_request.approvals.get()
+            merge_request.approved_by = approvals.approved_by
+            merge_request.approvers = approvals.approvers
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+            log_and_print_request_error(
+                e,
+                f'fetching approvals for merge_request {merge_request.id} -- '
+                f'handling it as if it has no approvals',
+            )
+            merge_request.approved_by = []
+            merge_request.approvals = []
 
         # convert the 'commit_list' generator into a list of objects
         merge_request.commit_list = merge_request.commits()
