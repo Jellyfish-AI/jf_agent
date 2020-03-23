@@ -18,7 +18,11 @@ from jf_agent.git import (
     NormalizedShortRepository,
     pull_since_date_for_repo,
 )
-from jf_agent.git.gitlab_client import GitLabClient
+from jf_agent.git.gitlab_client import (
+    GitLabClient,
+    log_and_print_request_error,
+    MissingSourceProjectException,
+)
 from jf_agent import diagnostics, agent_logging
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
@@ -89,7 +93,7 @@ class GitLabAdapter(GitAdapter):
                 tqdm(
                     self.client.list_group_projects(nrm_project.id),
                     desc=f'downloading repos for {nrm_project.name}',
-                    unit='commits',
+                    unit='repos',
                 ),
                 start=1,
             ):
@@ -113,20 +117,17 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo, redact_names_and_urls) -> List[NormalizedBranch]:
+        print('downloading gitlab branches... ', end='', flush=True)
         try:
             return [
                 _normalize_branch(api_branch, redact_names_and_urls)
                 for api_branch in self.client.list_project_branches(api_repo.id)
             ]
         except requests.exceptions.RetryError as e:
-            repo_name = (
-                api_repo.name
-                if not redact_names_and_urls
-                else _repo_redactor.redact_name(api_repo.name)
-            )
-            print(
-                f"Received a RetryError {e} when pulling branches from '{repo_name}'"
-                "This is most likely because no repo was in the GitlabProject -- will treat like there are no branches"
+            log_and_print_request_error(
+                e,
+                f'pulling branches from repo {api_repo.id}'
+                'This is most likely because no repo was in the GitlabProject -- will treat like there are no branches',
             )
             return []
 
@@ -139,6 +140,7 @@ class GitLabAdapter(GitAdapter):
         strip_text_content: bool,
         redact_names_and_urls: bool,
     ) -> List[NormalizedCommit]:
+        print('downloading gitlab default branch commits... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -164,6 +166,7 @@ class GitLabAdapter(GitAdapter):
                     print(
                         f':WARN: Got exception for branch {nrm_repo.default_branch_name}: {e}. Skipping...'
                     )
+        print('✓')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -174,45 +177,66 @@ class GitLabAdapter(GitAdapter):
         strip_text_content: bool,
         redact_names_and_urls: bool,
     ) -> List[NormalizedPullRequest]:
-        for i, nrm_repo in enumerate(normalized_repos, start=1):
+        print('downloading gitlab prs... ', end='', flush=True)
+
+        for i, nrm_repo in enumerate(
+            tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
+        ):
+
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
-                pull_since = pull_since_date_for_repo(
-                    server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
-                )
                 try:
-                    for j, api_pr in enumerate(
-                        tqdm(
-                            self.client.list_project_merge_requests(nrm_repo.id),
-                            desc=f'downloading PRs for {nrm_repo.name}',
-                            unit='prs',
-                        ),
-                        start=1,
-                    ):
-                        with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
-                            updated_at = parser.parse(api_pr.updated_at)
 
-                            # PRs are ordered newest to oldest
-                            # if this is too old, we're done with this repo
-                            if pull_since and updated_at < pull_since:
-                                break
+                    pull_since = pull_since_date_for_repo(
+                        server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
+                    )
 
-                            api_pr = self.client.expand_merge_request_data(api_pr)
-                            nrm_commits: List[NormalizedCommit] = [
-                                _normalize_commit(
-                                    commit, nrm_repo, strip_text_content, redact_names_and_urls
-                                )
-                                for commit in api_pr.commit_list
-                            ]
+                    api_prs = self.client.list_project_merge_requests(nrm_repo.id)
+                    total_api_prs = api_prs.total
 
-                            yield _normalize_pr(
-                                api_pr, nrm_commits, strip_text_content, redact_names_and_urls
+                    for j in range(1, total_api_prs):
+                        try:
+                            api_pr = api_prs.next()
+                        except Exception as e:
+                            log_and_print_request_error(
+                                e,
+                                f'fetching pr index={j} page={api_prs.current_page} from repo {nrm_repo.id}. Skipping...',
                             )
+                            continue
+
+                        updated_at = parser.parse(api_pr.updated_at)
+
+                        # PRs are ordered newest to oldest
+                        # if this is too old, we're done with this repo
+                        if pull_since and updated_at < pull_since:
+                            break
+
+                        try:
+                            api_pr = self.client.expand_merge_request_data(api_pr)
+                        except MissingSourceProjectException as e:
+                            log_and_print_request_error(
+                                e,
+                                f'fetching source project {api_pr.source_project_id} '
+                                f'for merge_request {api_pr.id} -- will skip',
+                            )
+                            continue
+
+                        nrm_commits: List[NormalizedCommit] = [
+                            _normalize_commit(
+                                commit, nrm_repo, strip_text_content, redact_names_and_urls
+                            )
+                            for commit in api_pr.commit_list
+                        ]
+
+                        yield _normalize_pr(
+                            api_pr, nrm_commits, strip_text_content, redact_names_and_urls
+                        )
 
                 except Exception as e:
-                    print(
-                        f':WARN: Exception getting PRs for repo {nrm_repo.name}: {e}. Skipping...'
+                    log_and_print_request_error(
+                        e, f'getting PRs for repo {nrm_repo.id}. Skipping...'
                     )
-        print()
+
+    print('✓')
 
 
 '''
@@ -334,9 +358,10 @@ def _get_normalized_pr_comments(
             for note in merge_request.note_list
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-        print(
-            f'Got {type(e)} ({e}) when standardizing PR comments for merge_request {merge_request.id} -- '
-            f'handling it as if it has no comments'
+        log_and_print_request_error(
+            e,
+            f'standardizing PR comments for merge_request {merge_request.id} -- '
+            f'handling it as if it has no comments',
         )
         return []
 
@@ -352,9 +377,10 @@ def _get_normalized_approvals(merge_request):
             for approval in merge_request.approved_by
         ]
     except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
-        print(
-            f'Got {type(e)} ({e}) when standardizing PR approvals for merge_request {merge_request.id} -- '
-            f'handling it as if it has no approvals'
+        log_and_print_request_error(
+            e,
+            f'standardizing PR approvals for merge_request {merge_request.id} -- '
+            f'handling it as if it has no approvals',
         )
         return []
 
