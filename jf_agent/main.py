@@ -248,7 +248,7 @@ def obtain_config(args):
     jira_issue_jql = jira_config.get('issue_jql', '')
 
     git_config = yaml_config.get('git', {})
-    git_provider = git_config.get('provider', None)
+    git_provider = git_config.get('provider', 'bitbucket_server')
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
@@ -264,6 +264,12 @@ def obtain_config(args):
     if debug and not debug_base_url:
         print(f'ERROR: Should provide debug_base_url for debug mode')
         raise BadConfigException()
+
+    if git_provider == 'bitbucket_server' and not git_url:
+        # allows the old code to be backwards compatible, where bitbucket_server
+        # is the default provider. if there is no git_url, then we will assume
+        # it's the newer version, where you do not have to define a provider (None)
+        git_provider = None
 
     if git_provider and git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
