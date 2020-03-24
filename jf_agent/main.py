@@ -247,13 +247,13 @@ def obtain_config(args):
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
     jira_issue_jql = jira_config.get('issue_jql', '')
 
-    git_config = yaml_config.get('git', {})
-    git_provider = git_config.get('provider')
-
-    if not git_config and 'bitbucket' in yaml_config:
-        # support old yaml configuration (where the key _is_ the bitbucket)
-        git_config = yaml_conf_global.get('bitbucket', {})
+    if 'bitbucket' in yaml_config:
+        # support legacy yaml configuration (where the key _is_ the bitbucket)
+        git_config = yaml_config.get('bitbucket', {})
         git_provider = 'bitbucket_server'
+    else:
+        git_config = yaml_config.get('git', {})
+        git_provider = git_config.get('provider')
 
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
