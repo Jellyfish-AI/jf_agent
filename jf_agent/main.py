@@ -247,8 +247,14 @@ def obtain_config(args):
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
     jira_issue_jql = jira_config.get('issue_jql', '')
 
-    git_config = yaml_config.get('git', yaml_config.get('bitbucket', {}))
-    git_provider = git_config.get('provider', 'bitbucket_server')
+    if 'bitbucket' in yaml_config:
+        # support legacy yaml configuration (where the key _is_ the bitbucket)
+        git_config = yaml_config.get('bitbucket', {})
+        git_provider = 'bitbucket_server'
+    else:
+        git_config = yaml_config.get('git', {})
+        git_provider = git_config.get('provider')
+
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
@@ -265,7 +271,13 @@ def obtain_config(args):
         print(f'ERROR: Should provide debug_base_url for debug mode')
         raise BadConfigException()
 
-    if git_provider not in ('bitbucket_server', 'github', 'gitlab'):
+    if 'git' in yaml_config and not git_provider:
+        print(
+            f'ERROR: Should add provider for git configuration. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
+        )
+        raise BadConfigException()
+
+    if git_provider and git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
             f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
         )
@@ -421,7 +433,6 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
-
     base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
     resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
 
