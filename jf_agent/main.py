@@ -248,7 +248,13 @@ def obtain_config(args):
     jira_issue_jql = jira_config.get('issue_jql', '')
 
     git_config = yaml_config.get('git', {})
-    git_provider = git_config.get('provider', 'bitbucket_server')
+    git_provider = git_config.get('provider')
+
+    if not git_config and 'bitbucket' in yaml_config:
+        # support old yaml configuration (where the key _is_ the bitbucket)
+        git_config = yaml_conf_global.get('bitbucket', {})
+        git_provider = 'bitbucket_server'
+
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
@@ -265,11 +271,11 @@ def obtain_config(args):
         print(f'ERROR: Should provide debug_base_url for debug mode')
         raise BadConfigException()
 
-    if git_provider == 'bitbucket_server' and not git_url:
-        # allows the old code to be backwards compatible, where bitbucket_server
-        # is the default provider. if there is no git_url, then we will assume
-        # it's the newer version, where you do not have to define a provider (None)
-        git_provider = None
+    if 'git' in yaml_config and not git_provider:
+        print(
+            f'ERROR: Should add provider for git configuration. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
+        )
+        raise BadConfigException()
 
     if git_provider and git_provider not in ('bitbucket_server', 'github', 'gitlab'):
         print(
@@ -426,7 +432,6 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
-
     base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
     resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
 
