@@ -211,7 +211,7 @@ UserProvidedCreds = namedtuple(
 
 JellyfishEndpointInfo = namedtuple(
     'JellyfishEndpointInfo',
-    ['s3_uri_prefix', 'aws_access_key_id', 'aws_secret_access_key', 'git_instance_info'],
+    ['s3_uri_prefix', 'git_instance_info'],
 )
 
 
@@ -434,8 +434,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     agent_config = resp.json()
     s3_uri_prefix = agent_config.get('s3_uri_prefix')
-    aws_access_key_id = agent_config.get('aws_access_key_id')
-    aws_secret_access_key = agent_config.get('aws_secret_access_key')
     git_instance_info = agent_config.get('git_instance_info')
 
     # Validate the S3 prefix, bail out if invalid value is found.
@@ -446,13 +444,13 @@ def obtain_jellyfish_endpoint_info(config, creds):
         )
         raise BadConfigException()
 
-    if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
-    ):
-        print(
-            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
-        )
-        raise BadConfigException()
+    # if config.run_mode_includes_send and (
+    #     not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
+    # ):
+    #     print(
+    #         f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
+    #     )
+    #     raise BadConfigException()
 
     if config.git_url and len(git_instance_info) != 1:
         print(
@@ -461,7 +459,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     return JellyfishEndpointInfo(
-        s3_uri_prefix, aws_access_key_id, aws_secret_access_key, git_instance_info
+        s3_uri_prefix, git_instance_info
     )
 
 
@@ -620,20 +618,20 @@ def get_basic_jira_connection(config, creds):
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
         )
 
-
+# no need for aws_access key or secret access key anymore in param
 def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
-    def _s3_cmd(cmd):
-        try:
-            subprocess.check_call(
-                f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
-                f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
-                f'{cmd}',
-                shell=True,
-                stdout=subprocess.DEVNULL,
-            )
-        except Exception:
-            print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
-            raise
+    # def _s3_cmd(cmd):
+    #     try:
+    #         subprocess.check_call(
+    #             f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
+    #             f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
+    #             f'{cmd}',
+    #             shell=True,
+    #             stdout=subprocess.DEVNULL,
+    #         )
+    #     except Exception:
+    #         print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
+    #         raise
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{outdir}/*.json'):
@@ -645,6 +643,8 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
 
     print('Sending data to Jellyfish... ')
 
+
+
     output_basedir, output_dir_timestamp = os.path.split(outdir)
     s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
     done_file_path = f'{os.path.join(outdir, ".done")}'
@@ -654,10 +654,10 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
         )
         return
 
-    _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
-    Path(done_file_path).touch()
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    # _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
+    # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    # Path(done_file_path).touch()
+    # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
 
 
 if __name__ == '__main__':
