@@ -479,8 +479,8 @@ def print_all_jira_fields(config, jira_connection):
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
     download_data_status = []
 
-    # if jira_connection:
-    #    download_data_status.append(load_and_dump_jira(config, jira_connection))
+    if jira_connection:
+        download_data_status.append(load_and_dump_jira(config, jira_connection))
 
     # testing purposes this is commented out
     # if git_connection:
@@ -651,12 +651,14 @@ def send_data(outdir, s3_uri_prefix, config, creds):
     payload = {'bucket': x[0], 'object': x[1]}
     headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
     r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
+    signed_url = r["signedUrl"]
+    print(f'response: {signed_url}')
+    print(f'outdir {outdir}')
 
-    print(f'response: {r["signedUrl"]}')
-    # _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
-    # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
-    # Path(done_file_path).touch()
-    # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    for filename in os.listdir(outdir):
+        print(f'filename: {filename}')
+        resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': filename})
+        print(resp.status_code)
 
 
 if __name__ == '__main__':
