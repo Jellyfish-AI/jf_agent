@@ -1,5 +1,6 @@
 import argparse
 import gzip
+import json
 import logging
 import os
 import re
@@ -478,13 +479,14 @@ def print_all_jira_fields(config, jira_connection):
 def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
     download_data_status = []
 
-    if jira_connection:
-        download_data_status.append(load_and_dump_jira(config, jira_connection))
+    # if jira_connection:
+    #    download_data_status.append(load_and_dump_jira(config, jira_connection))
 
-    if git_connection:
-        download_data_status.append(
-            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
-        )
+    # testing purposes this is commented out
+    # if git_connection:
+        # download_data_status.append(
+        #     load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+        # )
 
     return download_data_status
 
@@ -642,11 +644,15 @@ def send_data(outdir, s3_uri_prefix, config, creds):
         )
         return
     print(f'syncing to {s3_uri_prefix_with_timestamp}')
-    
-    base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
-    r = requests.get(f'{base_url}/agent/signed?api_token={creds.jellyfish_api_token}')
 
-    print(f'response: {r.json()}')
+    base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+
+    x = s3_uri_prefix_with_timestamp[5: len(s3_uri_prefix_with_timestamp)].split('/', 1)
+    payload = {'bucket': x[0], 'object': x[1]}
+    headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
+    r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
+
+    print(f'response: {r["signedUrl"]}')
     # _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
     # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
     # Path(done_file_path).touch()
