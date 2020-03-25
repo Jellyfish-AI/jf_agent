@@ -148,8 +148,8 @@ def main():
         send_data(
             config.outdir,
             jellyfish_endpoint_info.s3_uri_prefix,
-            jellyfish_endpoint_info.aws_access_key_id,
-            jellyfish_endpoint_info.aws_secret_access_key,
+            config,
+            creds
         )
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
@@ -444,13 +444,14 @@ def obtain_jellyfish_endpoint_info(config, creds):
         )
         raise BadConfigException()
 
-    # if config.run_mode_includes_send and (
-    #     not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
-    # ):
-    #     print(
-    #         f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
-    #     )
-    #     raise BadConfigException()
+    if config.run_mode_includes_send and (
+        not s3_uri_prefix 
+        # or not aws_access_key_id or not aws_secret_access_key
+    ):
+        print(
+            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
+        )
+        raise BadConfigException()
 
     if config.git_url and len(git_instance_info) != 1:
         print(
@@ -619,19 +620,8 @@ def get_basic_jira_connection(config, creds):
         )
 
 # no need for aws_access key or secret access key anymore in param
-def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
-    # def _s3_cmd(cmd):
-    #     try:
-    #         subprocess.check_call(
-    #             f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
-    #             f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
-    #             f'{cmd}',
-    #             shell=True,
-    #             stdout=subprocess.DEVNULL,
-    #         )
-    #     except Exception:
-    #         print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
-    #         raise
+def send_data(outdir, s3_uri_prefix, config, creds):
+    print(f'PREFIX: {s3_uri_prefix}, OUTDIR: {outdir}')
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{outdir}/*.json'):
@@ -643,17 +633,20 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
 
     print('Sending data to Jellyfish... ')
 
-
-
     output_basedir, output_dir_timestamp = os.path.split(outdir)
-    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
+    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp) # jellyfish_agent/company/ + timestamp/
     done_file_path = f'{os.path.join(outdir, ".done")}'
     if os.path.exists(done_file_path):
         print(
             f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
         )
         return
+    print(f'syncing to {s3_uri_prefix_with_timestamp}')
+    
+    base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+    r = requests.get(f'{base_url}/agent/signed?api_token={creds.jellyfish_api_token}')
 
+    print(f'response: {r.json()}')
     # _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
     # _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
     # Path(done_file_path).touch()
