@@ -147,10 +147,11 @@ def main():
 
     if config.run_mode_includes_send:
         send_data(
+            config,
+            creds,
             config.outdir,
             jellyfish_endpoint_info.s3_uri_prefix,
-            config,
-            creds
+            
         )
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
@@ -447,7 +448,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     if config.run_mode_includes_send and (
         not s3_uri_prefix 
-        # or not aws_access_key_id or not aws_secret_access_key
     ):
         print(
             f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
@@ -482,11 +482,10 @@ def download_data(config, endpoint_git_instance_info, jira_connection, git_conne
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, jira_connection))
 
-    # testing purposes this is commented out
-    # if git_connection:
-        # download_data_status.append(
-        #     load_and_dump_git(config, endpoint_git_instance_info, git_connection)
-        # )
+    if git_connection:
+        download_data_status.append(
+            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+        )
 
     return download_data_status
 
@@ -621,10 +620,7 @@ def get_basic_jira_connection(config, creds):
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
         )
 
-# no need for aws_access key or secret access key anymore in param
-def send_data(outdir, s3_uri_prefix, config, creds):
-    print(f'PREFIX: {s3_uri_prefix}, OUTDIR: {outdir}')
-
+def send_data(config, creds, outdir, s3_uri_prefix):
     # Compress any not yet compressed files before sending
     for fname in glob(f'{outdir}/*.json'):
         print(f'Compressing {fname}')
@@ -643,22 +639,20 @@ def send_data(outdir, s3_uri_prefix, config, creds):
             f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
         )
         return
-    print(f'syncing to {s3_uri_prefix_with_timestamp}')
 
     base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
 
-    x = s3_uri_prefix_with_timestamp[5: len(s3_uri_prefix_with_timestamp)].split('/', 1)
-    payload = {'bucket': x[0], 'object': x[1]}
+    bucket_object_path = s3_uri_prefix_with_timestamp[5: len(s3_uri_prefix_with_timestamp)].split('/', 1)
     headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-    r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
-    signed_url = r["signedUrl"]
-    print(f'response: {signed_url}')
-    print(f'outdir {outdir}')
 
     for filename in os.listdir(outdir):
-        print(f'filename: {filename}')
-        resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': filename})
-        print(resp.status_code)
+        payload = {'bucket': bucket_object_path[0], 'object': f'{bucket_object_path[1]}/' + filename}
+        r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
+        signed_url = r["signedUrl"]
+
+        # If successful, returns HTTP status code 204
+        upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': filename})
+        logger.info(f'File upload HTTP status code: {upload_resp.status_code}')
 
 
 if __name__ == '__main__':
