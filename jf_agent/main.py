@@ -649,10 +649,12 @@ def send_data(config, creds, outdir, s3_uri_prefix):
         payload = {'bucket': bucket_object_path[0], 'object': f'{bucket_object_path[1]}/' + filename}
         r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
         signed_url = r["signedUrl"]
+        path_to_obj = r['objectPath']
 
-        # If successful, returns HTTP status code 204
-        upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': filename})
-        logger.info(f'File upload HTTP status code: {upload_resp.status_code}')
+        with open(f'{outdir}/'+ filename, 'rb') as f:
+            # If successful, returns HTTP status code 204
+            upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+            logger.info(f'File upload HTTP status code: {upload_resp.status_code}')
 
 
 if __name__ == '__main__':
