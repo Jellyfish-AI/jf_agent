@@ -46,7 +46,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(
-            self, include_project_ids: List[int], redact_names_and_urls: bool
+        self, include_project_ids: List[int], redact_names_and_urls: bool
     ) -> List[NormalizedProject]:
         print('downloading gitlab projects... ', end='', flush=True)
         projects = [
@@ -78,11 +78,11 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_repos(
-            self,
-            normalized_projects: List[NormalizedProject],
-            include_repos_ids: List[int],
-            exclude_repos_ids: List[int],
-            redact_names_and_urls: bool,
+        self,
+        normalized_projects: List[NormalizedProject],
+        include_repos_ids: List[int],
+        exclude_repos_ids: List[int],
+        redact_names_and_urls: bool,
     ) -> List[NormalizedRepository]:
         print('downloading gitlab repos... ', end='', flush=True)
 
@@ -90,12 +90,12 @@ class GitLabAdapter(GitAdapter):
         for nrm_project in normalized_projects:
 
             for i, api_repo in enumerate(
-                    tqdm(
-                        self.client.list_group_projects(nrm_project.id),
-                        desc=f'downloading repos for {nrm_project.name}',
-                        unit='repos',
-                    ),
-                    start=1,
+                tqdm(
+                    self.client.list_group_projects(nrm_project.id),
+                    desc=f'downloading repos for {nrm_project.name}',
+                    unit='repos',
+                ),
+                start=1,
             ):
                 if len(include_repos_ids) > 0 and api_repo.id not in include_repos_ids:
                     continue  # skip this repo
@@ -134,11 +134,11 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_default_branch_commits(
-            self,
-            normalized_repos: List[NormalizedRepository],
-            server_git_instance_info,
-            strip_text_content: bool,
-            redact_names_and_urls: bool,
+        self,
+        normalized_repos: List[NormalizedRepository],
+        server_git_instance_info,
+        strip_text_content: bool,
+        redact_names_and_urls: bool,
     ) -> List[NormalizedCommit]:
         print('downloading gitlab default branch commits... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
@@ -148,15 +148,15 @@ class GitLabAdapter(GitAdapter):
                 )
                 try:
                     for j, commit in enumerate(
-                            tqdm(
-                                self.client.list_project_commits(nrm_repo.id, pull_since),
-                                desc=f'downloading commits for {nrm_repo.name}',
-                                unit='commits',
-                            ),
-                            start=1,
+                        tqdm(
+                            self.client.list_project_commits(nrm_repo.id, pull_since),
+                            desc=f'downloading commits for {nrm_repo.name}',
+                            unit='commits',
+                        ),
+                        start=1,
                     ):
                         with agent_logging.log_loop_iters(
-                                logger, 'branch commit inside repo', j, 100
+                            logger, 'branch commit inside repo', j, 100
                         ):
                             yield _normalize_commit(
                                 commit, nrm_repo, strip_text_content, redact_names_and_urls
@@ -171,16 +171,18 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
-            self,
-            normalized_repos: List[NormalizedRepository],
-            server_git_instance_info,
-            strip_text_content: bool,
-            redact_names_and_urls: bool,
+        self,
+        normalized_repos: List[NormalizedRepository],
+        server_git_instance_info,
+        strip_text_content: bool,
+        redact_names_and_urls: bool,
     ) -> List[NormalizedPullRequest]:
         print('downloading gitlab prs... ', end='', flush=True)
 
+        normalized_prs = []
+
         for i, nrm_repo in enumerate(
-                tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
+            tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
         ):
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
@@ -190,22 +192,17 @@ class GitLabAdapter(GitAdapter):
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
 
-                    try:
-                        api_prs = self.client.list_project_merge_requests(nrm_repo.id)
-                        total_api_prs = api_prs.total
-                    except gitlab.exceptions.GitlabGetError as e:
-                        if e.response_code == 404 and not self.client.project_has_repository(nrm_repo.id):
-                            # if we get a 404, it's likely because there is no repo in the
-                            # gitlab project. let us confirm this, and log it as the reason.
-                            log_and_print_request_error(e, f'cannot fetch prs for the repo {nrm_repo.id}'
-                                                           f'because there is no registered repository for the project. Skipping...')
-                            continue  # skip
-                        raise
+                    api_prs = self.client.list_project_merge_requests(nrm_repo.id)
+                    total_api_prs = api_prs.total
 
-                    for j in range(1, total_api_prs):
+                    if total_api_prs == 0:
+                        print(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        continue
+
+                    for j in range(0, total_api_prs):
                         try:
                             api_pr = api_prs.next()
-                            raise Exception('something happened, idk')
                             updated_at = parser.parse(api_pr.updated_at)
 
                             # PRs are ordered newest to oldest
@@ -219,7 +216,7 @@ class GitLabAdapter(GitAdapter):
                                 log_and_print_request_error(
                                     e,
                                     f'fetching source project {api_pr.source_project_id} '
-                                    f'for merge_request {api_pr.id} -- will skip',
+                                    f'for merge_request {api_pr.id}. Skipping...',
                                 )
                                 continue
 
@@ -234,11 +231,18 @@ class GitLabAdapter(GitAdapter):
                                 api_pr, nrm_commits, strip_text_content, redact_names_and_urls
                             )
                         except Exception as e:
-                            log_and_print_request_error(e, f'fetching pr index={j} page={api_prs.current_page} '
-                                                           f'from repo {nrm_repo.id}. Skipping...')
+                            # if something goes wrong with normalizing one of the prs - don't stop pulling. try
+                            # the next one.
+                            pr_id = f' {api_pr.id}' if api_pr else ''
+                            log_and_print_request_error(
+                                e,
+                                f'fetching pr{pr_id} index={j} page={api_prs.current_page} '
+                                f'from repo {nrm_repo.id}. Skipping...',
+                            )
                             continue
 
                 except Exception as e:
+                    # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
                         e, f'getting PRs for repo {nrm_repo.id}. Skipping...'
                     )
@@ -296,10 +300,10 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_repo(
-        api_repo,
-        normalized_branches: List[NormalizedBranch],
-        normalized_project: NormalizedProject,
-        redact_names_and_urls: bool,
+    api_repo,
+    normalized_branches: List[NormalizedBranch],
+    normalized_project: NormalizedProject,
+    redact_names_and_urls: bool,
 ) -> NormalizedRepository:
     repo_name = (
         api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
@@ -329,7 +333,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
 
 
 def _normalize_commit(
-        api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = NormalizedUser(
         id=f'{api_commit.author_name}<{api_commit.author_email}>',
@@ -353,7 +357,7 @@ def _normalize_commit(
 
 
 def _get_normalized_pr_comments(
-        merge_request, strip_text_content
+    merge_request, strip_text_content
 ) -> List[NormalizedPullRequestComment]:
     try:
         return [
@@ -393,10 +397,10 @@ def _get_normalized_approvals(merge_request):
 
 
 def _normalize_pr(
-        merge_request,
-        normalized_commits: List[NormalizedCommit],
-        strip_text_content: bool,
-        redact_names_and_urls: bool,
+    merge_request,
+    normalized_commits: List[NormalizedCommit],
+    strip_text_content: bool,
+    redact_names_and_urls: bool,
 ):
     base_branch_name = merge_request.source_branch
     head_branch_name = merge_request.target_branch
