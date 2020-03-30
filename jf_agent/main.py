@@ -632,7 +632,7 @@ def get_basic_jira_connection(config, creds):
         )
 
 def send_data(config, creds, outdir, s3_uri_prefix):
-    def upload_file(filename, bucket_object_path):
+    def get_signed_url(filename, bucket_object_path):
         base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
         
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
@@ -641,7 +641,9 @@ def send_data(config, creds, outdir, s3_uri_prefix):
         
         signed_url = r["signedUrl"]
         path_to_obj = r['objectPath']
-
+        return signed_url, path_to_obj
+    
+    def upload_file(filename, signed_url, path_to_obj):
         with open(f'{outdir}/'+ filename, 'rb') as f:
             # If successful, returns HTTP status code 204
             upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
@@ -663,8 +665,10 @@ def send_data(config, creds, outdir, s3_uri_prefix):
     bucket_object_path = s3_uri_prefix_with_timestamp[5: len(s3_uri_prefix_with_timestamp)].split('/', 1)
 
     for filename in os.listdir(outdir):
-        upload_file(filename, bucket_object_path)
+        signed_url, path_to_obj = get_signed_url(filename, bucket_object_path)
+        upload_file(filename, signed_url, path_to_obj)
 
+    # creating .done file
     done_file_path = f'{os.path.join(outdir, ".done")}'
     if os.path.exists(done_file_path):
         print(
@@ -672,7 +676,8 @@ def send_data(config, creds, outdir, s3_uri_prefix):
         )
         return
     Path(done_file_path).touch()
-    upload_file('.done', bucket_object_path)  
+    signed_url, path_to_obj = get_signed_url('.done', bucket_object_path)
+    upload_file('.done', signed_url, path_to_obj)
 
 if __name__ == '__main__':
     try:
