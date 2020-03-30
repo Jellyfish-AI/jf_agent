@@ -149,9 +149,6 @@ def main():
         send_data(
             config,
             creds,
-            config.outdir,
-            jellyfish_endpoint_info.s3_uri_prefix,
-            
         )
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
@@ -213,7 +210,7 @@ UserProvidedCreds = namedtuple(
 
 JellyfishEndpointInfo = namedtuple(
     'JellyfishEndpointInfo',
-    ['s3_uri_prefix', 'git_instance_info'],
+    ['git_instance_info'],
 )
 
 
@@ -446,24 +443,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     agent_config = resp.json()
-    s3_uri_prefix = agent_config.get('s3_uri_prefix')
     git_instance_info = agent_config.get('git_instance_info')
-
-    # Validate the S3 prefix, bail out if invalid value is found.
-    if not re.fullmatch(r'^s3:\/\/[A-Za-z0-9:\/\-_]+\/[A-Za-z0-9:\/\-_]+$', s3_uri_prefix or ''):
-        print(
-            "ERROR: The S3 bucket information provided by the agent config endpoint is invalid "
-            "-- please contact Jellyfish"
-        )
-        raise BadConfigException()
-
-    if config.run_mode_includes_send and (
-        not s3_uri_prefix 
-    ):
-        print(
-            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
-        )
-        raise BadConfigException()
 
     if config.git_url and len(git_instance_info) != 1:
         print(
@@ -472,7 +452,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     return JellyfishEndpointInfo(
-        s3_uri_prefix, git_instance_info
+        git_instance_info
     )
 
 
@@ -631,12 +611,13 @@ def get_basic_jira_connection(config, creds):
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
         )
 
-def send_data(config, creds, outdir, s3_uri_prefix):
-    def get_signed_url(filename, bucket_object_path):
+def send_data(config, creds):
+    output_basedir, timestamp = os.path.split(config.outdir) 
+    def get_signed_url(filename):
         base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
         
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-        payload = {'bucket': bucket_object_path[0], 'object': f'{bucket_object_path[1]}/' + filename}
+        payload = {'filename': filename, 'timestamp': timestamp}
         r = requests.post(f'{base_url}/endpoints/create-signed-url', headers=headers, json=payload).json()
         
         signed_url = r["signedUrl"]
@@ -644,13 +625,13 @@ def send_data(config, creds, outdir, s3_uri_prefix):
         return signed_url, path_to_obj
     
     def upload_file(filename, signed_url, path_to_obj):
-        with open(f'{outdir}/'+ filename, 'rb') as f:
+        with open(f'{config.outdir}/{filename}', 'rb') as f:
             # If successful, returns HTTP status code 204
             upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
             print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
 
     # Compress any not yet compressed files before sending
-    for fname in glob(f'{outdir}/*.json'):
+    for fname in glob(f'{config.outdir}/*.json'):
         print(f'Compressing {fname}')
         with open(fname, 'rb') as f_in:
             with gzip.open(f'{fname}.gz', 'wb') as f_out:
@@ -659,24 +640,19 @@ def send_data(config, creds, outdir, s3_uri_prefix):
 
     print('Sending data to Jellyfish... ')
 
-    output_basedir, output_dir_timestamp = os.path.split(outdir)
-    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
-
-    bucket_object_path = s3_uri_prefix_with_timestamp[5: len(s3_uri_prefix_with_timestamp)].split('/', 1)
-
-    for filename in os.listdir(outdir):
-        signed_url, path_to_obj = get_signed_url(filename, bucket_object_path)
+    for filename in os.listdir(config.outdir):
+        signed_url, path_to_obj = get_signed_url(filename)
         upload_file(filename, signed_url, path_to_obj)
 
     # creating .done file
-    done_file_path = f'{os.path.join(outdir, ".done")}'
+    done_file_path = f'{os.path.join(config.outdir, ".done")}'
     if os.path.exists(done_file_path):
         print(
             f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
         )
         return
     Path(done_file_path).touch()
-    signed_url, path_to_obj = get_signed_url('.done', bucket_object_path)
+    signed_url, path_to_obj = get_signed_url('.done')
     upload_file('.done', signed_url, path_to_obj)
 
 if __name__ == '__main__':
