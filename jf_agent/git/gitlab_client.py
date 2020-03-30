@@ -127,3 +127,13 @@ class GitLabClient:
     def list_project_commits(self, project_id, until_date):
         project = self.get_project(project_id)
         return project.commits.list(until=until_date, as_list=False)
+
+    def project_has_repository(self, project_id):
+        project = self.get_project(project_id)
+        try:
+            project.repositories.list()
+        except gitlab.GitlabGetError as e:
+            if e.response_code == 404:
+                return False
+            raise
+        return True
