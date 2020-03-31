@@ -179,6 +179,8 @@ class GitLabAdapter(GitAdapter):
     ) -> List[NormalizedPullRequest]:
         print('downloading gitlab prs... ', end='', flush=True)
 
+        normalized_prs = []
+
         for i, nrm_repo in enumerate(
             tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
         ):
@@ -193,45 +195,54 @@ class GitLabAdapter(GitAdapter):
                     api_prs = self.client.list_project_merge_requests(nrm_repo.id)
                     total_api_prs = api_prs.total
 
-                    for j in range(1, total_api_prs):
+                    if total_api_prs == 0:
+                        print(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        continue
+
+                    for j in range(0, total_api_prs):
                         try:
                             api_pr = api_prs.next()
+                            updated_at = parser.parse(api_pr.updated_at)
+
+                            # PRs are ordered newest to oldest
+                            # if this is too old, we're done with this repo
+                            if pull_since and updated_at < pull_since:
+                                break
+
+                            try:
+                                api_pr = self.client.expand_merge_request_data(api_pr)
+                            except MissingSourceProjectException as e:
+                                log_and_print_request_error(
+                                    e,
+                                    f'fetching source project {api_pr.source_project_id} '
+                                    f'for merge_request {api_pr.id}. Skipping...',
+                                )
+                                continue
+
+                            nrm_commits: List[NormalizedCommit] = [
+                                _normalize_commit(
+                                    commit, nrm_repo, strip_text_content, redact_names_and_urls
+                                )
+                                for commit in api_pr.commit_list
+                            ]
+
+                            yield _normalize_pr(
+                                api_pr, nrm_commits, strip_text_content, redact_names_and_urls
+                            )
                         except Exception as e:
+                            # if something goes wrong with normalizing one of the prs - don't stop pulling. try
+                            # the next one.
+                            pr_id = f' {api_pr.id}' if api_pr else ''
                             log_and_print_request_error(
                                 e,
-                                f'fetching pr index={j} page={api_prs.current_page} from repo {nrm_repo.id}. Skipping...',
+                                f'fetching pr{pr_id} index={j} page={api_prs.current_page} '
+                                f'from repo {nrm_repo.id}. Skipping...',
                             )
                             continue
-
-                        updated_at = parser.parse(api_pr.updated_at)
-
-                        # PRs are ordered newest to oldest
-                        # if this is too old, we're done with this repo
-                        if pull_since and updated_at < pull_since:
-                            break
-
-                        try:
-                            api_pr = self.client.expand_merge_request_data(api_pr)
-                        except MissingSourceProjectException as e:
-                            log_and_print_request_error(
-                                e,
-                                f'fetching source project {api_pr.source_project_id} '
-                                f'for merge_request {api_pr.id} -- will skip',
-                            )
-                            continue
-
-                        nrm_commits: List[NormalizedCommit] = [
-                            _normalize_commit(
-                                commit, nrm_repo, strip_text_content, redact_names_and_urls
-                            )
-                            for commit in api_pr.commit_list
-                        ]
-
-                        yield _normalize_pr(
-                            api_pr, nrm_commits, strip_text_content, redact_names_and_urls
-                        )
 
                 except Exception as e:
+                    # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
                         e, f'getting PRs for repo {nrm_repo.id}. Skipping...'
                     )
