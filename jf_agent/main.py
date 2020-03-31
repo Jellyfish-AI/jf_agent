@@ -433,7 +433,7 @@ def obtain_creds(config):
 
 def obtain_jellyfish_endpoint_info(config, creds):
     base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
-    resp = requests.get(f'{base_url}/v1/agent/config?api_token={creds.jellyfish_api_token}')
+    resp = requests.get(f'{base_url}/endpoints/agent/git-info', headers={'Jellyfish-API-Token': creds.jellyfish_api_token})
 
     if not resp.ok:
         print(
@@ -618,7 +618,7 @@ def send_data(config, creds):
         
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         payload = {'filename': filename, 'timestamp': timestamp}
-        r = requests.post(f'{base_url}/endpoints/v1/create-signed-url', headers=headers, json=payload).json()
+        r = requests.post(f'{base_url}/endpoints/agent/signed-url', headers=headers, json=payload).json()
         
         signed_url = r["signedUrl"]
         path_to_obj = r['objectPath']
