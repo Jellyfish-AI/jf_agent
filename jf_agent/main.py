@@ -433,7 +433,7 @@ def obtain_creds(config):
 
 def obtain_jellyfish_endpoint_info(config, creds):
     base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
-    resp = requests.get(f'{base_url}/endpoints/agent/git-info', headers={'Jellyfish-API-Token': creds.jellyfish_api_token})
+    resp = requests.get(f'{base_url}/endpoints/agent/pull-state', headers={'Jellyfish-API-Token': creds.jellyfish_api_token})
 
     if not resp.ok:
         print(
