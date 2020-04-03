@@ -1,6 +1,7 @@
 import gitlab
 import logging
 import requests
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,7 @@ class MissingSourceProjectException(Exception):
     pass
 
 
-def log_and_print_request_error(e, action='making request'):
+def log_and_print_request_error(e, action='making request', log_as_exception=False):
     try:
         response_code = e.response_code
     except AttributeError:
@@ -17,7 +18,11 @@ def log_and_print_request_error(e, action='making request'):
         response_code = ''
 
     error_name = type(e).__name__
-    logger.warning(f'Got {error_name} {response_code} when {action}')
+
+    if log_as_exception:
+        logger.exception(f'Got {error_name} {response_code} when {action} ({e})')
+    else:
+        logger.warning(f'Got {error_name} {response_code} when {action}')
     print(f'Got {error_name} ({e}) when {action}')
 
 
@@ -64,7 +69,7 @@ class GitLabClient:
 
         try:
             merge_request.note_list = merge_request.notes.list(as_list=False)
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
             log_and_print_request_error(
                 e,
                 f'fetching notes for merge_request {merge_request.id} -- '
@@ -74,7 +79,7 @@ class GitLabClient:
 
         try:
             merge_request.diff = GitLabClient._get_diff_string(merge_request)
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
             log_and_print_request_error(
                 e,
                 f'fetching changes for merge_request {merge_request.id} -- '
@@ -86,7 +91,7 @@ class GitLabClient:
             approvals = merge_request.approvals.get()
             merge_request.approved_by = approvals.approved_by
             merge_request.approvers = approvals.approvers
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabHttpError) as e:
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
             log_and_print_request_error(
                 e,
                 f'fetching approvals for merge_request {merge_request.id} -- '
