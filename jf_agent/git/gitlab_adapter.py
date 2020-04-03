@@ -179,8 +179,6 @@ class GitLabAdapter(GitAdapter):
     ) -> List[NormalizedPullRequest]:
         print('downloading gitlab prs... ', end='', flush=True)
 
-        normalized_prs = []
-
         for i, nrm_repo in enumerate(
             tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
         ):
@@ -238,13 +236,14 @@ class GitLabAdapter(GitAdapter):
                                 e,
                                 f'fetching pr{pr_id} index={j} page={api_prs.current_page} '
                                 f'from repo {nrm_repo.id}. Skipping...',
+                                log_as_exception=True,
                             )
                             continue
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
-                        e, f'getting PRs for repo {nrm_repo.id}. Skipping...'
+                        e, f'getting PRs for repo {nrm_repo.id}. Skipping...', log_as_exception=True
                     )
 
     print('✓')
