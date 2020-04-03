@@ -1,7 +1,6 @@
 import gitlab
 import logging
 import requests
-import traceback
 
 logger = logging.getLogger(__name__)
 
