@@ -617,8 +617,7 @@ def send_data(config, creds):
         base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
         
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-        payload = {'filename': filename, 'timestamp': timestamp}
-        r = requests.post(f'{base_url}/endpoints/agent/signed-url', headers=headers, json=payload).json()
+        r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
         
         signed_url = r["signedUrl"]
         path_to_obj = r['objectPath']
