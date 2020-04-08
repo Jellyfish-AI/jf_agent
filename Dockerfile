@@ -4,6 +4,10 @@ RUN pip install pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
 
 FROM python:3.7.4-slim
+
+ARG SHA=develop
+ENV SHA="${SHA}"
+
 COPY --from=py-deps /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
 RUN pip install awscli && \
     mkdir -p /home/jf_agent && \
