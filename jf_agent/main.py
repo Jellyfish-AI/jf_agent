@@ -102,6 +102,7 @@ def main():
         sys_diag_collector.start()
 
         try:
+            diagnostics.capture_agent_version()
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )

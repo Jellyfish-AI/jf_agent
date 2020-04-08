@@ -21,6 +21,16 @@ def _write_diagnostic(obj):
     DIAGNOSTICS_FILE.flush()
 
 
+def capture_agent_version():
+    git_head_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
+    _write_diagnostic(
+        {
+            'type': 'agent_version',
+            'sha': git_head_hash,
+        }
+    )
+
+
 def capture_timing(*args, **kwargs):
     def actual_decorator(func):
         @wraps(func)
