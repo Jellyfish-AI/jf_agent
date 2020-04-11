@@ -55,7 +55,14 @@ def main():
         help='Path to directory containing already-downloaded files',
     )
     parser.add_argument(
-        '-debug', '--debug', action="store_true", help='Debug mode (for Jellyfish developers only)'
+        '--jellyfish-api-base',
+        default=JELLYFISH_API_BASE,
+        help=(
+            f'For Jellyfish developers: override for JELLYFISH_API_BASE (which defaults to {JELLYFISH_API_BASE}) '
+            "-- if you're running the Jellyfish API locally you might use: "
+            "http://localhost:8000 (if running the agent container with --network host) or "
+            "http://172.17.0.1:8000 (if running the agent container with --network bridge)"
+        ),
     )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
@@ -178,8 +185,7 @@ ValidatedConfig = namedtuple(
         'gitlab_per_page_override',
         'outdir',
         'compress_output_files',
-        'debug',
-        'debug_base_url',
+        'jellyfish_api_base',
     ],
 )
 
@@ -211,7 +217,7 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
-    debug = args.debug
+    jellyfish_api_base = args.jellyfish_api_base
 
     try:
         with open(args.config_file, 'r') as ymlfile:
@@ -250,13 +256,6 @@ def obtain_config(args):
     git_strip_text_content = git_config.get('strip_text_content', False)
     git_redact_names_and_urls = git_config.get('redact_names_and_urls', False)
     gitlab_per_page_override = git_config.get('gitlab_per_page_override', None)
-
-    debug_config = yaml_config.get('debug', {})
-    debug_base_url = debug_config.get('base_url', None)
-
-    if debug and not debug_base_url:
-        print(f'ERROR: Should provide debug_base_url for debug mode')
-        raise BadConfigException()
 
     if 'git' in yaml_config and not git_provider:
         print(
@@ -369,8 +368,7 @@ def obtain_config(args):
         gitlab_per_page_override,
         outdir,
         compress_output_files,
-        debug,
-        debug_base_url,
+        jellyfish_api_base,
     )
 
 
@@ -420,7 +418,7 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
-    base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+    base_url = config.jellyfish_api_base
     resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
 
     if not resp.ok:
