@@ -24,10 +24,7 @@ def _write_diagnostic(obj):
 def capture_agent_version():
     git_head_hash = os.getenv('SHA')
     _write_diagnostic(
-        {
-            'type': 'agent_version',
-            'sha': git_head_hash,
-        }
+        {'type': 'agent_version', 'sha': git_head_hash}
     )
 
 
