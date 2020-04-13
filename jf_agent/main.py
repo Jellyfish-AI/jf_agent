@@ -200,8 +200,10 @@ UserProvidedCreds = namedtuple(
         'jellyfish_api_token',
         'jira_username',
         'jira_password',
-        'bb_username',
-        'bb_password',
+        'bb_server_username',
+        'bb_server_password',
+        'bb_cloud_username',
+        'bb_cloud_app_password',
         'github_token',
         'gitlab_token',
     ],
@@ -285,9 +287,14 @@ def obtain_config(args):
         )
         raise BadConfigException()
 
-    if git_provider and git_provider not in ('bitbucket_server', 'github', 'gitlab'):
+    if git_provider and git_provider not in (
+        'bitbucket_server',
+        'bitbucket_cloud',
+        'github',
+        'gitlab',
+    ):
         print(
-            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
+            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `bitbucket_cloud`, `github` or `gitlab`'
         )
         raise BadConfigException()
 
@@ -406,8 +413,10 @@ def obtain_creds(config):
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
-    bb_username = os.environ.get('BITBUCKET_USERNAME', None)
-    bb_password = os.environ.get('BITBUCKET_PASSWORD', None)
+    bb_server_username = os.environ.get('BITBUCKET_USERNAME', None)
+    bb_server_password = os.environ.get('BITBUCKET_PASSWORD', None)
+    bb_cloud_username = os.environ.get('BITBUCKET_CLOUD_USERNAME', None)
+    bb_cloud_app_password = os.environ.get('BITBUCKET_CLOUD_APP_PASSWORD', None)
     github_token = os.environ.get('GITHUB_TOKEN', None)
     gitlab_token = os.environ.get('GITLAB_TOKEN', None)
 
@@ -418,9 +427,19 @@ def obtain_creds(config):
         raise BadConfigException()
 
     if config.git_url:
-        if config.git_provider == 'bitbucket_server' and not (bb_username and bb_password):
+        if config.git_provider == 'bitbucket_server' and not (
+            bb_server_username and bb_server_password
+        ):
             print(
                 'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
+            )
+            raise BadConfigException()
+
+        if config.git_provider == 'bitbucket_cloud' and not (
+            bb_cloud_username and bb_cloud_app_password
+        ):
+            print(
+                'ERROR: Bitbucket Cloud credentials not found. Set environment variables BITBUCKET_CLOUD_USERNAME and BITBUCKET_CLOUD_APP_PASSWORD.'
             )
             raise BadConfigException()
 
@@ -436,8 +455,10 @@ def obtain_creds(config):
         jellyfish_api_token,
         jira_username,
         jira_password,
-        bb_username,
-        bb_password,
+        bb_server_username,
+        bb_server_password,
+        bb_cloud_username,
+        bb_cloud_app_password,
         github_token,
         gitlab_token,
     )

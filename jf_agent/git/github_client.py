@@ -22,7 +22,7 @@ class GithubClient:
         self.session.headers.update(
             {
                 'Accept': 'application/json',
-                'User-Agent': default_user_agent(),
+                'User-Agent': f'jellyfish/1.0 ({default_user_agent()})',
                 'Authorization': f'token {token}',
             }
         )

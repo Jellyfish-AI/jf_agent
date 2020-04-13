@@ -100,10 +100,12 @@ jira:
 
 
 git:
-  # Supported providers are `bitbucket_server`, 'gitlab' and `github`.
+  # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
+  # `gitlab` and `github`.
   provider: bitbucket_server
 
-  # URL to Bitbucket, GitLab, or GitHub.
+  # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
+  # For Bitbucket Cloud, this should be https://api.bitbucket.org
   # For GitHub Cloud, this should be https://api.github.com
   # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
   # Otherwise, use the URL to your local git server.
@@ -111,7 +113,8 @@ git:
 
   # Only pull from specific projects / organizations / groups.
   # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
-  # GitHub (required): use your organization name, as it appears in your github URLs (ex: MyOrg)
+  # Bitbucket Cloud (required): use your organization login, as it appears in your Bitbucket URLs
+  # GitHub (required): use your organization name, as it appears in your GitHub URLs (ex: MyOrg)
   # GitLab (required): use the top-level GitLab "Group ID" (ex: 123)
   include_projects:
       - PROJ1

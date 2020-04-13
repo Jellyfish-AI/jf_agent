@@ -7,6 +7,7 @@ import logging
 from stashy.client import Stash
 
 from jf_agent.session import retry_session
+from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 from jf_agent.git.github_client import GithubClient
 from jf_agent.git.gitlab_client import GitLabClient
 
@@ -15,14 +16,15 @@ from jf_agent import agent_logging, diagnostics, download_and_write_streaming, w
 logger = logging.getLogger(__name__)
 
 '''
-    
+
     Constants
-    
+
 '''
 BBS_PROVIDER = 'bitbucket_server'
+BBC_PROVIDER = 'bitbucket_cloud'
 GH_PROVIDER = 'github'
 GL_PROVIDER = 'gitlab'
-PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER]
+PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER]
 
 '''
 
@@ -232,11 +234,19 @@ def get_git_client(config, creds):
         if config.git_provider == BBS_PROVIDER:
             return Stash(
                 base_url=config.git_url,
-                username=creds.bb_username,
-                password=creds.bb_password,
+                username=creds.bb_server_username,
+                password=creds.bb_server_password,
                 verify=not config.skip_ssl_verification,
                 session=retry_session(),
             )
+
+        if config.git_provider == BBC_PROVIDER:
+            return BitbucketCloudClient(
+                server_base_uri=config.git_url,
+                username=creds.bb_cloud_username,
+                app_password=creds.bb_cloud_app_password,
+                session=retry_session())
+
         if config.git_provider == GH_PROVIDER:
             return GithubClient(
                 base_url=config.git_url,
@@ -251,6 +261,7 @@ def get_git_client(config, creds):
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
+
     except Exception as e:
         agent_logging.log_and_print(
             logger,
@@ -273,6 +284,9 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             from jf_agent.git.bitbucket_server import load_and_dump as load_and_dump_bbs
 
             load_and_dump_bbs(config, endpoint_git_instance_info, git_connection)
+        elif config.git_provider == 'bitbucket_cloud':
+            # TODO new variant for BB Cloud
+            pass
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
@@ -284,6 +298,7 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             GitLabAdapter(git_connection).load_and_dump_git(config, endpoint_git_instance_info)
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
+
     except Exception as e:
         agent_logging.log_and_print(
             logger,
