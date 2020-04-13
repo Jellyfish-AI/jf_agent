@@ -15,5 +15,6 @@ dateparser = "*"
 jsonstreams = "*"
 psutil = "*"
 python-gitlab = "*"
+numpy = ">= 1.18, < 1.19"
 
 [dev-packages]

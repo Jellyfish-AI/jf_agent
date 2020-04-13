@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import threading
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, date
 from glob import glob
 from pathlib import Path
 
@@ -120,6 +120,7 @@ def main():
             if config.run_mode_includes_download:
                 download_data_status = download_data(
                     config,
+                    jellyfish_endpoint_info.jira_info,
                     jellyfish_endpoint_info.git_instance_info,
                     jira_connection,
                     git_connection,
@@ -166,14 +167,18 @@ ValidatedConfig = namedtuple(
         'run_mode_is_print_all_jira_fields',
         'skip_ssl_verification',
         'jira_url',
+        'jira_earliest_issue_dt',
+        'jira_issue_download_concurrent_threads',
         'jira_include_fields',
         'jira_exclude_fields',
+        'jira_issue_batch_size',
         'jira_gdpr_active',
         'jira_include_projects',
         'jira_exclude_projects',
         'jira_include_project_categories',
         'jira_exclude_project_categories',
         'jira_issue_jql',
+        'jira_download_worklogs',
         'git_provider',
         'git_url',
         'git_include_projects',
@@ -204,7 +209,13 @@ UserProvidedCreds = namedtuple(
 
 JellyfishEndpointInfo = namedtuple(
     'JellyfishEndpointInfo',
-    ['s3_uri_prefix', 'aws_access_key_id', 'aws_secret_access_key', 'git_instance_info'],
+    [
+        's3_uri_prefix',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'jira_info',
+        'git_instance_info',
+    ],
 )
 
 
@@ -231,14 +242,25 @@ def obtain_config(args):
 
     jira_config = yaml_config.get('jira', {})
     jira_url = jira_config.get('url', None)
+
+    jira_earliest_issue_dt = jira_config.get('earliest_issue_dt', None)
+    if jira_earliest_issue_dt is not None and type(jira_earliest_issue_dt) != date:
+        print(f'ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
+        raise BadConfigException()
+
+    jira_issue_download_concurrent_threads = jira_config.get(
+        'issue_download_concurrent_threads', 10
+    )
     jira_include_fields = set(jira_config.get('include_fields', []))
     jira_exclude_fields = set(jira_config.get('exclude_fields', []))
+    jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
     jira_gdpr_active = jira_config.get('gdpr_active', False)
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
     jira_issue_jql = jira_config.get('issue_jql', '')
+    jira_download_worklogs = jira_config.get('download_worklogs', True)
 
     if 'bitbucket' in yaml_config:
         # support legacy yaml configuration (where the key _is_ the bitbucket)
@@ -349,14 +371,18 @@ def obtain_config(args):
         run_mode_is_print_all_jira_fields,
         skip_ssl_verification,
         jira_url,
+        jira_earliest_issue_dt,
+        jira_issue_download_concurrent_threads,
         jira_include_fields,
         jira_exclude_fields,
+        jira_issue_batch_size,
         jira_gdpr_active,
         jira_include_projects,
         jira_exclude_projects,
         jira_include_project_categories,
         jira_exclude_project_categories,
         jira_issue_jql,
+        jira_download_worklogs,
         git_provider,
         git_url,
         git_include_projects,
@@ -432,6 +458,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
     s3_uri_prefix = agent_config.get('s3_uri_prefix')
     aws_access_key_id = agent_config.get('aws_access_key_id')
     aws_secret_access_key = agent_config.get('aws_secret_access_key')
+    jira_info = agent_config.get('jira_info')
     git_instance_info = agent_config.get('git_instance_info')
 
     # Validate the S3 prefix, bail out if invalid value is found.
@@ -457,17 +484,19 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     return JellyfishEndpointInfo(
-        s3_uri_prefix, aws_access_key_id, aws_secret_access_key, git_instance_info
+        s3_uri_prefix, aws_access_key_id, aws_secret_access_key, jira_info, git_instance_info
     )
 
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_data(config, endpoint_git_instance_info, jira_connection, git_connection):
+def download_data(
+    config, endpoint_jira_info, endpoint_git_instance_info, jira_connection, git_connection
+):
     download_data_status = []
 
     if jira_connection:
-        download_data_status.append(load_and_dump_jira(config, jira_connection))
+        download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
     if git_connection:
         download_data_status.append(
