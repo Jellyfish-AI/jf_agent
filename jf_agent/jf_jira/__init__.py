@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 @agent_logging.log_entry_exit(logger)
 def get_basic_jira_connection(config, creds):
     try:
-        return JIRA(
+        jira_conn = JIRA(
             server=config.jira_url,
             basic_auth=(creds.jira_username, creds.jira_password),
             max_retries=3,
@@ -39,6 +39,13 @@ def get_basic_jira_connection(config, creds):
                 'verify': not config.skip_ssl_verification,
             },
         )
+
+        jira_conn._session.headers[
+            'User-Agent'
+        ] = f'jellyfish/1.0 ({jira_conn._session.headers["User-Agent"]})'
+
+        return jira_conn
+
     except Exception as e:
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
