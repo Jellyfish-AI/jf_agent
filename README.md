@@ -30,9 +30,11 @@ You'll execute the agent by running a Docker container based on the distributed 
 
 3. For Bitbucket Server: Gather your Bitbucket Server credentials.
 
-4. For GitHub: Create a personal access token (https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
+4. For Bitbucket Cloud: Create an app password (https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword).
 
-5. For GitLab: Create a personal access token (https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+5. For GitHub: Create a personal access token (https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
+
+6. For GitLab: Create a personal access token (https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
 
 ### Configuration
 
@@ -55,6 +57,15 @@ JIRA_USERNAME=...
 JIRA_PASSWORD=...
 BITBUCKET_USERNAME=...
 BITBUCKET_PASSWORD=...
+```
+
+For Jira and Bitbucket Cloud:
+```
+JELLYFISH_API_TOKEN=...
+JIRA_USERNAME=...
+JIRA_PASSWORD=...
+BITBUCKET_CLOUD_USERNAME=...
+BITBUCKET_CLOUD_APP_PASSWORD=...
 ```
 
 For Jira and GitLab:
