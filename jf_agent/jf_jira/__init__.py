@@ -1,14 +1,18 @@
+from datetime import datetime
 import logging
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
+import pytz
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.jf_jira.jira_download import (
     download_boards_and_sprints,
     download_customfieldoptions,
     download_fields,
-    download_issue_batch,
+    download_all_issue_metadata,
+    detect_issues_needing_sync,
+    download_necessary_issues,
     download_issuelinktypes,
     download_issuetypes,
     download_priorities,
@@ -16,6 +20,7 @@ from jf_agent.jf_jira.jira_download import (
     download_resolutions,
     download_users,
     download_worklogs,
+    IssueMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +56,7 @@ def print_all_jira_fields(config, jira_connection):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump_jira(config, jira_connection):
+def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
     try:
         write_file(
             config.outdir,
@@ -119,6 +124,30 @@ def load_and_dump_jira(config, jira_connection):
 
         download_and_write_boards_and_sprints()
 
+        issue_metadata_from_jira = download_all_issue_metadata(
+            jira_connection,
+            project_ids,
+            config.jira_earliest_issue_dt,
+            config.jira_issue_download_concurrent_threads,
+            config.jira_issue_jql,
+        )
+
+        issue_metadata_from_jellyfish = {
+            issue_id: IssueMetadata(
+                issue_info['key'], pytz.utc.localize(datetime.fromisoformat(issue_info['updated']))
+            )
+            for issue_id, issue_info in endpoint_jira_info['issue_metadata'].items()
+        }
+
+        (
+            missing_issue_ids,
+            _,
+            out_of_date_issue_ids,
+            deleted_issue_ids,
+        ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
+
+        issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
+
         @diagnostics.capture_timing()
         @agent_logging.log_entry_exit(logger)
         def download_and_write_issues():
@@ -126,33 +155,38 @@ def load_and_dump_jira(config, jira_connection):
                 config.outdir,
                 'jira_issues',
                 config.compress_output_files,
-                generator_func=download_issue_batch,
+                generator_func=download_necessary_issues,
                 generator_func_args=(
                     jira_connection,
-                    project_ids,
+                    issue_ids_to_download,
                     config.jira_include_fields,
                     config.jira_exclude_fields,
-                    config.jira_issue_jql,
+                    config.jira_issue_batch_size,
+                    config.jira_issue_download_concurrent_threads,
                 ),
                 item_id_dict_key='id',
             )
 
         issue_ids = download_and_write_issues()
 
-        write_file(
-            config.outdir,
-            'jira_worklogs',
-            config.compress_output_files,
-            download_worklogs(jira_connection, issue_ids),
-        )
+
+        if config.jira_download_worklogs:
+            write_file(
+                config.outdir,
+                'jira_worklogs',
+                config.compress_output_files,
+                download_worklogs(jira_connection, issue_ids),
+            )
+
         write_file(
             config.outdir,
             'jira_customfieldoptions',
             config.compress_output_files,
-            download_customfieldoptions(jira_connection),
+            download_customfieldoptions(jira_connection, project_ids),
         )
 
         return {'type': 'Jira', 'status': 'success'}
+
     except Exception as e:
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
