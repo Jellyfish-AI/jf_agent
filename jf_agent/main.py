@@ -355,7 +355,7 @@ def obtain_config(args):
     # github must be in whitelist mode
     if git_provider == 'github' and (git_exclude_projects or not git_include_projects):
         print(
-            'ERROR: GitHub Cloud requires a list of projects (i.e., GitHub organizations) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
+            'ERROR: GitHub requires a list of projects (i.e., GitHub organizations) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
         )
         raise BadConfigException()
 
@@ -363,6 +363,13 @@ def obtain_config(args):
     if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
         print(
             'ERROR: GitLab requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
+        )
+        raise BadConfigException()
+
+    # BBCloud must be in whitelist mode
+    if git_provider == 'bitbucket_cloud' and (git_exclude_projects or not git_include_projects):
+        print(
+            'ERROR: Bitbucket Cloud requires a list of projects to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
         )
         raise BadConfigException()
 

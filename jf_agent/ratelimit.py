@@ -91,17 +91,16 @@ class RateLimiter(object):
 
         # First, clear out any expired calls
         now = datetime.now().timestamp()
-        # self.redis.zremrangebyscore(f'{realm}-calls', '-inf', now)
         existing_call_expirations = self.realm_call_trackers[realm]
-        self.realm_call_trackers[realm] = existing_call_expirations[bisect.bisect_left(existing_call_expirations, now):]
+        self.realm_call_trackers[realm] = existing_call_expirations[
+            bisect.bisect_left(existing_call_expirations, now) :
+        ]
 
         # See how many remain
-        # calls_made = self.redis.zcard(f'{realm}-calls')
         calls_made = len(self.realm_call_trackers[realm])
         if calls_made < max_calls:
             return None, calls_made
 
-        # (_, next_tstamp) = self.redis.zrange(f'{realm}-calls', 0, 0, withscores=True)[0]
         next_tstamp = self.realm_call_trackers[realm][0]
 
         return datetime.fromtimestamp(next_tstamp, pytz.utc), calls_made
@@ -112,5 +111,4 @@ class RateLimiter(object):
         it and don't exceed the rate limit later.
         '''
         expiration = (datetime.now() + timedelta(seconds=period_secs)).timestamp()
-        # self.redis.zadd(f'{realm}-calls', **{str(uuid.uuid4()): expiration})
         self.realm_call_trackers[realm].append(expiration)

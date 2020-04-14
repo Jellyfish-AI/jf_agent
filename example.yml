@@ -113,26 +113,26 @@ git:
 
   # Only pull from specific projects / organizations / groups.
   # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
-  # Bitbucket Cloud (required): use your organization login, as it appears in your Bitbucket URLs
+  # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
   # GitHub (required): use your organization name, as it appears in your GitHub URLs (ex: MyOrg)
   # GitLab (required): use the top-level GitLab "Group ID" (ex: 123)
   include_projects:
       - PROJ1
 
-  # Uncomment this to pull from all but specific projects (not supported for GitHub).
+  # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
   # Bitbucket Server: use project keys, not names (ex: PROJ1)
   # GitLab: use the top-level GitLab "Group ID" (ex: 123)
   #  exclude_projects:
   #    - PROJ1
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
-  # Bitbucket Server or GitHub: use repository name (ex: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (ex: my_repository)
   # GitLab: use the GitLab "Project ID" (ex: 123)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
-  # Bitbucket Server or GitHub: use repository name (ex: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (ex: my_repository)
   # GitLab: use the GitLab "Project ID" (ex: 123)
   # exclude_repos:
   #    - repo_to_skip

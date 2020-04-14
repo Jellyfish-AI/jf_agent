@@ -341,9 +341,8 @@ def download_necessary_issues(
     if not issue_ids_to_download:
         return
 
-    field_spec = ','.join(include_fields) if include_fields else '*all'
-    for f in exclude_fields:
-        field_spec += f',-{f}'
+    field_spec = include_fields or ['*all']
+    field_spec.extend(f',-{field}' for field in exclude_fields)
 
     actual_batch_size = jira_connection.search_issues(
         f'order by id asc',
@@ -397,10 +396,10 @@ def download_necessary_issues(
 
             # issues sometimes appear at the end of one batch and again at the beginning of the next; de-dup them
             new_issues_this_batch = []
-            for i in batch:
-                if i['id'] not in encountered_issue_ids:
-                    encountered_issue_ids.add(i['id'])
-                    new_issues_this_batch.append(i)
+            for issue_id, issue in batch:
+                if issue_id not in encountered_issue_ids:
+                    encountered_issue_ids.add(issue_id)
+                    new_issues_this_batch.append(issue)
             prog_bar.update(len(new_issues_this_batch))
 
             yield new_issues_this_batch
@@ -482,8 +481,9 @@ def _download_jira_issues_page(
 
             batch_size = int(batch_size / 2)
             agent_logging.log_and_print(
-                f'JIRAError ({e}), reducing batch size to {batch_size}',
+                logger,
                 logging.WARNING,
+                f'JIRAError ({e}), reducing batch size to {batch_size}',
                 exc_info=True,
             )
             if batch_size == 0:
@@ -491,8 +491,9 @@ def _download_jira_issues_page(
                     return [], 1
                 elif not get_changelog:
                     agent_logging.log_and_print(
-                        f'Apparently unable to fetch issue based on search_params {search_params}',
+                        logger,
                         logging.WARNING,
+                        f'Apparently unable to fetch issue based on search_params {search_params}',
                     )
                     return [], 0
                 else:
