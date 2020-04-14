@@ -141,7 +141,8 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
 
         issue_metadata_from_jellyfish = {
             issue_id: IssueMetadata(
-                issue_info['key'], pytz.utc.localize(datetime.fromisoformat(issue_info['updated']))
+                issue_info['key'],
+                datetime.fromisoformat(issue_info['updated']),  # already includes TZ info
             )
             for issue_id, issue_info in endpoint_jira_info['issue_metadata'].items()
         }
@@ -175,7 +176,6 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             )
 
         issue_ids = download_and_write_issues()
-
 
         if config.jira_download_worklogs:
             write_file(

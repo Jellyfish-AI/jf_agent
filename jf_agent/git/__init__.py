@@ -152,6 +152,7 @@ class GitAdapter(ABC):
     ) -> List[NormalizedCommit]:
         pass
 
+    @abstractmethod
     def get_pull_requests(
         self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
     ) -> List[NormalizedPullRequest]:
@@ -245,7 +246,8 @@ def get_git_client(config, creds):
                 server_base_uri=config.git_url,
                 username=creds.bb_cloud_username,
                 app_password=creds.bb_cloud_app_password,
-                session=retry_session())
+                session=retry_session(),
+            )
 
         if config.git_provider == GH_PROVIDER:
             return GithubClient(
@@ -285,8 +287,11 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
 
             load_and_dump_bbs(config, endpoint_git_instance_info, git_connection)
         elif config.git_provider == 'bitbucket_cloud':
-            # TODO new variant for BB Cloud
-            pass
+            from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
+
+            BitbucketCloudAdapter(git_connection).load_and_dump_git(
+                config, endpoint_git_instance_info
+            )
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
