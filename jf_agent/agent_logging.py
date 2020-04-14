@@ -18,6 +18,9 @@ logger output is for Jellyfish; it should include
 
 logger output is submitted to Jellyfish, so should only contain non-sensitive data:
 e.g., function names, iteration counts
+
+Since we generally want errors/warnings to go to BOTH stdout and the logger, we
+should generally use log_and_print() instead of logger.whatever().
 '''
 
 
