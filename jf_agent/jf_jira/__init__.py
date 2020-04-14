@@ -3,7 +3,6 @@ import logging
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
-import pytz
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.jf_jira.jira_download import (
@@ -140,7 +139,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         )
 
         issue_metadata_from_jellyfish = {
-            issue_id: IssueMetadata(
+            int(issue_id): IssueMetadata(
                 issue_info['key'],
                 datetime.fromisoformat(issue_info['updated']),  # already includes TZ info
             )
@@ -178,7 +177,10 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         issue_ids = download_and_write_issues()
 
         write_file(
-            config.outdir, 'jira_issues_deleted', config.compress_output_files, deleted_issue_ids,
+            config.outdir, 'jira_issue_ids_downloaded', config.compress_output_files, [int(i) for i in issue_ids],
+        )
+        write_file(
+            config.outdir, 'jira_issue_ids_deleted', config.compress_output_files, list(deleted_issue_ids),
         )
 
         if config.jira_download_worklogs:
