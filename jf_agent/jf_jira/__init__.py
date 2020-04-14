@@ -177,6 +177,10 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
 
         issue_ids = download_and_write_issues()
 
+        write_file(
+            config.outdir, 'jira_issues_deleted', config.compress_output_files, deleted_issue_ids,
+        )
+
         if config.jira_download_worklogs:
             write_file(
                 config.outdir,
