@@ -286,7 +286,7 @@ def _normalize_user(api_user):
             id=api_user['uuid'],
             name=api_user['display_name'],
             login=api_user.get('username'),
-            url=['links']['html']['href'],
+            url=api_user['links']['html']['href'],
             # TODO: email?
         )
 
@@ -312,7 +312,7 @@ def _normalize_pr(
     try:
         diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(
-            repo.id, api_pr['id'], diff_str
+            diff_str
         )
         if additions is None:
             logger.warn(
@@ -427,7 +427,7 @@ def _normalize_pr(
     )
 
 
-def _calculate_diff_counts(pr_id, diff):
+def _calculate_diff_counts(diff):
     """
     Process a PR's diff to get the total count of additions, deletions, changed_files
     :param diff: string
