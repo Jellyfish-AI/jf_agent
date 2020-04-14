@@ -186,13 +186,21 @@ class BitbucketCloudAdapter(GitAdapter):
 
                         except Exception:
                             # if something happens when normalizing a PR, just keep going with the rest
-                            logger.exception(
-                                f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...'
+                            agent_logging.log_and_print(
+                                logger,
+                                logging.ERROR,
+                                f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...',
+                                exc_info=True,
                             )
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
-                    logger.exception(f'Error getting PRs for repo {repo.id}. Skipping...')
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.ERROR,
+                        f'Error getting PRs for repo {repo.id}. Skipping...',
+                        exc_info=True,
+                    )
 
         print('✓')
 
@@ -311,9 +319,7 @@ def _normalize_pr(
     additions, deletions, changed_files = None, None, None
     try:
         diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
-        additions, deletions, changed_files = _calculate_diff_counts(
-            diff_str
-        )
+        additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             logger.warn(
                 f'Unable to parse the diff For PR {api_pr["id"]} in repo {repo.id}; proceeding as though no files were changed.'
