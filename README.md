@@ -78,7 +78,7 @@ GITLAB_TOKEN=...
 
 ## Execution
 
-You execute the agent with a `docker run` command that references the image on Docker Hub. You'll use volume mounts and environment variables to configure it with your YAML file and credentials.
+You execute the agent with a `docker run` command that references the image on Docker Hub. You'll use bind mounts and environment variables to configure it with your YAML file and credentials.
 
 You can pull down the latest Docker image from Docker Hub with:
 ```
@@ -93,12 +93,12 @@ You may also want to periodically perform that `docker pull` command, or prepend
 
 The usage mode is provided to the agent via the `-m` argument. The value should be one of: `download_and_send`, `download_only`, `send_only`, `print_all_jira_fields`. If you don't provide a `-m` argument, the `download_and_send` mode is used.
 
-#### Providing YAML configuration file as volume mount
+#### Providing YAML configuration file as bind mount
 
-The YAML configuration file you've created should be provided to the container via a volume mount. The syntax for providing a volume mount is:
+The YAML configuration file you've created should be provided to the container via a bind mount. The syntax for providing a bind mount is:
 
 ```
--v host_path:container_path
+--mount type=bind,source=<host_path>,target=<container_path>
 ```
 
 The `host_path` should be the full path to where you've stored the YAML configuration file. The `container_path` must be `/home/jf_agent/config.yml`.
@@ -108,25 +108,25 @@ The `host_path` should be the full path to where you've stored the YAML configur
 Your credentials should be provided to the container via environment variables. The syntax for providing environment variables from a file is:
 
 ```
---env-file full_path_to_env_file
+--env-file <full_path_to_env_file>
 ```
 
 #### Saving the downloaded output
 
 By default, the agent will download and send the data it collects. Upon completion the data downloaded will be stored inside the container. If you use the `--rm` argument to `docker run` then the container and the data will be cleaned up when the agent completes.
 
-If you instead want to save the downloaded output (perhaps so that you can inspect it), you can provide a volume that mounts a host directory to the container's agent output directory.
+If you instead want to save the downloaded output (perhaps so that you can inspect it), you can provide a bind mount that maps a host directory to the container's agent output directory.
 
-As for providing the YAML configuration file, the syntax for providing a mount for the agent output directory is:
+As for providing the YAML configuration file, the syntax for providing a bind mount for the agent output directory is:
 ```
--v host_path:container_path
+--mount type=bind,source=<host_path>,target=<container_path>
 ```
 
 In this case, the `host_path` should be the full path to a directory on the host and the `container_path` must be `/home/jf_agent/output`.
 
 #### Specifying a previously downloaded dataset to be sent
 
-If you've run the agent in `download_only` mode so that you can inspect its output, when you're ready to send the data to Jellyfish you'll use the `send_only` mode. You'll provide a volume mount for the output directory, and you'll also provide the `-od` argument to specify a path relative to the container's output directory that contains the data previously downloaded.
+If you've run the agent in `download_only` mode so that you can inspect its output, when you're ready to send the data to Jellyfish you'll use the `send_only` mode. You'll provide a bind mount for the output directory, and you'll also provide the `-od` argument to specify a path relative to the container's output directory that contains the data previously downloaded.
 
 When the agent runs, it saves its downloaded data in a timestamped directory inside of `/home/jf_agent/output`. It shows the directory its downloaded data is being written to with a line like this:
 ```
@@ -136,7 +136,7 @@ Will write output files into ./output/20190822_133513
 So, e.g., if an earlier run with `download_only` may has written its output file into `./output/20190822_133513` and the host directory `/tmp/jf_agent/output` had been mounted at `/home/jf_agent/output`, you'd use these arguments to send that data to Jellyfish:
 
 ```
--v /tmp/jf_agent_output:/home/jf_agent/output
+--mount type=bind,source=/tmp/jf_agent_output,target=/home/jf_agent/output
 -m send_only
 -od ./output/20190822_133513
 ```
@@ -149,7 +149,7 @@ The following sample commands can be used for common usage scenarios.
 ```
 docker pull jellyfishco/jf_agent:latest && \
 docker run --rm \
--v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
 --env-file /full/path/creds.env \
 jellyfishco/jf_agent:latest
 ```
@@ -158,8 +158,8 @@ jellyfishco/jf_agent:latest
 ```
 docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
--v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
--v /full/path/jf_agent_output:/home/jf_agent/output \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
+--mount type=bind,source=/full/path/jf_agent_output,target=/home/jf_agent/output \
 --env-file ./creds.env \
 jellyfishco/jf_agent:latest -m download_only
 ```
@@ -168,8 +168,8 @@ jellyfishco/jf_agent:latest -m download_only
 ```
 docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
--v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
--v /full/path/jf_agent_output:/home/jf_agent/output \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
+--mount type=bind,source=/full/path/jf_agent_output,target=/home/jf_agent/output \
 --env-file ./creds.env \
 jellyfishco/jf_agent:latest -m send_only -od ./output/20190822_133513
 ```
@@ -178,7 +178,7 @@ jellyfishco/jf_agent:latest -m send_only -od ./output/20190822_133513
 ```
 docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
--v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
 --env-file ./creds.env \
 jellyfishco/jf_agent:latest -m print_all_jira_fields
 ```
