@@ -85,7 +85,7 @@ You can pull down the latest Docker image from Docker Hub with:
 docker pull jellyfishco/jf_agent:latest
 ```
 
-You may also want to periodically perform that `docker pull` command to ensure you're using the latest version of the agent.
+You may also want to periodically perform that `docker pull` command, or prepend it to the command you use for `docker run`, to ensure you're using the latest version of the agent.
 
 ### Execution variants
 
@@ -145,13 +145,9 @@ So, e.g., if an earlier run with `download_only` may has written its output file
 
 The following sample commands can be used for common usage scenarios.
 
-Keep in mind that you may want to perform this periodically, or before each execution of the agent:
-```
-docker pull jellyfishco/jf_agent:latest
-```
-
 1. Normal mode: download and send
 ```
+docker pull jellyfishco/jf_agent:latest && \
 docker run --rm \
 -v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
 --env-file /full/path/creds.env \
@@ -160,6 +156,7 @@ jellyfishco/jf_agent:latest
 
 2. Download data without sending
 ```
+docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
 -v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
 -v /full/path/jf_agent_output:/home/jf_agent/output \
@@ -169,6 +166,7 @@ jellyfishco/jf_agent:latest -m download_only
 
 3. Send previously downloaded data
 ```
+docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
 -v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
 -v /full/path/jf_agent_output:/home/jf_agent/output \
@@ -178,6 +176,7 @@ jellyfishco/jf_agent:latest -m send_only -od ./output/20190822_133513
 
 4. Print info on Jira fields
 ```
+docker pull jellyfishco/jf_agent:latest &&
 docker run --rm \
 -v /full/path/ourconfig.yml:/home/jf_agent/config.yml \
 --env-file ./creds.env \
