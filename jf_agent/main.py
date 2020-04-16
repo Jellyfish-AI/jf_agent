@@ -179,6 +179,7 @@ ValidatedConfig = namedtuple(
         'jira_exclude_project_categories',
         'jira_issue_jql',
         'jira_download_worklogs',
+        'jira_download_sprints',
         'git_provider',
         'git_url',
         'git_include_projects',
@@ -263,6 +264,7 @@ def obtain_config(args):
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
     jira_issue_jql = jira_config.get('issue_jql', '')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
+    jira_download_sprints = jira_config.get('download_sprints', True)
 
     if 'bitbucket' in yaml_config:
         # support legacy yaml configuration (where the key _is_ the bitbucket)
@@ -397,6 +399,7 @@ def obtain_config(args):
         jira_exclude_project_categories,
         jira_issue_jql,
         jira_download_worklogs,
+        jira_download_sprints,
         git_provider,
         git_url,
         git_include_projects,

@@ -121,7 +121,9 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         )
 
         def download_and_write_boards_and_sprints():
-            boards, sprints, links = download_boards_and_sprints(jira_connection, project_ids)
+            boards, sprints, links = download_boards_and_sprints(
+                jira_connection, project_ids, config.jira_download_sprints
+            )
             write_file(config.outdir, 'jira_boards', config.compress_output_files, boards)
             write_file(config.outdir, 'jira_sprints', config.compress_output_files, sprints)
             write_file(
@@ -177,10 +179,16 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         issue_ids = download_and_write_issues()
 
         write_file(
-            config.outdir, 'jira_issue_ids_downloaded', config.compress_output_files, [int(i) for i in issue_ids],
+            config.outdir,
+            'jira_issue_ids_downloaded',
+            config.compress_output_files,
+            [int(i) for i in issue_ids],
         )
         write_file(
-            config.outdir, 'jira_issue_ids_deleted', config.compress_output_files, list(deleted_issue_ids),
+            config.outdir,
+            'jira_issue_ids_deleted',
+            config.compress_output_files,
+            list(deleted_issue_ids),
         )
 
         if config.jira_download_worklogs:

@@ -161,7 +161,7 @@ def download_projects_and_versions(
 #   - Array of board/sprint links
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_boards_and_sprints(jira_connection, project_ids):
+def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
     b_start_at = 0
     boards = []
     print('downloading jira boards... ', end='', flush=True)
@@ -187,31 +187,34 @@ def download_boards_and_sprints(jira_connection, project_ids):
 
     links = []
     sprints = {}
-    for b in tqdm(boards, desc='downloading jira sprints', file=sys.stdout):
-        if b.raw['type'] != 'scrum':
-            continue
-        s_start_at = 0
-        sprints_for_board = []
-        while True:
-            batch = None
-            try:
-                batch = jira_connection.sprints(board_id=b.id, startAt=s_start_at, maxResults=50)
-            except JIRAError as e:
-                # JIRA returns 500 errors for various reasons: board is
-                # misconfigured; "falied to execute search"; etc.  Just
-                # skip and move on
-                if e.status_code == 500 or e.status_code == 404:
-                    print(f"Couldn't get sprints for board {b.id}.  Skipping...")
-                else:
-                    raise
+    if download_sprints:
+        for b in tqdm(boards, desc='downloading jira sprints', file=sys.stdout):
+            if b.raw['type'] != 'scrum':
+                continue
+            s_start_at = 0
+            sprints_for_board = []
+            while True:
+                batch = None
+                try:
+                    batch = jira_connection.sprints(
+                        board_id=b.id, startAt=s_start_at, maxResults=50
+                    )
+                except JIRAError as e:
+                    # JIRA returns 500 errors for various reasons: board is
+                    # misconfigured; "falied to execute search"; etc.  Just
+                    # skip and move on
+                    if e.status_code == 500 or e.status_code == 404:
+                        print(f"Couldn't get sprints for board {b.id}.  Skipping...")
+                    else:
+                        raise
 
-            if not batch:
-                break
-            s_start_at += len(batch)
-            sprints_for_board.extend(batch)
+                if not batch:
+                    break
+                s_start_at += len(batch)
+                sprints_for_board.extend(batch)
 
-        links.append({'board_id': b.id, 'sprint_ids': [s.id for s in sprints_for_board]})
-        sprints.update({s.id: s for s in sprints_for_board})
+            links.append({'board_id': b.id, 'sprint_ids': [s.id for s in sprints_for_board]})
+            sprints.update({s.id: s for s in sprints_for_board})
 
     return [b.raw for b in boards], [s.raw for s in sprints.values()], links
 
