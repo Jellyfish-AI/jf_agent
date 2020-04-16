@@ -344,8 +344,8 @@ def download_necessary_issues(
     if not issue_ids_to_download:
         return
 
-    field_spec = include_fields or ['*all']
-    field_spec.extend(f',-{field}' for field in exclude_fields)
+    field_spec = list(include_fields) or ['*all']
+    field_spec.extend(f'-{field}' for field in exclude_fields)
 
     actual_batch_size = jira_connection.search_issues(
         f'order by id asc',
