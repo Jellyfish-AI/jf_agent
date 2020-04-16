@@ -36,6 +36,9 @@ jira:
   # Whether the agent should download issue worklogs.  If omitted, defaults to True.
   download_worklogs: True
 
+  # Whether the agent should download issue worklogs.  If omitted, defaults to True.
+  download_sprints: True
+
   #############################
   # Options for filtering projects. Only data for projects that meet ALL
   # these criteria will be used. For example, if you provide both
