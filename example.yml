@@ -36,7 +36,7 @@ jira:
   # Whether the agent should download issue worklogs.  If omitted, defaults to True.
   download_worklogs: True
 
-  # Whether the agent should download issue worklogs.  If omitted, defaults to True.
+  # Whether the agent should download sprints.  If omitted, defaults to True.
   download_sprints: True
 
   #############################
