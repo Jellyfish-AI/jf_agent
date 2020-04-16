@@ -3,7 +3,6 @@ import logging
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
-import pytz
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.jf_jira.jira_download import (
