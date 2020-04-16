@@ -142,19 +142,21 @@ def main():
             sys_diag_collector.join()
 
         finally:
-            write_file(config.outdir, 'status', config.compress_output_files, status_json)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        send_data(
+        s3_url_gen_status, s3_file_upload_status = send_data(
             config,
             creds,
         )
+        status_json.append(s3_url_gen_status)
+        status_json.append(s3_file_upload_status)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
         print(f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"')
 
+    write_file(config.outdir, 'status', config.compress_output_files, status_json)
     print('Done!')
 
 
@@ -444,7 +446,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     agent_config = resp.json()
     git_instance_info = agent_config.get('git_instance_info')
-
     if config.git_url and len(git_instance_info) != 1:
         print(
             f'ERROR: Invalid Git instance info returned from the agent config endpoint -- please contact Jellyfish'
@@ -613,12 +614,12 @@ def get_basic_jira_connection(config, creds):
 
 def send_data(config, creds):
     output_basedir, timestamp = os.path.split(config.outdir) 
+
     def get_signed_url(filename):
         base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
-        
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
-        
+        print(f'response:{r}')
         signed_url = r["signedUrl"]
         path_to_obj = r['objectPath']
         return signed_url, path_to_obj
@@ -653,6 +654,8 @@ def send_data(config, creds):
     Path(done_file_path).touch()
     signed_url, path_to_obj = get_signed_url('.done')
     upload_file('.done', signed_url, path_to_obj)
+
+    return {'type': 'S3 URL Generation', 'status': 'success'}, {'type': 'S3 File Upload', 'status': 'success'}
 
 if __name__ == '__main__':
     try:
