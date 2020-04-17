@@ -19,6 +19,7 @@ from jf_agent.jf_jira.jira_download import (
     download_resolutions,
     download_users,
     download_worklogs,
+    download_statuses,
     IssueMetadata,
 )
 
@@ -204,6 +205,13 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             'jira_customfieldoptions',
             config.compress_output_files,
             download_customfieldoptions(jira_connection, project_ids),
+        )
+
+        write_file(
+            config.outdir,
+            'jira_statuses',
+            config.compress_output_files,
+            download_statuses(jira_connection),
         )
 
         return {'type': 'Jira', 'status': 'success'}
