@@ -524,7 +524,7 @@ def send_data(config, creds):
     output_basedir, timestamp = os.path.split(config.outdir) 
 
     def get_signed_url(filename):
-        base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+        base_url = config.jellyfish_api_base
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
         signed_url = r["signedUrl"]
