@@ -591,6 +591,16 @@ def download_customfieldoptions(jira_connection, project_ids):
     return result
 
 
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def download_statuses(jira_connection):
+    print('downloading jira statuses... ', end='', flush=True)
+    statuses = jira_connection.statuses()
+    result = [{'status_id': status.id, 'raw_json': status.raw} for status in statuses]
+    print('✓')
+    return result
+
+
 # return True if this field is either a single or multi select option
 # field_meta is a dict that comes from raw field json
 def _is_option_field(field_meta):
