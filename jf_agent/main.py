@@ -1,5 +1,6 @@
 import argparse
 import gzip
+import json
 import logging
 import os
 import re
@@ -136,21 +137,19 @@ def main():
             sys_diag_collector.join()
 
         finally:
-            write_file(config.outdir, 'status', config.compress_output_files, status_json)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
         send_data(
-            config.outdir,
-            jellyfish_endpoint_info.s3_uri_prefix,
-            jellyfish_endpoint_info.aws_access_key_id,
-            jellyfish_endpoint_info.aws_secret_access_key,
+            config,
+            creds
         )
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
         print(f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"')
 
+    write_file(config.outdir, 'status', config.compress_output_files, status_json)
     print('Done!')
 
 
@@ -215,9 +214,6 @@ UserProvidedCreds = namedtuple(
 JellyfishEndpointInfo = namedtuple(
     'JellyfishEndpointInfo',
     [
-        's3_uri_prefix',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         'jira_info',
         'git_instance_info',
     ],
@@ -482,7 +478,7 @@ def obtain_creds(config):
 
 def obtain_jellyfish_endpoint_info(config, creds):
     base_url = config.jellyfish_api_base
-    resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
+    resp = requests.get(f'{base_url}/endpoints/agent/pull-state', headers={'Jellyfish-API-Token': creds.jellyfish_api_token})
 
     if not resp.ok:
         print(
@@ -492,27 +488,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     agent_config = resp.json()
-    s3_uri_prefix = agent_config.get('s3_uri_prefix')
-    aws_access_key_id = agent_config.get('aws_access_key_id')
-    aws_secret_access_key = agent_config.get('aws_secret_access_key')
     jira_info = agent_config.get('jira_info')
     git_instance_info = agent_config.get('git_instance_info')
-
-    # Validate the S3 prefix, bail out if invalid value is found.
-    if not re.fullmatch(r'^s3:\/\/[A-Za-z0-9:\/\-_]+\/[A-Za-z0-9:\/\-_]+$', s3_uri_prefix or ''):
-        print(
-            "ERROR: The S3 bucket information provided by the agent config endpoint is invalid "
-            "-- please contact Jellyfish"
-        )
-        raise BadConfigException()
-
-    if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
-    ):
-        print(
-            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
-        )
-        raise BadConfigException()
 
     if config.git_url and len(git_instance_info) != 1:
         print(
@@ -521,7 +498,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     return JellyfishEndpointInfo(
-        s3_uri_prefix, aws_access_key_id, aws_secret_access_key, jira_info, git_instance_info
+       jira_info, git_instance_info
     )
 
 
@@ -543,22 +520,25 @@ def download_data(
     return download_data_status
 
 
-def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
-    def _s3_cmd(cmd):
-        try:
-            subprocess.check_call(
-                f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
-                f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
-                f'{cmd}',
-                shell=True,
-                stdout=subprocess.DEVNULL,
-            )
-        except Exception:
-            print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
-            raise
+def send_data(config, creds):
+    output_basedir, timestamp = os.path.split(config.outdir) 
+
+    def get_signed_url(filename):
+        base_url = config.debug_base_url if config.debug else JELLYFISH_API_BASE
+        headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
+        r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
+        signed_url = r["signedUrl"]
+        path_to_obj = r['objectPath']
+        return signed_url, path_to_obj
+    
+    def upload_file(filename, signed_url, path_to_obj):
+        with open(f'{config.outdir}/{filename}', 'rb') as f:
+            # If successful, returns HTTP status code 204
+            upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+            print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
 
     # Compress any not yet compressed files before sending
-    for fname in glob(f'{outdir}/*.json'):
+    for fname in glob(f'{config.outdir}/*.json'):
         print(f'Compressing {fname}')
         with open(fname, 'rb') as f_in:
             with gzip.open(f'{fname}.gz', 'wb') as f_out:
@@ -567,19 +547,20 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
 
     print('Sending data to Jellyfish... ')
 
-    output_basedir, output_dir_timestamp = os.path.split(outdir)
-    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
-    done_file_path = f'{os.path.join(outdir, ".done")}'
+    for filename in os.listdir(config.outdir):
+        signed_url, path_to_obj = get_signed_url(filename)
+        upload_file(filename, signed_url, path_to_obj)
+
+    # creating .done file
+    done_file_path = f'{os.path.join(config.outdir, ".done")}'
     if os.path.exists(done_file_path):
         print(
             f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
         )
         return
-
-    _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
     Path(done_file_path).touch()
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    signed_url, path_to_obj = get_signed_url('.done')
+    upload_file('.done', signed_url, path_to_obj)
 
 
 if __name__ == '__main__':
