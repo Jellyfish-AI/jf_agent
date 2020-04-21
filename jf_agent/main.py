@@ -536,6 +536,10 @@ def send_data(config, creds):
             # If successful, returns HTTP status code 204
             upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
             print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
+    
+    def mush(filename):
+        signed_url, path_to_obj = get_signed_url(filename)
+        upload_file(filename, signed_url, path_to_obj)
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -547,9 +551,18 @@ def send_data(config, creds):
 
     print('Sending data to Jellyfish... ')
 
+    threads = []
     for filename in os.listdir(config.outdir):
-        signed_url, path_to_obj = get_signed_url(filename)
-        upload_file(filename, signed_url, path_to_obj)
+        # threading
+        s3_url_and_upload = threading.Thread(
+            target=mush,
+            args=[filename, ],
+        )
+        s3_url_and_upload.start()
+        threads.append(s3_url_and_upload)
+    
+    for process in threads:
+        process.join()
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
