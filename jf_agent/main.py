@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import threading
+import traceback
 from collections import namedtuple
 from datetime import datetime, date
 from glob import glob
@@ -521,25 +522,29 @@ def download_data(
 
 
 def send_data(config, creds):
-    output_basedir, timestamp = os.path.split(config.outdir) 
+    output_basedir, timestamp = os.path.split(config.outdir)         
+    
+    def get_url_and_send(thread_num, filename):
+        try:
+            base_url = config.jellyfish_api_base
+            headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
+            r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
+            signed_url = r["signedUrl"]
+            path_to_obj = r['objectPath']
+        except Exception as e:
+            thread_exceptions[thread_num] = e
+            print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
-    def get_signed_url(filename):
-        base_url = config.jellyfish_api_base
-        headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-        r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
-        signed_url = r["signedUrl"]
-        path_to_obj = r['objectPath']
-        return signed_url, path_to_obj
-    
-    def upload_file(filename, signed_url, path_to_obj):
-        with open(f'{config.outdir}/{filename}', 'rb') as f:
-            # If successful, returns HTTP status code 204
-            upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
-            print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
-    
-    def get_url_and_send(filename):
-        signed_url, path_to_obj = get_signed_url(filename)
-        upload_file(filename, signed_url, path_to_obj)
+        try:
+            with open(f'{config.outdir}/{filename}', 'rb') as f:
+                if thread_num == 2:
+                    raise Exception('failed in upload file')
+                # If successful, returns HTTP status code 204
+                upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+                print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
+        except Exception as e:
+            thread_exceptions[thread_num] = e
+            print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -554,10 +559,11 @@ def send_data(config, creds):
     threads = [
         threading.Thread(
             target=get_url_and_send,
-            args=[filename, ]
+            args=[index, filename]
         )
-        for filename in os.listdir(config.outdir)
+        for index, filename in list(enumerate(os.listdir(config.outdir)))
     ]
+    thread_exceptions = [None] * (len(threads) + 1)
     
     print(f'Starting {len(threads)} threads to upload files to S3')
     for thread in threads:
@@ -565,6 +571,17 @@ def send_data(config, creds):
 
     for process in threads:
         process.join()
+
+    # if all threads failed
+    if all(x is not None for x in thread_exceptions):
+        print('All yall failed')
+        any_exception = [e for e in thread_exceptions if e][0]
+        raise any_exception
+    # if some threads failed
+    elif any(thread_exceptions):
+        print('some of yall failed, but not all, so we can continue but log the error')
+    else:
+        print('all yall succeeded')
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
@@ -574,8 +591,7 @@ def send_data(config, creds):
         )
         return
     Path(done_file_path).touch()
-    signed_url, path_to_obj = get_signed_url('.done')
-    upload_file('.done', signed_url, path_to_obj)
+    get_url_and_send(len(thread_exceptions), '.done')
 
 
 if __name__ == '__main__':
