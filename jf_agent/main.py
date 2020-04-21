@@ -141,10 +141,11 @@ def main():
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        send_data(
+        s3_upload_status = send_data(
             config,
             creds
         )
+        status_json.append(s3_upload_status)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
@@ -525,6 +526,7 @@ def send_data(config, creds):
     output_basedir, timestamp = os.path.split(config.outdir)         
     
     def get_url_and_send(thread_num, filename):
+        # Get signed URL
         try:
             base_url = config.jellyfish_api_base
             headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
@@ -535,6 +537,7 @@ def send_data(config, creds):
             thread_exceptions[thread_num] = e
             print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
+        # Post file to signed URL
         try:
             with open(f'{config.outdir}/{filename}', 'rb') as f:
                 if thread_num == 2:
@@ -563,6 +566,8 @@ def send_data(config, creds):
         )
         for index, filename in list(enumerate(os.listdir(config.outdir)))
     ]
+
+    # +1 for .done file
     thread_exceptions = [None] * (len(threads) + 1)
     
     print(f'Starting {len(threads)} threads to upload files to S3')
@@ -574,14 +579,17 @@ def send_data(config, creds):
 
     # if all threads failed
     if all(x is not None for x in thread_exceptions):
-        print('All yall failed')
-        any_exception = [e for e in thread_exceptions if e][0]
-        raise any_exception
+        print(f'ERROR: All threads failed to upload to S3')
+        # any_exception = [e for e in thread_exceptions if e][0]
+        # raise any_exception
+        status = {'type': 'S3 Upload', 'status': 'failed'}
     # if some threads failed
     elif any(thread_exceptions):
         print('some of yall failed, but not all, so we can continue but log the error')
+        status = {'type': 'S3 Upload', 'status': 'failed'}
     else:
         print('all yall succeeded')
+        status = {'type': 'S3 Upload', 'status': 'failed'}
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
@@ -592,6 +600,7 @@ def send_data(config, creds):
         return
     Path(done_file_path).touch()
     get_url_and_send(len(thread_exceptions), '.done')
+    return status
 
 
 if __name__ == '__main__':
@@ -599,3 +608,6 @@ if __name__ == '__main__':
         main()
     except BadConfigException:
         print('ERROR: Bad config; see earlier messages')
+
+# NOTES TO SELF
+# turn thread exception to hold tuples, [(which failed upload or gen, e)]
