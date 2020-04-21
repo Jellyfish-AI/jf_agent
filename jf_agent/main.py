@@ -512,10 +512,10 @@ def download_data(
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    if git_connection:
-        download_data_status.append(
-            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
-        )
+    # if git_connection:
+    #     download_data_status.append(
+    #         load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+    #     )
 
     return download_data_status
 
@@ -537,7 +537,7 @@ def send_data(config, creds):
             upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
             print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
     
-    def mush(filename):
+    def get_url_and_send(filename):
         signed_url, path_to_obj = get_signed_url(filename)
         upload_file(filename, signed_url, path_to_obj)
 
@@ -551,16 +551,18 @@ def send_data(config, creds):
 
     print('Sending data to Jellyfish... ')
 
-    threads = []
-    for filename in os.listdir(config.outdir):
-        # threading
-        s3_url_and_upload = threading.Thread(
-            target=mush,
-            args=[filename, ],
+    threads = [
+        threading.Thread(
+            target=get_url_and_send,
+            args=[filename, ]
         )
-        s3_url_and_upload.start()
-        threads.append(s3_url_and_upload)
+        for filename in os.listdir(config.outdir)
+    ]
     
+    print(f'Starting {len(threads)} threads to upload files to S3')
+    for thread in threads:
+        thread.start()
+
     for process in threads:
         process.join()
 
