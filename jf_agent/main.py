@@ -525,29 +525,33 @@ def download_data(
 def send_data(config, creds):
     output_basedir, timestamp = os.path.split(config.outdir)         
     
-    def get_url_and_send(thread_num, filename):
+    def get_signed_url(files):
         # Get signed URL
         try:
             base_url = config.jellyfish_api_base
             headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-            r = requests.get(f'{base_url}/endpoints/agent/signed-url?filename={filename}&timestamp={timestamp}', headers=headers).json()
-            signed_url = r["signedUrl"]
-            path_to_obj = r['objectPath']
+            payload = {'files': files}
+            print(f'what payload looks like {payload}')
+            r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload).json()
+            return r['signedUrls']
         except Exception as e:
-            thread_exceptions[thread_num] = e
-            print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
+            print(f'failed get signed url, {e}')
+            # thread_exceptions[thread_num] = e
+            # print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
-        # Post file to signed URL
-        try:
-            with open(f'{config.outdir}/{filename}', 'rb') as f:
-                if thread_num == 2:
-                    raise Exception('failed in upload file')
-                # If successful, returns HTTP status code 204
-                upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
-                print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
-        except Exception as e:
-            thread_exceptions[thread_num] = e
-            print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
+
+    # def get_url_and_send(thread_num, filename):
+    #     # Post file to signed URL
+    #     try:
+    #         with open(f'{config.outdir}/{filename}', 'rb') as f:
+    #             if thread_num == 2:
+    #                 raise Exception('failed in upload file')
+    #             # If successful, returns HTTP status code 204
+    #             upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+    #             print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
+    #     except Exception as e:
+    #         thread_exceptions[thread_num] = e
+    #         print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -559,48 +563,52 @@ def send_data(config, creds):
 
     print('Sending data to Jellyfish... ')
 
-    threads = [
-        threading.Thread(
-            target=get_url_and_send,
-            args=[index, filename]
-        )
-        for index, filename in list(enumerate(os.listdir(config.outdir)))
-    ]
+    # if i get all signed urls at once, then the threads will only be for uploads
+    signed_urls = get_signed_url(os.listdir(config.outdir))
+    # this would be iterating over the output of get_signed_url list of objects 
+    # objects shaped as {'filename': (signed_url, path_to_obj)}
+    # threads = [
+    #     threading.Thread(
+    #         target=get_url_and_send,
+    #         args=[index, filename]
+    #     )
+    #     for index, filename in list(enumerate(os.listdir(config.outdir)))
+    # ]
 
     # +1 for .done file
-    thread_exceptions = [None] * (len(threads) + 1)
+    # thread_exceptions = [None] * (len(threads) + 1)
     
-    print(f'Starting {len(threads)} threads to upload files to S3')
-    for thread in threads:
-        thread.start()
+    # print(f'Starting {len(threads)} threads to upload files to S3')
+    # for thread in threads:
+    #     thread.start()
 
-    for process in threads:
-        process.join()
+    # for process in threads:
+    #     process.join()
 
-    # if all threads failed
-    if all(x is not None for x in thread_exceptions):
-        print(f'ERROR: All threads failed to upload to S3')
-        # any_exception = [e for e in thread_exceptions if e][0]
-        # raise any_exception
-        status = {'type': 'S3 Upload', 'status': 'failed'}
-    # if some threads failed
-    elif any(thread_exceptions):
-        print('some of yall failed, but not all, so we can continue but log the error')
-        status = {'type': 'S3 Upload', 'status': 'failed'}
-    else:
-        print('all yall succeeded')
-        status = {'type': 'S3 Upload', 'status': 'failed'}
+    # # if all threads failed
+    # if all(x is not None for x in thread_exceptions):
+    #     print(f'ERROR: All threads failed to upload to S3')
+    #     # any_exception = [e for e in thread_exceptions if e][0]
+    #     # raise any_exception
+    #     status = {'type': 'S3 Upload', 'status': 'failed'}
+    # # if some threads failed
+    # elif any(thread_exceptions):
+    #     print('some of yall failed, but not all, so we can continue but log the error')
+    #     status = {'type': 'S3 Upload', 'status': 'failed'}
+    # else:
+    #     print('all yall succeeded')
+    #     status = {'type': 'S3 Upload', 'status': 'failed'}
 
-    # creating .done file
-    done_file_path = f'{os.path.join(config.outdir, ".done")}'
-    if os.path.exists(done_file_path):
-        print(
-            f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
-        )
-        return
-    Path(done_file_path).touch()
-    get_url_and_send(len(thread_exceptions), '.done')
-    return status
+    # # creating .done file
+    # done_file_path = f'{os.path.join(config.outdir, ".done")}'
+    # if os.path.exists(done_file_path):
+    #     print(
+    #         f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
+    #     )
+    #     return
+    # Path(done_file_path).touch()
+    # get_url_and_send(len(thread_exceptions), '.done')
+    return {'type': 'S3 Uploads', 'status': 'in progress'}
 
 
 if __name__ == '__main__':
