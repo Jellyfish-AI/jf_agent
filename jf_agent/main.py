@@ -532,8 +532,8 @@ def send_data(config, creds):
             r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload).json()
             return r['signed_urls']
         except Exception as e:
-            # may need to take this more seriously and fail right then and there?
-            print(f'Failed to generate signed URLS for files: {e}')
+            print(f'ERROR: Failed to generate signed URLS for files')
+            raise e
             
 
     def upload_file(thread_num, filename, path_to_obj, signed_url):
