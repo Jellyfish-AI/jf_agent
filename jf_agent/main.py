@@ -514,18 +514,18 @@ def download_data(
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    if git_connection:
-        download_data_status.append(
-            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
-        )
+    # if git_connection:
+    #     download_data_status.append(
+    #         load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+    #     )
 
     return download_data_status
 
 
 def send_data(config, creds):
-    output_basedir, timestamp = os.path.split(config.outdir)         
+    output_basedir, timestamp = os.path.split(config.outdir)
+
     def get_signed_url(files):
-        # Get signed URL
         try:
             base_url = config.jellyfish_api_base
             headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
@@ -534,19 +534,17 @@ def send_data(config, creds):
             r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload).json()
             return r['signedUrls']
         except Exception as e:
-            thread_exceptions[thread_num] = e
+            #thread_exceptions[thread_num] = e
             print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
     def upload_file(thread_num, filename, path_to_obj, signed_url):
-        print(f'filename: {filename}')
-        # Post file to signed URL
         try:
             with open(f'{config.outdir}/{filename}', 'rb') as f:
                 # If successful, returns HTTP status code 204
                 upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
                 print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
         except Exception as e:
-            thread_exceptions[thread_num] = e
+            #thread_exceptions[thread_num] = e
             print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
 
     # Compress any not yet compressed files before sending
@@ -568,30 +566,31 @@ def send_data(config, creds):
         touple = file_info[filename]
         path_to_obj = touple[0]
         signed_url = touple[1]
-
-        process = threading.Thread(
+        # print(f"inside forloop: {filename}, {path_to_obj}, {signed_url['url']}")
+        s3_upload_process = threading.Thread(
             target=upload_file,
-            args=[index, filename, path_to_obj, signed_url]
+            args=[index, filename, path_to_obj, signed_url],
         )
-        process.start()
+        s3_upload_process.start()
+        threads.append(s3_upload_process)
 
     # +1 for .done file
-    thread_exceptions = [None] * (len(threads) + 1)
+    # thread_exceptions = [None] * (len(threads) + 1)
     
     print(f'Joining {len(threads)} threads')
 
     for process in threads:
         process.join()
 
-    # if all threads failed
-    if all(x is not None for x in thread_exceptions):
-        print(f'ERROR: All threads failed to upload to S3')
-        status = {'type': 'S3 Upload', 'status': 'failed'}
-    # if some threads failed
-    elif any(thread_exceptions):
-        status = {'type': 'S3 Upload', 'status': 'failed'}
-    else:
-        status = {'type': 'S3 Upload', 'status': 'success'}
+    # # if all threads failed
+    # if all(x is not None for x in thread_exceptions):
+    #     print(f'ERROR: All threads failed to upload to S3')
+    #     status = {'type': 'S3 Upload', 'status': 'failed'}
+    # # if some threads failed
+    # elif any(thread_exceptions):
+    #     status = {'type': 'S3 Upload', 'status': 'failed'}
+    # else:
+    #     status = {'type': 'S3 Upload', 'status': 'success'}
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
@@ -602,8 +601,9 @@ def send_data(config, creds):
         return
     Path(done_file_path).touch()
     done_file_signed_url = get_signed_url(['.done'])
-    upload_file(len(threads) + 1, '.done', done_file_signed_url['.done'][0], done_file_signed_url['.done'][1])
-    return status
+    print(f'done file {done_file_signed_url}')
+    # upload_file(len(threads) + 1, '.done', done_file_signed_url.get('.done')[0], done_file_signed_url.get('.done')[1])
+    return "status"
 
 
 if __name__ == '__main__':
