@@ -120,13 +120,13 @@ class BitbucketCloudClient:
                     # been too long
                     if (datetime.now() - start) < timedelta(hours=1):
                         agent_logging.log_and_print(
-                            logger, logging.info, 'Retrying in 30 seconds...'
+                            logger, logging.INFO, 'Retrying in 30 seconds...'
                         )
                         time.sleep(30)
                         continue
                     else:
                         agent_logging.log_and_print(
-                            logger, logging.error, 'Getting HTTP 429s for over an hour; giving up!'
+                            logger, logging.ERROR, 'Getting HTTP 429s for over an hour; giving up!'
                         )
                 raise
 
