@@ -13,15 +13,28 @@ import requests
 import urllib3
 import yaml
 
+import math
+
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.jf_jira import get_basic_jira_connection, print_all_jira_fields, load_and_dump_jira
+from jf_agent.jf_jira import (
+    get_basic_jira_connection,
+    print_all_jira_fields,
+    load_and_dump_jira,
+    print_missing_repos_found_by_jira,
+)
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://jellyfish.co'
-VALID_RUN_MODES = ('download_and_send', 'download_only', 'send_only', 'print_all_jira_fields')
+VALID_RUN_MODES = (
+    'download_and_send',
+    'download_only',
+    'send_only',
+    'print_all_jira_fields',
+    'scan_jira_for_missing_repos',
+)
 
 
 def main():
@@ -62,6 +75,12 @@ def main():
             "http://localhost:8000 (if running the agent container with --network host) or "
             "http://172.17.0.1:8000 (if running the agent container with --network bridge)"
         ),
+    )
+    parser.add_argument(
+        '--for-scan-jira-updated-within-last-x-months',
+        type=int,
+        help='scan jira issues that have been updated since the given number of months back; leave blank to '
+        'only check issues updated in the past month',
     )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
@@ -112,6 +131,16 @@ def main():
             if config.git_url:
                 git_connection = get_git_client(config, creds)
 
+            if config.run_mode_is_scan_jira_for_missing_repos:
+                issues_to_scan = get_issues_to_scan_from_jellyfish(
+                    config, creds, args.for_scan_jira_updated_within_last_x_months
+                )
+                if issues_to_scan:
+                    print_missing_repos_found_by_jira(
+                        issues_to_scan, config, jira_connection, git_connection
+                    )
+                return
+
             if config.run_mode_includes_download:
                 download_data_status = download_data(
                     config,
@@ -155,6 +184,7 @@ ValidatedConfig = namedtuple(
         'run_mode_includes_download',
         'run_mode_includes_send',
         'run_mode_is_print_all_jira_fields',
+        'run_mode_is_scan_jira_for_missing_repos',
         'skip_ssl_verification',
         'jira_url',
         'jira_earliest_issue_dt',
@@ -214,6 +244,7 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
+    run_mode_is_scan_jira_for_missing_repos = run_mode == 'scan_jira_for_missing_repos'
     jellyfish_api_base = args.jellyfish_api_base
 
     try:
@@ -365,11 +396,16 @@ def obtain_config(args):
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
+    if run_mode_is_scan_jira_for_missing_repos and not (jira_url and git_url):
+        print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
+        raise BadConfigException()
+
     return ValidatedConfig(
         run_mode,
         run_mode_includes_download,
         run_mode_includes_send,
         run_mode_is_print_all_jira_fields,
+        run_mode_is_scan_jira_for_missing_repos,
         skip_ssl_verification,
         jira_url,
         jira_earliest_issue_dt,
@@ -528,6 +564,7 @@ def send_data(config, creds):
         return r.json()['signed_urls']
 
     thread_exceptions = []
+
     def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
             upload_file(filename, path_to_obj, signed_url)
@@ -563,8 +600,7 @@ def send_data(config, creds):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread,
-            args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]
@@ -588,6 +624,68 @@ def send_data(config, creds):
     Path(done_file_path).touch()
     done_file_dict = get_signed_url(['.done'])['.done']
     upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+
+
+def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):
+    base_url = config.jellyfish_api_base
+    api_token = creds.jellyfish_api_token
+
+    issues_to_scan = {}
+    max_issues_to_grab_per_request = 100
+
+    params = {'limit': max_issues_to_grab_per_request}
+
+    if updated_within_last_x_months:
+        params.update({'monthsback': updated_within_last_x_months})
+
+    issue_data = _get_unlinked_issue_data(base_url, api_token, params)
+
+    if issue_data:
+        total_issue_count = issue_data.get('total')
+        issues_to_scan.update(issue_data.get('issues'))
+
+        remaining_issues_to_grab = total_issue_count - max_issues_to_grab_per_request
+        for i in range(1, math.ceil(remaining_issues_to_grab / max_issues_to_grab_per_request) + 1):
+            params.update({'offset': max_issues_to_grab_per_request * i})
+
+            issue_data = _get_unlinked_issue_data(base_url, api_token, params)
+            issues_to_scan.update(issue_data.get('issues'))
+
+    return issues_to_scan
+
+
+def _get_unlinked_issue_data(base_url, api_token, params):
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/unlinked-dev-issues',
+        headers={'Jellyfish-API-Token': api_token},
+        params=params,
+    )
+    if not resp.ok:
+        print(
+            f"ERROR: Couldn't grab unlinked development issues from {base_url}/endpoints/agent/unlinked-dev-issues "
+            f"using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})"
+        )
+        raise BadConfigException()
+
+    data = resp.json()
+
+    if data.get('status') == 'FAIL':
+        print(f"ERROR: You do not have permission to do this: contact an administrator for help")
+        return None
+    elif data.get('status') == 'PARTIAL_FAIL':
+        print(
+            f"ERROR: Make sure Jellyfish has access to the Development Jira Field "
+            f"and that we have already processed your data with this field included"
+        )
+        return None
+    elif data.get('status') == 'EMPTY':
+        months_back = params.get('monthsback', 1)
+        print(
+            f"The Jellyfish database couldn't find any unlinked development issues to scan for issues updated within the past {months_back} month(s)"
+        )
+        return None
+    else:
+        return data
 
 
 if __name__ == '__main__':

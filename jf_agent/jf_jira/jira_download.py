@@ -757,3 +757,193 @@ def _search_users(
             includeActive=include_active,
         )
     ]
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
+    print('downloading git repos found by jira development custom field... ', end='', flush=True)
+
+    missing_repositories = {}
+
+    for issue_id, instance_types in tqdm(issues_to_scan.items(), desc='scanning jira for git repo'):
+        for instance_type in instance_types:
+            try:
+                repositories = _scan_jira_issue_for_repo_data(
+                    jira_connection, issue_id, instance_type
+                )
+            except JIRAError as e:
+                if e.status_code == 403:
+                    agent_logging.log_and_print(
+                        logger,
+                        logger.ERROR,
+                        f"You do not have the required 'development field' permissions in jira required to scan for missing repos",
+                    )
+                    return []
+
+            for repo in repositories:
+                repo_name = repo['name']
+                repo_url = repo['url']
+
+                if repo_name not in missing_repositories:
+                    missing_repositories[repo_name] = {
+                        'name': repo_name,
+                        'url': repo_url,
+                        'instance_type': instance_type,
+                    }
+
+    print()
+
+    _remove_mismatched_repos(
+        missing_repositories, _get_repos_from_git(git_connection, config), config
+    )
+
+    result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
+    return result
+
+
+def _get_repos_from_git(git_connection, config):
+    if config.git_provider == 'bitbucket_server':
+        # returns a dict of repos
+
+        from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
+        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs
+
+        projects = get_projects_bbs(
+            git_connection, config.git_include_projects, config.git_exclude_projects, False
+        )
+        _, repos = zip(
+            *get_repos_bbs(
+                git_connection, projects, config.git_include_repos, config.git_exclude_repos, False
+            )
+        )
+
+    elif config.git_provider == 'bitbucket_cloud':
+        # returns a list of repos
+
+        from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
+
+        bbc_adapter = BitbucketCloudAdapter(git_connection)
+
+        projects = bbc_adapter.get_projects(config.git_include_projects, False)
+        repos = bbc_adapter.get_repos(
+            projects, config.git_include_repos, config.git_exclude_repos, False
+        )
+
+    elif config.git_provider == 'github':
+        # returns a list of repos
+        from jf_agent.git.github import get_repos as get_repos_gh
+
+        repos = get_repos_gh(
+            git_connection,
+            config.git_include_projects,
+            config.git_include_repos,
+            config.git_exclude_repos,
+            False,
+        )
+
+    elif config.git_provider == 'gitlab':
+        # returns a list of repos
+        from jf_agent.git.gitlab_adapter import GitLabAdapter
+
+        gl_adapter = GitLabAdapter(git_connection)
+
+        projects = gl_adapter.get_projects(config.git_include_projects, False)
+        repos = gl_adapter.get_repos(
+            projects, config.git_include_repos, config.git_exclude_repos, False
+        )
+    else:
+        raise ValueError(f'unsupported git provider {config.git_provider}')
+        return []
+
+    return repos
+
+
+def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
+
+    params = {
+        'issueId': issue_id,
+        'dataType': 'repository',
+        'applicationType': application_type,
+    }
+
+    try:
+        response = jira_connection._get_json(
+            '/rest/dev-status/1.0/issue/detail', params, base='{server}{path}'
+        )
+    except JIRAError as e:
+        if e.status_code == 400:
+            print(
+                f"WARNING: received a 400 when requesting development details for issue {issue_id}, "
+                f"likely because it doesn't exist anymore -- skipping"
+            )
+            return []
+        raise
+    except Exception as e:
+        print(
+            f'WARNING: caught {type(e)} exception requesting development details for '
+            f'{issue_id} -- skipping'
+        )
+        return []
+
+    if response.get('errors'):
+        print(
+            f"WARNING: received an error when requesting development details for {issue_id}: {response['errors']}"
+        )
+
+    detail = response.get('detail', [])
+    if not detail:
+        print(f'found no development details for {issue_id}')
+        return []
+
+    return detail[0]['repositories']
+
+
+def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
+    '''
+    Cross reference results with data from git to differentiate a 'missing repo' from a 'missed match'
+    '''
+    if not repos_found_by_jira:
+        return
+
+    # TODO git repos could be a dict or a list (right now teseting list)
+    git_repo_names = []
+    git_repo_urls = []
+    for t in git_repos:
+        normalized_repo = t[1]
+        git_repo_names.extend([normalized_repo.get('name'), normalized_repo.get('name')])
+        git_repo_urls.append(normalized_repo.get('url'))
+
+    ignore_repos = []
+    for repo in tqdm(
+        list(repos_found_by_jira.values()), unit='repo', desc='comparing repos with git sources'
+    ):
+
+        repo_name = repo['name']
+        repo_url = repo['url']
+
+        # Jira sometimes responds with a different version of names/urls than
+        # what is returned from their respective git APIs. In order to cross reference
+        # the git repos given to us, we will try to query with something more similar:
+        # (url ex.) gitlab.com/group/@group/@subgroup/@myrepo >> gitlab.com/group/subgroup/myrepo
+        # (name ex.) @group@subgroup@myrepo >> myrepo
+        if '@' in repo_url:
+            repo_url = repo_url.replace('@', '/')
+            repo_url = repo_url.split('/')
+            seen = set()
+            repo_url = [x for x in repo_url if not (x in seen or seen.add(x))]
+            repo_url = '/'.join(repo_url)
+        if '@' in repo_name:
+            repo_name = repo_name.split('@')[-1]
+
+        if repo_url in git_repo_urls or repo_name in git_repo_names:
+            ignore_repos.append(repo_name)
+            del repos_found_by_jira[repo['name']]
+
+    print(
+        f'\nJira found the following repos but per your config file, Jellyfish already has access:'
+    )
+    if config.git_redact_names_and_urls:
+        print('(NOTE: names and urls are redacted in Jellyfish per your config)')
+    for repo in ignore_repos:
+        print(f' * {repo}')
