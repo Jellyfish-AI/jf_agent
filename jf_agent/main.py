@@ -681,7 +681,7 @@ def _get_unlinked_issue_data(base_url, api_token, params):
     elif data.get('status') == 'EMPTY':
         months_back = params.get('monthsback', 1)
         print(
-            f"The Jellyfish database couldn't find any unlinked development issues to scan for issues updated within the past {months_back} month(s)"
+            f"Jellyfish couldn't find any unlinked development issues to scan for issues updated within the past {months_back} month(s)"
         )
         return None
     else:

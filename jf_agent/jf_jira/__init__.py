@@ -70,7 +70,7 @@ def print_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, g
     missing_repos = download_missing_repos_found_by_jira(
         issues_to_scan, config, jira_connection, git_connection
     )
-    print(f'\nJira found {len(missing_repos)} git repos missing from Jellyfish')
+    print(f'\nJira found {len(missing_repos)} repos potentially missing from Jellyfish')
     for missing_repo in missing_repos:
         print(f"{missing_repo['name']:30}\t{missing_repo['url']}")
     print('\n')

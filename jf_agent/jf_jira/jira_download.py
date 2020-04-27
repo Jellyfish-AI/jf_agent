@@ -762,11 +762,13 @@ def _search_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
-    print('downloading git repos found by jira development custom field... ', end='', flush=True)
+    print('downloading git repos found by jira development field... ', end='', flush=True)
 
     missing_repositories = {}
 
-    for issue_id, instance_types in tqdm(issues_to_scan.items(), desc='scanning jira for git repo'):
+    for issue_id, instance_types in tqdm(
+        issues_to_scan.items(), desc='scanning jira for git repos'
+    ):
         for instance_type in instance_types:
             try:
                 repositories = _scan_jira_issue_for_repo_data(
@@ -777,7 +779,7 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
                     agent_logging.log_and_print(
                         logger,
                         logger.ERROR,
-                        f"You do not have the required 'development field' permissions in jira required to scan for missing repos",
+                        f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
                     )
                     return []
 
@@ -794,9 +796,16 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
 
     print()
 
-    _remove_mismatched_repos(
-        missing_repositories, _get_repos_from_git(git_connection, config), config
-    )
+    try:
+        _remove_mismatched_repos(
+            missing_repositories, _get_repos_from_git(git_connection, config), config
+        )
+    except Exception as e:
+        print(
+            f'WARNING: Got an error when trying to cross reference repos discoverd by '
+            f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
+            f'discovered by Jira...'
+        )
 
     result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
     return result
@@ -804,7 +813,6 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
 
 def _get_repos_from_git(git_connection, config):
     if config.git_provider == 'bitbucket_server':
-        # returns a dict of repos
 
         from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
         from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs
@@ -819,7 +827,6 @@ def _get_repos_from_git(git_connection, config):
         )
 
     elif config.git_provider == 'bitbucket_cloud':
-        # returns a list of repos
 
         from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
@@ -831,19 +838,21 @@ def _get_repos_from_git(git_connection, config):
         )
 
     elif config.git_provider == 'github':
-        # returns a list of repos
+
         from jf_agent.git.github import get_repos as get_repos_gh
 
-        repos = get_repos_gh(
-            git_connection,
-            config.git_include_projects,
-            config.git_include_repos,
-            config.git_exclude_repos,
-            False,
+        _, repos = zip(
+            *get_repos_gh(
+                git_connection,
+                config.git_include_projects,
+                config.git_include_repos,
+                config.git_exclude_repos,
+                False,
+            )
         )
 
     elif config.git_provider == 'gitlab':
-        # returns a list of repos
+
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
         gl_adapter = GitLabAdapter(git_connection)
@@ -854,7 +863,6 @@ def _get_repos_from_git(git_connection, config):
         )
     else:
         raise ValueError(f'unsupported git provider {config.git_provider}')
-        return []
 
     return repos
 
@@ -903,21 +911,19 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
     '''
     Cross reference results with data from git to differentiate a 'missing repo' from a 'missed match'
     '''
-    if not repos_found_by_jira:
+    if not (repos_found_by_jira and git_repos):
         return
 
-    # TODO git repos could be a dict or a list (right now teseting list)
+    print(f'comparing repos found by Jira against Git repos to find missing ones...')
+
     git_repo_names = []
     git_repo_urls = []
-    for t in git_repos:
-        normalized_repo = t[1]
-        git_repo_names.extend([normalized_repo.get('name'), normalized_repo.get('name')])
+    for normalized_repo in git_repos:
+        git_repo_names.extend([normalized_repo.get('full_name'), normalized_repo.get('name')])
         git_repo_urls.append(normalized_repo.get('url'))
 
     ignore_repos = []
-    for repo in tqdm(
-        list(repos_found_by_jira.values()), unit='repo', desc='comparing repos with git sources'
-    ):
+    for repo in list(repos_found_by_jira.values()):
 
         repo_name = repo['name']
         repo_url = repo['url']
@@ -940,10 +946,11 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
             ignore_repos.append(repo_name)
             del repos_found_by_jira[repo['name']]
 
-    print(
-        f'\nJira found the following repos but per your config file, Jellyfish already has access:'
-    )
-    if config.git_redact_names_and_urls:
-        print('(NOTE: names and urls are redacted in Jellyfish per your config)')
-    for repo in ignore_repos:
-        print(f' * {repo}')
+    if len(ignore_repos):
+        print(
+            f'\nJira found the following repos but per your config file, Jellyfish already has access:'
+        )
+        if config.git_redact_names_and_urls:
+            print('(NOTE: names and urls are redacted in Jellyfish per your config)')
+        for repo in ignore_repos:
+            print(f' * {repo}')
