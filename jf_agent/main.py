@@ -1,13 +1,9 @@
 import argparse
 import gzip
-import json
 import logging
 import os
-import re
 import shutil
-import subprocess
 import threading
-import traceback
 from collections import namedtuple
 from datetime import datetime, date
 from glob import glob
@@ -103,21 +99,17 @@ def main():
             )
 
             jira_connection = None
+            git_connection = None
             if config.jira_url:
-                jira_connection = get_basic_jira_connection(config, creds)
-                if jira_connection is None:
-                    status_json.append({'type': 'Jira', 'status': 'failed'})
+                jira_connection = get_basic_jira_connection(config, creds)                    
 
             if config.run_mode_is_print_all_jira_fields:
-                print_all_jira_fields(config, jira_connection)
+                if jira_connection:
+                    print_all_jira_fields(config, jira_connection)
                 return
 
             if config.git_url:
                 git_connection = get_git_client(config, creds)
-                if git_connection is None:
-                    status_json.append({'type': 'Git', 'status': 'failed'})
-            else:
-                git_connection = None
 
             if config.run_mode_includes_download:
                 download_data_status = download_data(
@@ -127,9 +119,8 @@ def main():
                     jira_connection,
                     git_connection,
                 )
-
-                for item in download_data_status:
-                    status_json.append(item)
+                
+                write_file(config.outdir, 'status', config.compress_output_files, download_data_status)
 
             diagnostics.capture_outdir_size(config.outdir)
 
@@ -141,17 +132,15 @@ def main():
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        s3_upload_status = send_data(
+        send_data(
             config,
             creds
         )
-        status_json.append(s3_upload_status)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
         print(f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"')
 
-    write_file(config.outdir, 'status', config.compress_output_files, status_json)
     print('Done!')
 
 
@@ -513,38 +502,45 @@ def download_data(
 
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
+    else:
+        download_data_status.append({'type': 'Jira', 'status': 'failed'})
 
     if git_connection:
         download_data_status.append(
             load_and_dump_git(config, endpoint_git_instance_info, git_connection)
         )
+    else: 
+        download_data_status.append({'type': 'Git', 'status': 'failed'})
 
     return download_data_status
 
 
 def send_data(config, creds):
-    output_basedir, timestamp = os.path.split(config.outdir)
+    _, timestamp = os.path.split(config.outdir)
     def get_signed_url(files):
-        try:
-            base_url = config.jellyfish_api_base
-            headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-            payload = {'files': files}
-            r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload).json()
-            return r['signed_urls']
-        except Exception as e:
-            print(f'ERROR: Failed to generate signed URLS for files')
-            raise e
+        base_url = config.jellyfish_api_base
+        headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
+        payload = {'files': files}
+
+        r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload)
+        r.raise_for_status()
+        
+        return r.json()['signed_urls']
             
 
-    def upload_file(thread_num, filename, path_to_obj, signed_url):
+    def upload_file_from_thread(thread_num, filename, path_to_obj, signed_url):
         try:
-            with open(f'{config.outdir}/{filename}', 'rb') as f:
-                # If successful, returns HTTP status code 204
-                upload_resp = requests.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
-                print(f'File {filename} upload HTTP status code: {upload_resp.status_code}')
+            upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
             thread_exceptions[thread_num] = e
-            print(f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}')
+            agent_logging.log_and_print(logger,  logging.ERROR, f'Failed to upload file {filename} to S3 bucket', exc_info=True)
+    
+    def upload_file(filename, path_to_obj, signed_url):
+        with open(f'{config.outdir}/{filename}', 'rb') as f:
+            # If successful, returns HTTP status code 204
+            session = retry_session()
+            upload_resp = session.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+            upload_resp.raise_for_status()
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -558,32 +554,27 @@ def send_data(config, creds):
 
     signed_urls = get_signed_url(os.listdir(config.outdir))
 
-    threads = []
-    thread_exceptions = [None] * (len(signed_urls) + 1)
-    for index, file_info in list(enumerate(signed_urls)):
-        # file_info shape {filename: (path_to_obj, signed_url object)}
-        filename = list(file_info.keys())[0]
-        touple = file_info[filename]
-        path_to_obj = touple[0]
-        signed_url = touple[1]
-
-        s3_upload_process = threading.Thread(
+    threads = [
+        threading.Thread(
             target=upload_file,
-            args=[index, filename, path_to_obj, signed_url],
+            args=[index, filename, file_dict['s3_path'], file_dict['url']],
         )
-        s3_upload_process.start()
-        threads.append(s3_upload_process)
+        for index, (filename, file_dict) in enumerate(signed_urls.items())
+    ]
+
+    thread_exceptions = [None] * (len(signed_urls))
     
-    print(f'Joining {len(threads)} threads')
+    print(f'Starting {len(threads)} threads')
 
-    for process in threads:
-        process.join()
+    for t in thread:
+        t.start()
 
-    # if all threads failed
+    for t in threads:
+        t.join()
+
     if any(thread_exceptions):
-        status = {'type': 'S3 Upload', 'status': 'failed'}
-    else:
-        status = {'type': 'S3 Upload', 'status': 'success'}
+        print(f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.')
+        return
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
@@ -593,9 +584,8 @@ def send_data(config, creds):
         )
         return
     Path(done_file_path).touch()
-    done_file_signed_url = get_signed_url(['.done'])[0].get('.done')
-    upload_file(len(threads) + 1, '.done', done_file_signed_url[0], done_file_signed_url[1])
-    return status
+    done_file_dict = get_signed_url(['.done'])['.done']
+    upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
 
 
 if __name__ == '__main__':

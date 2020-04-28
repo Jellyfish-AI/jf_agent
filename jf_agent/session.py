@@ -29,7 +29,7 @@ def retry_session(**kwargs):
 
     retries = 3
     backoff_factor = 0.5
-    status_forcelist = (500, 502, 504)
+    status_forcelist = (500, 502, 503, 504)
 
     retry = Retry(
         total=retries,
