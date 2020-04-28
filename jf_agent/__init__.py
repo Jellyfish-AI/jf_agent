@@ -21,26 +21,48 @@ class StrDefaultEncoder(json.JSONEncoder):
 
 
 def download_and_write_streaming(
-    outdir, filename_prefix, compress, generator_func, generator_func_args, item_id_dict_key
+    outdir,
+    filename_prefix,
+    compress,
+    generator_func,
+    generator_func_args,
+    item_id_dict_key,
+    addl_info_dict_key=None,
 ):
     if compress:
         outfile = gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wt')
     else:
         outfile = open(f'{outdir}/{filename_prefix}.json', 'w')
 
-    item_ids = set()
+    item_infos = set()
     with jsonstreams.Stream(jsonstreams.Type.array, fd=outfile, encoder=StrDefaultEncoder) as s:
         for item in generator_func(*generator_func_args):
             if isinstance(item, list):
                 for i in item:
                     s.write(i)
-                    item_ids.add(_get_item_by_key(i, item_id_dict_key))
+                    if not addl_info_dict_key:
+                        item_infos.add(_get_item_by_key(i, item_id_dict_key))
+                    else:
+                        item_infos.add(
+                            (
+                                _get_item_by_key(i, item_id_dict_key),
+                                _get_item_by_key(i, addl_info_dict_key),
+                            )
+                        )
             else:
                 s.write(item)
-                item_ids.add(_get_item_by_key(item, item_id_dict_key))
+                if not addl_info_dict_key:
+                    item_infos.add(_get_item_by_key(item, item_id_dict_key))
+                else:
+                    item_infos.add(
+                        (
+                            _get_item_by_key(item, item_id_dict_key),
+                            _get_item_by_key(item, addl_info_dict_key),
+                        )
+                    )
 
     outfile.close()
-    return item_ids
+    return item_infos
 
 
 def _get_item_by_key(item, key):
