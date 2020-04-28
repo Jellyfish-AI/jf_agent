@@ -134,5 +134,8 @@ dmypy.json
 config.yml
 creds.env
 
+# jf_agent output dir (by convention)
+output
+
 .bash_history
 
