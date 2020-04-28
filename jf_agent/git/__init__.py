@@ -1,3 +1,4 @@
+import os
 import pytz
 from typing import List
 from dataclasses import dataclass
@@ -285,6 +286,8 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
+        files_downloaded = [f for f in os.listdir(config.outdir) if 'bb' in f]
+
     except Exception as e:
         agent_logging.log_and_print(
             logger,
@@ -292,9 +295,11 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             f'Failed to download {config.git_provider} data:\n{e}',
             exc_info=True,
         )
-        return {'type': 'Git', 'status': 'failed'}
+        files_downloaded =[f for f in os.listdir(config.outdir) if 'bb' in f]
+        
+        return {'type': 'Git', 'status': 'failed', 'files_uploaded': len(files_downloaded)}
 
-    return {'type': 'Git', 'status': 'success'}
+    return {'type': 'Git', 'status': 'success', 'files_uploaded': len(files_downloaded)}
 
 
 def pull_since_date_for_repo(server_git_instance_info, org_login, repo_id, commits_or_prs: str):
