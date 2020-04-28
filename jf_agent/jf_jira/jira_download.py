@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import json
 import logging
 import math
@@ -329,6 +329,37 @@ def detect_issues_needing_sync(
     return missing_issue_ids, already_up_to_date_issue_ids, out_of_date_issue_ids, deleted_issue_ids
 
 
+def detect_issues_needing_re_download(
+    downloaded_issue_info, issue_metadata_from_jellyfish, issue_metadata_addl_from_jellyfish
+):
+    issue_keys_changed = []
+    for issue_id_str, issue_key in downloaded_issue_info:
+        existing_metadata = issue_metadata_from_jellyfish.get(int(issue_id_str))
+        if existing_metadata and issue_key != existing_metadata.key:
+            agent_logging.log_and_print(
+                logger,
+                logging.INFO,
+                f'Detected a key change for issue {issue_id_str} ({existing_metadata.key} -> {issue_key})',
+            )
+            issue_keys_changed.append(existing_metadata.key)
+
+    issues_by_elfik, issues_by_pfik = defaultdict(list), defaultdict(list)
+    for issue_id, (elfik, pfik) in issue_metadata_addl_from_jellyfish.items():
+        if elfik:
+            issues_by_elfik[elfik].append(issue_id)
+        if pfik:
+            issues_by_pfik[pfik].append(issue_id)
+
+    # Find all of the issues that refer to those issues through epic_link_field_issue_key
+    # or parent_field_issue_key; these issues need to be re-downloaded
+    issue_ids_needing_re_download = set()
+    for changed_key in issue_keys_changed:
+        issue_ids_needing_re_download.update(set(issues_by_elfik.get(changed_key, [])))
+        issue_ids_needing_re_download.update(set(issues_by_pfik.get(changed_key, [])))
+
+    return issue_ids_needing_re_download
+
+
 def download_necessary_issues(
     jira_connection,
     issue_ids_to_download,
@@ -547,7 +578,7 @@ def download_worklogs(jira_connection, issue_ids):
             print("Couldn't parse JIRA response as JSON: %s", resp.text)
             raise
 
-        updated.extend([wl for wl in worklog_list_json if wl['issueId'] in issue_ids])
+        updated.extend([wl for wl in worklog_list_json if int(wl['issueId']) in issue_ids])
         if worklog_ids_json['lastPage']:
             break
         since = worklog_ids_json['until']

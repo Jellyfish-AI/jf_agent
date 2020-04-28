@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import chain
 import logging
 
 from jira import JIRA
@@ -11,6 +12,7 @@ from jf_agent.jf_jira.jira_download import (
     download_fields,
     download_all_issue_metadata,
     detect_issues_needing_sync,
+    detect_issues_needing_re_download,
     download_necessary_issues,
     download_issuelinktypes,
     download_issuetypes,
@@ -149,6 +151,14 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             for issue_id, issue_info in endpoint_jira_info['issue_metadata'].items()
         }
 
+        issue_metadata_addl_from_jellyfish = {
+            int(issue_id): (
+                issue_info.get('epic_link_field_issue_key'),
+                issue_info.get('parent_field_issue_key'),
+            )
+            for issue_id, issue_info in endpoint_jira_info['issue_metadata'].items()
+        }
+
         (
             missing_issue_ids,
             _,
@@ -175,15 +185,47 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                     config.jira_issue_download_concurrent_threads,
                 ),
                 item_id_dict_key='id',
+                addl_info_dict_key='key',
             )
 
-        issue_ids = download_and_write_issues()
+        downloaded_issue_info = download_and_write_issues()
+
+        issue_ids_needing_re_download = detect_issues_needing_re_download(
+            downloaded_issue_info,
+            issue_metadata_from_jellyfish,
+            issue_metadata_addl_from_jellyfish,
+        )
+
+        @diagnostics.capture_timing()
+        @agent_logging.log_entry_exit(logger)
+        def download_and_write_issues_needing_re_download():
+            return download_and_write_streaming(
+                config.outdir,
+                'jira_issues_re_downloaded',
+                config.compress_output_files,
+                generator_func=download_necessary_issues,
+                generator_func_args=(
+                    jira_connection,
+                    list(issue_ids_needing_re_download),
+                    config.jira_include_fields,
+                    config.jira_exclude_fields,
+                    config.jira_issue_batch_size,
+                    config.jira_issue_download_concurrent_threads,
+                ),
+                item_id_dict_key='id',
+            )
+
+        re_downloaded_issue_info = download_and_write_issues_needing_re_download()
+
+        all_downloaded_issue_ids = [
+            int(i[0]) for i in chain(downloaded_issue_info, re_downloaded_issue_info)
+        ]
 
         write_file(
             config.outdir,
             'jira_issue_ids_downloaded',
             config.compress_output_files,
-            [int(i) for i in issue_ids],
+            all_downloaded_issue_ids,
         )
         write_file(
             config.outdir,
@@ -197,7 +239,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.outdir,
                 'jira_worklogs',
                 config.compress_output_files,
-                download_worklogs(jira_connection, issue_ids),
+                download_worklogs(jira_connection, all_downloaded_issue_ids),
             )
 
         write_file(
