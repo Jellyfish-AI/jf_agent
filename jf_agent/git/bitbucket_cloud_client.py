@@ -105,7 +105,7 @@ class BitbucketCloudClient:
             raise
 
     def get_raw_result(self, url, rate_limit_realm=None):
-        start = datetime.now()
+        start = datetime.utcnow()
         while True:
             try:
                 with self.rate_limiter.limit(rate_limit_realm):
@@ -118,7 +118,7 @@ class BitbucketCloudClient:
                     # requests.  We don't know how long we need to wait,
                     # so just try in 30 seconds, unless it's already
                     # been too long
-                    if (datetime.now() - start) < timedelta(hours=1):
+                    if (datetime.utcnow() - start) < timedelta(hours=1):
                         agent_logging.log_and_print(
                             logger, logging.INFO, 'Retrying in 30 seconds...'
                         )

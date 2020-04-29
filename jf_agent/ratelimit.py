@@ -38,7 +38,7 @@ class RateLimiter(object):
             return
 
         max_calls, period_secs = self.realm_config[realm]
-        start = datetime.now()
+        start = datetime.utcnow()
         while True:
             # decide whether to sleep or call, inside the lock
             with self.lock:
@@ -74,7 +74,7 @@ class RateLimiter(object):
                 )
                 raise Exception('Rate limit timeout')
 
-            sleep_period_secs = (sleep_until - datetime.now()).total_seconds()
+            sleep_period_secs = (sleep_until - datetime.utcnow()).total_seconds()
             if sleep_period_secs > 0:  # it's possible that sleep_until was a couple ms ago
                 agent_logging.log_and_print(
                     logger,
@@ -90,7 +90,7 @@ class RateLimiter(object):
         '''
 
         # First, clear out any expired calls
-        now = datetime.now().timestamp()
+        now = datetime.utcnow().timestamp()
         existing_call_expirations = self.realm_call_trackers[realm]
         self.realm_call_trackers[realm] = existing_call_expirations[
             bisect.bisect_left(existing_call_expirations, now) :
@@ -103,12 +103,12 @@ class RateLimiter(object):
 
         next_tstamp = self.realm_call_trackers[realm][0]
 
-        return datetime.fromtimestamp(next_tstamp, pytz.utc), calls_made
+        return datetime.fromtimestamp(next_tstamp), calls_made
 
     def _record_call(self, realm, period_secs):
         '''
         Record that we're making a call for this realm so that others know about
         it and don't exceed the rate limit later.
         '''
-        expiration = (datetime.now() + timedelta(seconds=period_secs)).timestamp()
+        expiration = (datetime.utcnow() + timedelta(seconds=period_secs)).timestamp()
         self.realm_call_trackers[realm].append(expiration)
