@@ -762,13 +762,12 @@ def _search_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
-    print('downloading git repos found by jira development field... ', end='', flush=True)
+    from jf_agent.git import get_repos_from_git
 
+    print('Scanning Jira issues for Git repos...')
     missing_repositories = {}
 
-    for issue_id, instance_types in tqdm(
-        issues_to_scan.items(), desc='scanning jira for git repos'
-    ):
+    for issue_id, instance_types in issues_to_scan.items():
         for instance_type in instance_types:
             try:
                 repositories = _scan_jira_issue_for_repo_data(
@@ -794,13 +793,11 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
                         'instance_type': instance_type,
                     }
 
-    print()
-
     try:
         # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
         # Jira may return inexact repo names/urls. Remove any mismatches found.
         _remove_mismatched_repos(
-            missing_repositories, _get_repos_from_git(git_connection, config), config
+            missing_repositories, get_repos_from_git(git_connection, config), config
         )
     except Exception as e:
         print(
@@ -808,65 +805,8 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
             f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
             f'discovered by Jira...'
         )
-
     result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
     return result
-
-
-def _get_repos_from_git(git_connection, config):
-    if config.git_provider == 'bitbucket_server':
-
-        from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
-        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs
-
-        projects = get_projects_bbs(
-            git_connection, config.git_include_projects, config.git_exclude_projects, False
-        )
-        _, repos = zip(
-            *get_repos_bbs(
-                git_connection, projects, config.git_include_repos, config.git_exclude_repos, False
-            )
-        )
-
-    elif config.git_provider == 'bitbucket_cloud':
-
-        from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
-
-        bbc_adapter = BitbucketCloudAdapter(git_connection)
-
-        projects = bbc_adapter.get_projects(config.git_include_projects, False)
-        repos = bbc_adapter.get_repos(
-            projects, config.git_include_repos, config.git_exclude_repos, False
-        )
-
-    elif config.git_provider == 'github':
-
-        from jf_agent.git.github import get_repos as get_repos_gh
-
-        _, repos = zip(
-            *get_repos_gh(
-                git_connection,
-                config.git_include_projects,
-                config.git_include_repos,
-                config.git_exclude_repos,
-                False,
-            )
-        )
-
-    elif config.git_provider == 'gitlab':
-
-        from jf_agent.git.gitlab_adapter import GitLabAdapter
-
-        gl_adapter = GitLabAdapter(git_connection)
-
-        projects = gl_adapter.get_projects(config.git_include_projects, False)
-        repos = gl_adapter.get_repos(
-            projects, config.git_include_repos, config.git_exclude_repos, False
-        )
-    else:
-        raise ValueError(f'unsupported git provider {config.git_provider}')
-
-    return repos
 
 
 def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
@@ -945,7 +885,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
             repo_name = repo_name.split('@')[-1]
 
         if repo_url in git_repo_urls or repo_name in git_repo_names:
-            ignore_repos.append(repo_name)
+            ignore_repos.append((repo['name'], repo['url']))
             del repos_found_by_jira[repo['name']]
 
     if len(ignore_repos):
@@ -955,4 +895,4 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
         if config.git_redact_names_and_urls:
             print('(NOTE: names and urls are redacted in Jellyfish per your config)')
         for repo in ignore_repos:
-            print(f' * {repo}')
+            print(f"* {repo[0]:30}\t{repo[1]}")

@@ -331,3 +331,63 @@ def pull_since_date_for_repo(server_git_instance_info, org_login, repo_id, commi
     else:
         # We need to backpopulate the repo
         return instance_pull_from_dt
+
+
+def get_repos_from_git(git_connection, config):
+    '''
+    Gets git repositories for use in the `print_apparently_missing_git_repos` run mode
+    to compare git repos from git sources against git repos found by jira
+    '''
+    if config.git_provider == 'bitbucket_server':
+
+        from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
+        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs
+
+        projects = get_projects_bbs(
+            git_connection, config.git_include_projects, config.git_exclude_projects, False
+        )
+        _, repos = zip(
+            *get_repos_bbs(
+                git_connection, projects, config.git_include_repos, config.git_exclude_repos, False
+            )
+        )
+
+    elif config.git_provider == 'bitbucket_cloud':
+
+        from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
+
+        bbc_adapter = BitbucketCloudAdapter(git_connection)
+
+        projects = bbc_adapter.get_projects(config.git_include_projects, False)
+        repos = bbc_adapter.get_repos(
+            projects, config.git_include_repos, config.git_exclude_repos, False
+        )
+
+    elif config.git_provider == 'github':
+
+        from jf_agent.git.github import get_repos as get_repos_gh
+
+        _, repos = zip(
+            *get_repos_gh(
+                git_connection,
+                config.git_include_projects,
+                config.git_include_repos,
+                config.git_exclude_repos,
+                False,
+            )
+        )
+
+    elif config.git_provider == 'gitlab':
+
+        from jf_agent.git.gitlab_adapter import GitLabAdapter
+
+        gl_adapter = GitLabAdapter(git_connection)
+
+        projects = gl_adapter.get_projects(config.git_include_projects, False)
+        repos = gl_adapter.get_repos(
+            projects, config.git_include_repos, config.git_exclude_repos, False
+        )
+    else:
+        raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
+
+    return repos

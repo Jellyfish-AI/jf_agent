@@ -74,7 +74,7 @@ def print_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, g
         f'\nScanning the "Development" field on the Jira issues revealed {len(missing_repos)} Git repos apparently missing from Jellyfish'
     )
     for missing_repo in missing_repos:
-        print(f"{missing_repo['name']:30}\t{missing_repo['url']}")
+        print(f"* {missing_repo['name']:30}\t{missing_repo['url']}")
     print('\n')
 
 

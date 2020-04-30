@@ -247,7 +247,9 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
-    run_mode_is_print_apparently_missing_git_repos = run_mode == 'print_apparently_missing_git_repos'
+    run_mode_is_print_apparently_missing_git_repos = (
+        run_mode == 'print_apparently_missing_git_repos'
+    )
     jellyfish_api_base = args.jellyfish_api_base
 
     try:
@@ -637,6 +639,8 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     if updated_within_last_x_months:
         params.update({'monthsback': updated_within_last_x_months})
 
+    print(f'Fetching Jira issues that are missing Git repo data in Jellyfish...')
+
     resp = requests.get(
         f'{base_url}/endpoints/agent/unlinked-dev-issues',
         headers={'Jellyfish-API-Token': api_token},
@@ -644,14 +648,15 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     )
 
     data = resp.json()
-    print(data.get('message')
+    print(data.get('message', ''))
 
-    if resp.bad:
+    if resp.status_code == 400:
         raise BadConfigException()
     elif not resp.ok:
         return None
 
     return data.get('issues')
+
 
 if __name__ == '__main__':
     try:
