@@ -33,7 +33,7 @@ VALID_RUN_MODES = (
     'download_only',
     'send_only',
     'print_all_jira_fields',
-    'scan_jira_for_missing_repos',
+    'print_apparently_missing_git_repos',
 )
 
 
@@ -77,10 +77,13 @@ def main():
         ),
     )
     parser.add_argument(
-        '--for-scan-jira-updated-within-last-x-months',
+        '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
-        help='scan jira issues that have been updated since the given number of months back; leave blank to '
-        'only check issues updated in the past month',
+        choices=range(1, 6),
+        help=(
+            f'scan jira issues that have been updated since the given number of months back (max is 6) '
+            f'for git repo data, leave blank to only check issues updated in the past month'
+        ),
     )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
@@ -131,9 +134,9 @@ def main():
             if config.git_url:
                 git_connection = get_git_client(config, creds)
 
-            if config.run_mode_is_scan_jira_for_missing_repos:
+            if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config, creds, args.for_scan_jira_updated_within_last_x_months
+                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(
@@ -184,7 +187,7 @@ ValidatedConfig = namedtuple(
         'run_mode_includes_download',
         'run_mode_includes_send',
         'run_mode_is_print_all_jira_fields',
-        'run_mode_is_scan_jira_for_missing_repos',
+        'run_mode_is_print_apparently_missing_git_repos',
         'skip_ssl_verification',
         'jira_url',
         'jira_earliest_issue_dt',
@@ -244,7 +247,7 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
-    run_mode_is_scan_jira_for_missing_repos = run_mode == 'scan_jira_for_missing_repos'
+    run_mode_is_print_apparently_missing_git_repos = run_mode == 'print_apparently_missing_git_repos'
     jellyfish_api_base = args.jellyfish_api_base
 
     try:
@@ -396,7 +399,7 @@ def obtain_config(args):
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
-    if run_mode_is_scan_jira_for_missing_repos and not (jira_url and git_url):
+    if run_mode_is_print_apparently_missing_git_repos and not (jira_url and git_url):
         print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
         raise BadConfigException()
 
@@ -405,7 +408,7 @@ def obtain_config(args):
         run_mode_includes_download,
         run_mode_includes_send,
         run_mode_is_print_all_jira_fields,
-        run_mode_is_scan_jira_for_missing_repos,
+        run_mode_is_print_apparently_missing_git_repos,
         skip_ssl_verification,
         jira_url,
         jira_earliest_issue_dt,
@@ -630,63 +633,25 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     base_url = config.jellyfish_api_base
     api_token = creds.jellyfish_api_token
 
-    issues_to_scan = {}
-    max_issues_to_grab_per_request = 100
-
-    params = {'limit': max_issues_to_grab_per_request}
-
+    params = {}
     if updated_within_last_x_months:
         params.update({'monthsback': updated_within_last_x_months})
 
-    issue_data = _get_unlinked_issue_data(base_url, api_token, params)
-
-    if issue_data:
-        total_issue_count = issue_data.get('total')
-        issues_to_scan.update(issue_data.get('issues'))
-
-        remaining_issues_to_grab = total_issue_count - max_issues_to_grab_per_request
-        for i in range(1, math.ceil(remaining_issues_to_grab / max_issues_to_grab_per_request) + 1):
-            params.update({'offset': max_issues_to_grab_per_request * i})
-
-            issue_data = _get_unlinked_issue_data(base_url, api_token, params)
-            issues_to_scan.update(issue_data.get('issues'))
-
-    return issues_to_scan
-
-
-def _get_unlinked_issue_data(base_url, api_token, params):
     resp = requests.get(
         f'{base_url}/endpoints/agent/unlinked-dev-issues',
         headers={'Jellyfish-API-Token': api_token},
         params=params,
     )
-    if not resp.ok:
-        print(
-            f"ERROR: Couldn't grab unlinked development issues from {base_url}/endpoints/agent/unlinked-dev-issues "
-            f"using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})"
-        )
-        raise BadConfigException()
 
     data = resp.json()
+    print(data.get('message')
 
-    if data.get('status') == 'FAIL':
-        print(f"ERROR: You do not have permission to do this: contact an administrator for help")
+    if resp.bad:
+        raise BadConfigException()
+    elif not resp.ok:
         return None
-    elif data.get('status') == 'PARTIAL_FAIL':
-        print(
-            f"ERROR: Make sure Jellyfish has access to the Development Jira Field "
-            f"and that we have already processed your data with this field included"
-        )
-        return None
-    elif data.get('status') == 'EMPTY':
-        months_back = params.get('monthsback', 1)
-        print(
-            f"Jellyfish couldn't find any unlinked development issues to scan for issues updated within the past {months_back} month(s)"
-        )
-        return None
-    else:
-        return data
 
+    return data.get('issues')
 
 if __name__ == '__main__':
     try:

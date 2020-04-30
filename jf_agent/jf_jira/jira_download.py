@@ -797,6 +797,8 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
     print()
 
     try:
+        # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
+        # Jira may return inexact repo names/urls. Remove any mismatches found.
         _remove_mismatched_repos(
             missing_repositories, _get_repos_from_git(git_connection, config), config
         )
