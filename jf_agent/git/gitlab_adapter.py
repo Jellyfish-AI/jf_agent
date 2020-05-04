@@ -33,27 +33,27 @@ _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
 
 '''
-    
+
     Data Fetching
 
 '''
 
 
 class GitLabAdapter(GitAdapter):
-    def __init__(self, client: GitLabClient):
+    def __init__(self, config, client: GitLabClient):
+        super().__init__(config)
         self.client = client
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_projects(
-        self, include_project_ids: List[int], redact_names_and_urls: bool
-    ) -> List[NormalizedProject]:
+    def get_projects(self) -> List[NormalizedProject]:
         print('downloading gitlab projects... ', end='', flush=True)
         projects = [
             _normalize_project(
-                self.client.get_group(project_id), redact_names_and_urls  # are group_ids
+                self.client.get_group(project_id),
+                self.config.git_redact_names_and_urls,  # are group_ids
             )
-            for project_id in include_project_ids
+            for project_id in self.config.git_include_projects
         ]
         print('✓')
 
@@ -65,11 +65,11 @@ class GitLabAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_users(self, include_project_ids: List[int]) -> List[NormalizedUser]:
+    def get_users(self) -> List[NormalizedUser]:
         print('downloading gitlab users... ', end='', flush=True)
         users = [
             _normalize_user(user)
-            for project_id in include_project_ids
+            for project_id in self.config.git_include_projects
             for user in self.client.list_group_members(project_id)
         ]
         print('✓')
@@ -78,11 +78,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_repos(
-        self,
-        normalized_projects: List[NormalizedProject],
-        include_repos_ids: List[int],
-        exclude_repos_ids: List[int],
-        redact_names_and_urls: bool,
+        self, normalized_projects: List[NormalizedProject],
     ) -> List[NormalizedRepository]:
         print('downloading gitlab repos... ', end='', flush=True)
 
@@ -97,14 +93,19 @@ class GitLabAdapter(GitAdapter):
                 ),
                 start=1,
             ):
-                if len(include_repos_ids) > 0 and api_repo.id not in include_repos_ids:
+                if (
+                    self.config.git_include_repos
+                    and api_repo.id not in self.config.git_include_repos
+                ):
                     continue  # skip this repo
-                if len(exclude_repos_ids) > 0 and api_repo.id in exclude_repos_ids:
+                if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
                     continue  # skip this repo
 
-                nrm_branches = self.get_branches(api_repo, redact_names_and_urls)
+                nrm_branches = self.get_branches(api_repo)
                 nrm_repos.append(
-                    _normalize_repo(api_repo, nrm_branches, nrm_project, redact_names_and_urls)
+                    _normalize_repo(
+                        api_repo, nrm_branches, nrm_project, self.config.git_redact_names_and_urls
+                    )
                 )
 
         print('✓')
@@ -116,11 +117,11 @@ class GitLabAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_branches(self, api_repo, redact_names_and_urls) -> List[NormalizedBranch]:
+    def get_branches(self, api_repo) -> List[NormalizedBranch]:
         print('downloading gitlab branches... ', end='', flush=True)
         try:
             return [
-                _normalize_branch(api_branch, redact_names_and_urls)
+                _normalize_branch(api_branch, self.config.git_redact_names_and_urls)
                 for api_branch in self.client.list_project_branches(api_repo.id)
             ]
         except requests.exceptions.RetryError as e:
@@ -134,11 +135,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_default_branch_commits(
-        self,
-        normalized_repos: List[NormalizedRepository],
-        server_git_instance_info,
-        strip_text_content: bool,
-        redact_names_and_urls: bool,
+        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
     ) -> List[NormalizedCommit]:
         print('downloading gitlab default branch commits... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
@@ -159,7 +156,10 @@ class GitLabAdapter(GitAdapter):
                             logger, 'branch commit inside repo', j, 100
                         ):
                             yield _normalize_commit(
-                                commit, nrm_repo, strip_text_content, redact_names_and_urls
+                                commit,
+                                nrm_repo,
+                                self.config.git_strip_text_content,
+                                self.config.git_redact_names_and_urls,
                             )
 
                 except Exception as e:
@@ -171,11 +171,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
-        self,
-        normalized_repos: List[NormalizedRepository],
-        server_git_instance_info,
-        strip_text_content: bool,
-        redact_names_and_urls: bool,
+        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
     ) -> List[NormalizedPullRequest]:
         print('downloading gitlab prs... ', end='', flush=True)
 
@@ -198,9 +194,13 @@ class GitLabAdapter(GitAdapter):
                         logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
                         continue
 
-                    for j in range(0, total_api_prs):
+                    for api_pr in tqdm(
+                        api_prs,
+                        desc=f'processing prs for {nrm_repo.name}',
+                        unit='prs',
+                        total=total_api_prs,
+                    ):
                         try:
-                            api_pr = api_prs.next()
                             updated_at = parser.parse(api_pr.updated_at)
 
                             # PRs are ordered newest to oldest
@@ -220,13 +220,19 @@ class GitLabAdapter(GitAdapter):
 
                             nrm_commits: List[NormalizedCommit] = [
                                 _normalize_commit(
-                                    commit, nrm_repo, strip_text_content, redact_names_and_urls
+                                    commit,
+                                    nrm_repo,
+                                    self.config.git_strip_text_content,
+                                    self.config.git_redact_names_and_urls,
                                 )
                                 for commit in api_pr.commit_list
                             ]
 
                             yield _normalize_pr(
-                                api_pr, nrm_commits, strip_text_content, redact_names_and_urls
+                                api_pr,
+                                nrm_commits,
+                                self.config.git_strip_text_content,
+                                self.config.git_redact_names_and_urls,
                             )
                         except Exception as e:
                             # if something goes wrong with normalizing one of the prs - don't stop pulling. try
@@ -234,11 +240,9 @@ class GitLabAdapter(GitAdapter):
                             pr_id = f' {api_pr.id}' if api_pr else ''
                             log_and_print_request_error(
                                 e,
-                                f'fetching pr{pr_id} index={j} page={api_prs.current_page} '
-                                f'from repo {nrm_repo.id}. Skipping...',
+                                f'normalizing PR {pr_id} from repo {nrm_repo.id}. Skipping...',
                                 log_as_exception=True,
                             )
-                            continue
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.

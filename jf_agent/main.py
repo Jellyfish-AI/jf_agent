@@ -184,6 +184,8 @@ ValidatedConfig = namedtuple(
         'git_url',
         'git_include_projects',
         'git_exclude_projects',
+        'git_include_bbcloud_projects',
+        'git_exclude_bbcloud_projects',
         'git_include_repos',
         'git_exclude_repos',
         'git_strip_text_content',
@@ -277,6 +279,8 @@ def obtain_config(args):
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
+    git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', []))
+    git_exclude_bbcloud_projects = set(git_config.get('exclude_bitbucket_cloud_projects', []))
     git_include_repos = set(git_config.get('include_repos', []))
     git_exclude_repos = set(git_config.get('exclude_repos', []))
     git_strip_text_content = git_config.get('strip_text_content', False)
@@ -404,6 +408,8 @@ def obtain_config(args):
         git_url,
         git_include_projects,
         git_exclude_projects,
+        git_include_bbcloud_projects,
+        git_exclude_bbcloud_projects,
         git_include_repos,
         git_exclude_repos,
         git_strip_text_content,

@@ -117,26 +117,37 @@ git:
   # Only pull from specific projects / organizations / groups.
   # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
   # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
-  # GitHub (required): use your organization name, as it appears in your GitHub URLs (ex: MyOrg)
-  # GitLab (required): use the top-level GitLab "Group ID" (ex: 123)
+  # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
+  # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
   include_projects:
       - PROJ1
 
   # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
-  # Bitbucket Server: use project keys, not names (ex: PROJ1)
-  # GitLab: use the top-level GitLab "Group ID" (ex: 123)
+  # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
+  # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
   #  exclude_projects:
   #    - PROJ1
 
+  # Bitbucket cloud only: the include_projects filter above maps to
+  # top-level organization for bitbucket cloud. If you've grouped your
+  # repos into Bitbucket Cloud projects, use these filters instead to
+  # pull only from repos in particular projects.  Specify projects by
+  # key (e.g.: PROJ1)
+  # include_bitbucket_cloud_projects:
+  #     - PROJ1
+  #    
+  # exclude_bitbucket_cloud_projects:
+  #     - PROJ1
+  
   # Only pull from specific repos.  Comment this out to pull from all repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (ex: my_repository)
-  # GitLab: use the GitLab "Project ID" (ex: 123)
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # GitLab: use the GitLab "Project ID" (e.g.: 123)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (ex: my_repository)
-  # GitLab: use the GitLab "Project ID" (ex: 123)
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # GitLab: use the GitLab "Project ID" (e.g.: 123)
   # exclude_repos:
   #    - repo_to_skip
 
