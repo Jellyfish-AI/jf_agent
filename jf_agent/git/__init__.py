@@ -132,43 +132,39 @@ class NormalizedPullRequest:
 
 
 class GitAdapter(ABC):
+    def __init__(self, config):
+        self.config = config
+
     @abstractmethod
-    def get_users(self, include_projects) -> List[NormalizedUser]:
+    def get_users(self) -> List[NormalizedUser]:
         pass
 
     @abstractmethod
-    def get_projects(self, include_projects, redact_names_and_urls) -> List[NormalizedProject]:
+    def get_projects(self) -> List[NormalizedProject]:
         pass
 
     @abstractmethod
-    def get_repos(
-        self, include_projects, include_repos, exclude_repos, redact_names_and_urls
-    ) -> List[NormalizedRepository]:
+    def get_repos(self) -> List[NormalizedRepository]:
         pass
 
     @abstractmethod
     def get_default_branch_commits(
-        self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+        self, api_repos, server_git_instance_info
     ) -> List[NormalizedCommit]:
         pass
 
     @abstractmethod
-    def get_pull_requests(
-        self, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
-    ) -> List[NormalizedPullRequest]:
+    def get_pull_requests(self, api_repos, server_git_instance_info) -> List[NormalizedPullRequest]:
         pass
 
-    def load_and_dump_git(self, config, endpoint_git_instance_info):
-        nrm_projects: List[NormalizedProject] = self.get_projects(
-            config.git_include_projects, config.git_redact_names_and_urls
+    def load_and_dump_git(self, endpoint_git_instance_info):
+        nrm_projects: List[NormalizedProject] = self.get_projects()
+        write_file(
+            self.config.outdir, 'bb_projects', self.config.compress_output_files, nrm_projects
         )
-        write_file(config.outdir, 'bb_projects', config.compress_output_files, nrm_projects)
 
         write_file(
-            config.outdir,
-            'bb_users',
-            config.compress_output_files,
-            self.get_users(config.git_include_projects),
+            self.config.outdir, 'bb_users', self.config.compress_output_files, self.get_users(),
         )
         nrm_repos = None
 
@@ -177,14 +173,9 @@ class GitAdapter(ABC):
         def get_and_write_repos():
             nonlocal nrm_repos
 
-            nrm_repos = self.get_repos(
-                nrm_projects,
-                config.git_include_repos,
-                config.git_exclude_repos,
-                config.git_redact_names_and_urls,
-            )
+            nrm_repos = self.get_repos(nrm_projects,)
 
-            write_file(config.outdir, 'bb_repos', config.compress_output_files, nrm_repos)
+            write_file(self.config.outdir, 'bb_repos', self.config.compress_output_files, nrm_repos)
             return len(nrm_repos)
 
         get_and_write_repos()
@@ -193,16 +184,11 @@ class GitAdapter(ABC):
         @agent_logging.log_entry_exit(logger)
         def download_and_write_commits():
             return download_and_write_streaming(
-                config.outdir,
+                self.config.outdir,
                 'bb_commits',
-                config.compress_output_files,
+                self.config.compress_output_files,
                 generator_func=self.get_default_branch_commits,
-                generator_func_args=(
-                    nrm_repos,
-                    endpoint_git_instance_info,
-                    config.git_strip_text_content,
-                    config.git_redact_names_and_urls,
-                ),
+                generator_func_args=(nrm_repos, endpoint_git_instance_info,),
                 item_id_dict_key='hash',
             )
 
@@ -212,16 +198,11 @@ class GitAdapter(ABC):
         @agent_logging.log_entry_exit(logger)
         def download_and_write_prs():
             return download_and_write_streaming(
-                config.outdir,
+                self.config.outdir,
                 'bb_prs',
-                config.compress_output_files,
+                self.config.compress_output_files,
                 generator_func=self.get_pull_requests,
-                generator_func_args=(
-                    nrm_repos,
-                    endpoint_git_instance_info,
-                    config.git_strip_text_content,
-                    config.git_redact_names_and_urls,
-                ),
+                generator_func_args=(nrm_repos, endpoint_git_instance_info,),
                 item_id_dict_key='id',
             )
 
@@ -289,8 +270,8 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
         elif config.git_provider == 'bitbucket_cloud':
             from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-            BitbucketCloudAdapter(git_connection).load_and_dump_git(
-                config, endpoint_git_instance_info
+            BitbucketCloudAdapter(config, git_connection).load_and_dump_git(
+                endpoint_git_instance_info
             )
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
@@ -300,7 +281,7 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-            GitLabAdapter(git_connection).load_and_dump_git(config, endpoint_git_instance_info)
+            GitLabAdapter(config, git_connection).load_and_dump_git(endpoint_git_instance_info)
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
