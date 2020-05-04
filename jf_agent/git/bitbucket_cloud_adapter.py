@@ -124,7 +124,7 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_default_branch_commits(
         self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
     ) -> List[NormalizedCommit]:
-        print('downloading gitlab default branch commits... ', end='', flush=True)
+        print('downloading bitbucket default branch commits... ', end='', flush=True)
         for i, repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -158,7 +158,7 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_pull_requests(
         self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
     ) -> List[NormalizedPullRequest]:
-        print('downloading gitlab prs... ', end='', flush=True)
+        print('downloading bitbucket prs... ', end='', flush=True)
         for i, repo in enumerate(
             tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
         ):

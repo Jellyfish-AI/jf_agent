@@ -194,9 +194,13 @@ class GitLabAdapter(GitAdapter):
                         logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
                         continue
 
-                    for j in range(0, total_api_prs):
+                    for api_pr in tqdm(
+                        api_prs,
+                        desc=f'processing prs for {nrm_repo.name}',
+                        unit='prs',
+                        total=total_api_prs,
+                    ):
                         try:
-                            api_pr = api_prs.next()
                             updated_at = parser.parse(api_pr.updated_at)
 
                             # PRs are ordered newest to oldest
@@ -236,11 +240,9 @@ class GitLabAdapter(GitAdapter):
                             pr_id = f' {api_pr.id}' if api_pr else ''
                             log_and_print_request_error(
                                 e,
-                                f'fetching pr{pr_id} index={j} page={api_prs.current_page} '
-                                f'from repo {nrm_repo.id}. Skipping...',
+                                f'normalizing PR {pr_id} from repo {nrm_repo.id}. Skipping...',
                                 log_as_exception=True,
                             )
-                            continue
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.
