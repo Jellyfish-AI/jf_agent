@@ -257,13 +257,10 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             download_statuses(jira_connection),
         )
 
-        files_downloaded =[f for f in os.listdir(config.outdir) if 'jira' in f]
-
-        return {'type': 'Jira', 'status': 'success', 'files_downloaded': len(files_downloaded)}
+        return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
         )
-        files_downloaded =[f for f in os.listdir(config.outdir) if 'jira' in f]
-        return {'type': 'Jira', 'status': 'failed', 'files_downloaded': len(files_downloaded)}
+        return {'type': 'Jira', 'status': 'failed'}
