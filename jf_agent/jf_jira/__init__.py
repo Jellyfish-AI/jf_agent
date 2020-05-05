@@ -1,7 +1,6 @@
 from datetime import datetime
 from itertools import chain
 import logging
-import os
 
 from jira import JIRA
 from jira.resources import GreenHopperResource

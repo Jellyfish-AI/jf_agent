@@ -16,6 +16,7 @@ import yaml
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.jf_jira import get_basic_jira_connection, print_all_jira_fields, load_and_dump_jira
+from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +527,6 @@ def send_data(config, creds):
         r.raise_for_status()
         
         return r.json()['signed_urls']
-            
 
     def upload_file_from_thread(thread_num, filename, path_to_obj, signed_url):
         try:
@@ -553,20 +553,19 @@ def send_data(config, creds):
     print('Sending data to Jellyfish... ')
 
     signed_urls = get_signed_url(os.listdir(config.outdir))
+    thread_exceptions = [None] * len(signed_urls)
 
     threads = [
         threading.Thread(
-            target=upload_file,
+            target=upload_file_from_thread,
             args=[index, filename, file_dict['s3_path'], file_dict['url']],
         )
         for index, (filename, file_dict) in enumerate(signed_urls.items())
     ]
 
-    thread_exceptions = [None] * (len(signed_urls))
-    
     print(f'Starting {len(threads)} threads')
 
-    for t in thread:
+    for t in threads:
         t.start()
 
     for t in threads:
@@ -578,11 +577,6 @@ def send_data(config, creds):
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
-    if os.path.exists(done_file_path):
-        print(
-            f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
-        )
-        return
     Path(done_file_path).touch()
     done_file_dict = get_signed_url(['.done'])['.done']
     upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
