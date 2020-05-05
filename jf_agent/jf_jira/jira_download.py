@@ -251,7 +251,20 @@ def download_all_issue_metadata(
                         startAt=start_at,
                         maxResults=batch_size,
                     )
-                except KeyError:
+                except (JIRAError, KeyError) as e:
+                    if hasattr(e, 'status_code') and e.status_code < 500:
+                        # something wrong with our request; re-raise
+                        raise
+
+                    # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
+                    # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
+                    # object instead of a JSON object with an "issues" key, which results in the
+                    # `search_issues()` function in the Jira library throwing a KeyError.
+                    #
+                    # Sometimes both cloud and server will return a 5xx.
+                    #
+                    # In either case, reduce the maxResults parameter and try again, on the theory that
+                    # a smaller ask will prevent the server from choking.
                     batch_size = int(batch_size / 2)
                     if batch_size > 0:
                         agent_logging.log_and_print(
