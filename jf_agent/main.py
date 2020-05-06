@@ -102,7 +102,7 @@ def main():
             jira_connection = None
             git_connection = None
             if config.jira_url:
-                jira_connection = get_basic_jira_connection(config, creds)                    
+                jira_connection = get_basic_jira_connection(config, creds)
 
             if config.run_mode_is_print_all_jira_fields:
                 if jira_connection:
@@ -120,8 +120,10 @@ def main():
                     jira_connection,
                     git_connection,
                 )
-                
-                write_file(config.outdir, 'status', config.compress_output_files, download_data_status)
+
+                write_file(
+                    config.outdir, 'status', config.compress_output_files, download_data_status
+                )
 
             diagnostics.capture_outdir_size(config.outdir)
 
@@ -133,10 +135,7 @@ def main():
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        send_data(
-            config,
-            creds
-        )
+        send_data(config, creds)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
@@ -203,13 +202,7 @@ UserProvidedCreds = namedtuple(
     ],
 )
 
-JellyfishEndpointInfo = namedtuple(
-    'JellyfishEndpointInfo',
-    [
-        'jira_info',
-        'git_instance_info',
-    ],
-)
+JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info'])
 
 
 def obtain_config(args):
@@ -470,7 +463,10 @@ def obtain_creds(config):
 
 def obtain_jellyfish_endpoint_info(config, creds):
     base_url = config.jellyfish_api_base
-    resp = requests.get(f'{base_url}/endpoints/agent/pull-state', headers={'Jellyfish-API-Token': creds.jellyfish_api_token})
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/pull-state',
+        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+    )
 
     if not resp.ok:
         print(
@@ -489,9 +485,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         )
         raise BadConfigException()
 
-    return JellyfishEndpointInfo(
-       jira_info, git_instance_info
-    )
+    return JellyfishEndpointInfo(jira_info, git_instance_info)
 
 
 @diagnostics.capture_timing()
@@ -510,7 +504,7 @@ def download_data(
         download_data_status.append(
             load_and_dump_git(config, endpoint_git_instance_info, git_connection)
         )
-    else: 
+    else:
         download_data_status.append({'type': 'Git', 'status': 'failed'})
 
     return download_data_status
@@ -518,28 +512,41 @@ def download_data(
 
 def send_data(config, creds):
     _, timestamp = os.path.split(config.outdir)
+
     def get_signed_url(files):
         base_url = config.jellyfish_api_base
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         payload = {'files': files}
 
-        r = requests.post(f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}', headers=headers, json=payload)
+        r = requests.post(
+            f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}',
+            headers=headers,
+            json=payload,
+        )
         r.raise_for_status()
-        
+
         return r.json()['signed_urls']
 
-    def upload_file_from_thread(thread_num, filename, path_to_obj, signed_url):
+    thread_exceptions = []
+    def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
             upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
-            thread_exceptions[thread_num] = e
-            agent_logging.log_and_print(logger,  logging.ERROR, f'Failed to upload file {filename} to S3 bucket', exc_info=True)
-    
+            thread_exceptions.append(e)
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Failed to upload file {filename} to S3 bucket',
+                exc_info=True,
+            )
+
     def upload_file(filename, path_to_obj, signed_url):
         with open(f'{config.outdir}/{filename}', 'rb') as f:
             # If successful, returns HTTP status code 204
             session = retry_session()
-            upload_resp = session.post(signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)})
+            upload_resp = session.post(
+                signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)}
+            )
             upload_resp.raise_for_status()
 
     # Compress any not yet compressed files before sending
@@ -553,14 +560,13 @@ def send_data(config, creds):
     print('Sending data to Jellyfish... ')
 
     signed_urls = get_signed_url(os.listdir(config.outdir))
-    thread_exceptions = [None] * len(signed_urls)
 
     threads = [
         threading.Thread(
             target=upload_file_from_thread,
-            args=[index, filename, file_dict['s3_path'], file_dict['url']],
+            args=[filename, file_dict['s3_path'], file_dict['url']],
         )
-        for index, (filename, file_dict) in enumerate(signed_urls.items())
+        for (filename, file_dict) in signed_urls.items()
     ]
 
     print(f'Starting {len(threads)} threads')
@@ -572,7 +578,9 @@ def send_data(config, creds):
         t.join()
 
     if any(thread_exceptions):
-        print(f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.')
+        print(
+            f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
+        )
         return
 
     # creating .done file
