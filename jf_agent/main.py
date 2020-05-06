@@ -26,7 +26,7 @@ from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
-JELLYFISH_API_BASE = 'https://api.jellyfish.co'
+JELLYFISH_API_BASE = 'https://app.jellyfish.co'
 VALID_RUN_MODES = (
     'download_and_send',
     'download_only',
