@@ -292,6 +292,7 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             f'Failed to download {config.git_provider} data:\n{e}',
             exc_info=True,
         )
+        
         return {'type': 'Git', 'status': 'failed'}
 
     return {'type': 'Git', 'status': 'success'}

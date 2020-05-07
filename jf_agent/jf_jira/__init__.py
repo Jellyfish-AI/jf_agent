@@ -262,5 +262,4 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
         )
-
         return {'type': 'Jira', 'status': 'failed'}

@@ -2,9 +2,7 @@ import argparse
 import gzip
 import logging
 import os
-import re
 import shutil
-import subprocess
 import threading
 from collections import namedtuple
 from datetime import datetime, date
@@ -18,6 +16,7 @@ import yaml
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.jf_jira import get_basic_jira_connection, print_all_jira_fields, load_and_dump_jira
+from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
@@ -101,21 +100,17 @@ def main():
             )
 
             jira_connection = None
+            git_connection = None
             if config.jira_url:
                 jira_connection = get_basic_jira_connection(config, creds)
-                if jira_connection is None:
-                    status_json.append({'type': 'Jira', 'status': 'failed'})
 
             if config.run_mode_is_print_all_jira_fields:
-                print_all_jira_fields(config, jira_connection)
+                if jira_connection:
+                    print_all_jira_fields(config, jira_connection)
                 return
 
             if config.git_url:
                 git_connection = get_git_client(config, creds)
-                if git_connection is None:
-                    status_json.append({'type': 'Git', 'status': 'failed'})
-            else:
-                git_connection = None
 
             if config.run_mode_includes_download:
                 download_data_status = download_data(
@@ -126,8 +121,9 @@ def main():
                     git_connection,
                 )
 
-                for item in download_data_status:
-                    status_json.append(item)
+                write_file(
+                    config.outdir, 'status', config.compress_output_files, download_data_status
+                )
 
             diagnostics.capture_outdir_size(config.outdir)
 
@@ -136,16 +132,10 @@ def main():
             sys_diag_collector.join()
 
         finally:
-            write_file(config.outdir, 'status', config.compress_output_files, status_json)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        send_data(
-            config.outdir,
-            jellyfish_endpoint_info.s3_uri_prefix,
-            jellyfish_endpoint_info.aws_access_key_id,
-            jellyfish_endpoint_info.aws_secret_access_key,
-        )
+        send_data(config, creds)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
@@ -212,16 +202,7 @@ UserProvidedCreds = namedtuple(
     ],
 )
 
-JellyfishEndpointInfo = namedtuple(
-    'JellyfishEndpointInfo',
-    [
-        's3_uri_prefix',
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        'jira_info',
-        'git_instance_info',
-    ],
-)
+JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info'])
 
 
 def obtain_config(args):
@@ -482,7 +463,10 @@ def obtain_creds(config):
 
 def obtain_jellyfish_endpoint_info(config, creds):
     base_url = config.jellyfish_api_base
-    resp = requests.get(f'{base_url}/agent/config?api_token={creds.jellyfish_api_token}')
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/pull-state',
+        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+    )
 
     if not resp.ok:
         print(
@@ -492,27 +476,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
         raise BadConfigException()
 
     agent_config = resp.json()
-    s3_uri_prefix = agent_config.get('s3_uri_prefix')
-    aws_access_key_id = agent_config.get('aws_access_key_id')
-    aws_secret_access_key = agent_config.get('aws_secret_access_key')
     jira_info = agent_config.get('jira_info')
     git_instance_info = agent_config.get('git_instance_info')
-
-    # Validate the S3 prefix, bail out if invalid value is found.
-    if not re.fullmatch(r'^s3:\/\/[A-Za-z0-9:\/\-_]+\/[A-Za-z0-9:\/\-_]+$', s3_uri_prefix or ''):
-        print(
-            "ERROR: The S3 bucket information provided by the agent config endpoint is invalid "
-            "-- please contact Jellyfish"
-        )
-        raise BadConfigException()
-
-    if config.run_mode_includes_send and (
-        not s3_uri_prefix or not aws_access_key_id or not aws_secret_access_key
-    ):
-        print(
-            f"ERROR: Missing some required info from the agent config info -- please contact Jellyfish"
-        )
-        raise BadConfigException()
 
     if config.git_url and len(git_instance_info) != 1:
         print(
@@ -520,9 +485,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         )
         raise BadConfigException()
 
-    return JellyfishEndpointInfo(
-        s3_uri_prefix, aws_access_key_id, aws_secret_access_key, jira_info, git_instance_info
-    )
+    return JellyfishEndpointInfo(jira_info, git_instance_info)
 
 
 @diagnostics.capture_timing()
@@ -534,31 +497,60 @@ def download_data(
 
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
+    else:
+        download_data_status.append({'type': 'Jira', 'status': 'failed'})
 
     if git_connection:
         download_data_status.append(
             load_and_dump_git(config, endpoint_git_instance_info, git_connection)
         )
+    else:
+        download_data_status.append({'type': 'Git', 'status': 'failed'})
 
     return download_data_status
 
 
-def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
-    def _s3_cmd(cmd):
+def send_data(config, creds):
+    _, timestamp = os.path.split(config.outdir)
+
+    def get_signed_url(files):
+        base_url = config.jellyfish_api_base
+        headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
+        payload = {'files': files}
+
+        r = requests.post(
+            f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}',
+            headers=headers,
+            json=payload,
+        )
+        r.raise_for_status()
+
+        return r.json()['signed_urls']
+
+    thread_exceptions = []
+    def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
-            subprocess.check_call(
-                f'AWS_ACCESS_KEY_ID={aws_access_key_id} '
-                f'AWS_SECRET_ACCESS_KEY={aws_secret_access_key} '
-                f'{cmd}',
-                shell=True,
-                stdout=subprocess.DEVNULL,
+            upload_file(filename, path_to_obj, signed_url)
+        except Exception as e:
+            thread_exceptions.append(e)
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Failed to upload file {filename} to S3 bucket',
+                exc_info=True,
             )
-        except Exception:
-            print(f'ERROR: aws command failed ({cmd}) -- bad credentials?')
-            raise
+
+    def upload_file(filename, path_to_obj, signed_url):
+        with open(f'{config.outdir}/{filename}', 'rb') as f:
+            # If successful, returns HTTP status code 204
+            session = retry_session()
+            upload_resp = session.post(
+                signed_url['url'], data=signed_url['fields'], files={'file': (path_to_obj, f)}
+            )
+            upload_resp.raise_for_status()
 
     # Compress any not yet compressed files before sending
-    for fname in glob(f'{outdir}/*.json'):
+    for fname in glob(f'{config.outdir}/*.json'):
         print(f'Compressing {fname}')
         with open(fname, 'rb') as f_in:
             with gzip.open(f'{fname}.gz', 'wb') as f_out:
@@ -567,19 +559,35 @@ def send_data(outdir, s3_uri_prefix, aws_access_key_id, aws_secret_access_key):
 
     print('Sending data to Jellyfish... ')
 
-    output_basedir, output_dir_timestamp = os.path.split(outdir)
-    s3_uri_prefix_with_timestamp = os.path.join(s3_uri_prefix, output_dir_timestamp)
-    done_file_path = f'{os.path.join(outdir, ".done")}'
-    if os.path.exists(done_file_path):
+    signed_urls = get_signed_url(os.listdir(config.outdir))
+
+    threads = [
+        threading.Thread(
+            target=upload_file_from_thread,
+            args=[filename, file_dict['s3_path'], file_dict['url']],
+        )
+        for (filename, file_dict) in signed_urls.items()
+    ]
+
+    print(f'Starting {len(threads)} threads')
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    if any(thread_exceptions):
         print(
-            f'ERROR: {done_file_path} already exists -- has this data already been sent to Jellyfish?'
+            f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         return
 
-    _s3_cmd(f'aws s3 rm {s3_uri_prefix_with_timestamp} --recursive')
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    # creating .done file
+    done_file_path = f'{os.path.join(config.outdir, ".done")}'
     Path(done_file_path).touch()
-    _s3_cmd(f'aws s3 sync {outdir} {s3_uri_prefix_with_timestamp}')
+    done_file_dict = get_signed_url(['.done'])['.done']
+    upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
 
 
 if __name__ == '__main__':
