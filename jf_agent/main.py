@@ -13,8 +13,6 @@ import requests
 import urllib3
 import yaml
 
-import math
-
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.jf_jira import (
@@ -79,7 +77,7 @@ def main():
     parser.add_argument(
         '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
-        choices=range(1, 6),
+        choices=range(1, 7),
         help=(
             f'scan jira issues that have been updated since the given number of months back (max is 6) '
             f'for git repo data, leave blank to only check issues updated in the past month'
