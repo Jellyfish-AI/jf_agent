@@ -12,6 +12,7 @@ from pathlib import Path
 import requests
 import urllib3
 import yaml
+import json
 
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
@@ -75,6 +76,7 @@ def main():
         ),
     )
     parser.add_argument(
+        '-ius',
         '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
         choices=range(1, 7),
@@ -648,10 +650,18 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
         params=params,
     )
 
-    data = resp.json()
-    print(data.get('message', ''))
+    # try and grab any specific error messages sent over
+    try:
+        data = resp.json()
+        print(data.get('message', ''))
+    except json.decoder.JSONDecodeError:
+        print(
+            f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.'
+        )
+        return None
 
     if resp.status_code == 400:
+        # additionally, indicate config needs alterations
         raise BadConfigException()
     elif not resp.ok:
         return None
