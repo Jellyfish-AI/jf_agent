@@ -162,49 +162,49 @@ def download_projects_and_versions(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
-    b_start_at = 0
     boards = []
-    print('downloading jira boards... ', end='', flush=True)
-    while True:
-        # boards seem to come back in batches of 50 at most
-        jira_boards = jira_connection.boards(startAt=b_start_at, maxResults=50)
-        if not jira_boards:
-            break
-        b_start_at += len(jira_boards)
+    for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
+        b_start_at = 0
+        while True:
+            # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
+            project_boards = jira_connection._session.get(
+                url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
+                params={
+                    'maxResults': 50,
+                    'startAt': b_start_at,
+                    'type': 'scrum',
+                    'includePrivate': 'false',
+                    'projectKeyOrId': project_id,
+                },
+            ).json()['values']
 
-        # Some versions of Jira map boards to projects, some do not.
-        # If this includes a "location" for boards, then only
-        # include boards for the projects we're pulling
-        boards.extend(
-            [
-                b
-                for b in jira_boards
-                if not hasattr(b, 'location')
-                or str(getattr(b.location, 'projectId', '')) in project_ids
-            ]
-        )
-    print('✓')
+            if not project_boards:
+                break
+            b_start_at += len(project_boards)
+            boards.extend(project_boards)
 
     links = []
     sprints = {}
     if download_sprints:
         for b in tqdm(boards, desc='downloading jira sprints', file=sys.stdout):
-            if b.raw['type'] != 'scrum':
-                continue
             s_start_at = 0
             sprints_for_board = []
             while True:
                 batch = None
                 try:
                     batch = jira_connection.sprints(
-                        board_id=b.id, startAt=s_start_at, maxResults=50
+                        # ignore future sprints
+                        board_id=b['id'],
+                        startAt=s_start_at,
+                        maxResults=50,
+                        state='active,closed',
                     )
                 except JIRAError as e:
                     # JIRA returns 500 errors for various reasons: board is
                     # misconfigured; "falied to execute search"; etc.  Just
                     # skip and move on
                     if e.status_code == 500 or e.status_code == 404:
-                        print(f"Couldn't get sprints for board {b.id}.  Skipping...")
+                        print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
                     else:
                         raise
 
@@ -213,10 +213,10 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 s_start_at += len(batch)
                 sprints_for_board.extend(batch)
 
-            links.append({'board_id': b.id, 'sprint_ids': [s.id for s in sprints_for_board]})
+            links.append({'board_id': b['id'], 'sprint_ids': [s.id for s in sprints_for_board]})
             sprints.update({s.id: s for s in sprints_for_board})
 
-    return [b.raw for b in boards], [s.raw for s in sprints.values()], links
+    return boards, [s.raw for s in sprints.values()], links
 
 
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
