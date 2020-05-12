@@ -12,16 +12,28 @@ from pathlib import Path
 import requests
 import urllib3
 import yaml
+import json
 
 from jf_agent import agent_logging, diagnostics, write_file
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.jf_jira import get_basic_jira_connection, print_all_jira_fields, load_and_dump_jira
+from jf_agent.jf_jira import (
+    get_basic_jira_connection,
+    print_all_jira_fields,
+    load_and_dump_jira,
+    print_missing_repos_found_by_jira,
+)
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://jellyfish.co'
-VALID_RUN_MODES = ('download_and_send', 'download_only', 'send_only', 'print_all_jira_fields')
+VALID_RUN_MODES = (
+    'download_and_send',
+    'download_only',
+    'send_only',
+    'print_all_jira_fields',
+    'print_apparently_missing_git_repos',
+)
 
 
 def main():
@@ -61,6 +73,16 @@ def main():
             "-- if you're running the Jellyfish API locally you might use: "
             "http://localhost:8000 (if running the agent container with --network host) or "
             "http://172.17.0.1:8000 (if running the agent container with --network bridge)"
+        ),
+    )
+    parser.add_argument(
+        '-ius',
+        '--for-print-missing-repos-issues-updated-within-last-x-months',
+        type=int,
+        choices=range(1, 7),
+        help=(
+            f'scan jira issues that have been updated since the given number of months back (max is 6) '
+            f'for git repo data, leave blank to only check issues updated in the past month'
         ),
     )
     parser.add_argument(
@@ -112,6 +134,19 @@ def main():
             if config.git_url:
                 git_connection = get_git_client(config, creds)
 
+            if config.run_mode_is_print_apparently_missing_git_repos:
+                if jira_connection and git_connection:
+                    issues_to_scan = get_issues_to_scan_from_jellyfish(
+                        config,
+                        creds,
+                        args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    )
+                    if issues_to_scan:
+                        print_missing_repos_found_by_jira(
+                            issues_to_scan, config, jira_connection, git_connection
+                        )
+                return
+
             if config.run_mode_includes_download:
                 download_data_status = download_data(
                     config,
@@ -155,6 +190,7 @@ ValidatedConfig = namedtuple(
         'run_mode_includes_download',
         'run_mode_includes_send',
         'run_mode_is_print_all_jira_fields',
+        'run_mode_is_print_apparently_missing_git_repos',
         'skip_ssl_verification',
         'jira_url',
         'jira_earliest_issue_dt',
@@ -214,6 +250,9 @@ def obtain_config(args):
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
+    run_mode_is_print_apparently_missing_git_repos = (
+        run_mode == 'print_apparently_missing_git_repos'
+    )
     jellyfish_api_base = args.jellyfish_api_base
 
     try:
@@ -365,11 +404,21 @@ def obtain_config(args):
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
+    if run_mode_is_print_apparently_missing_git_repos:
+        if not (jira_url and git_url):
+            print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
+            raise BadConfigException()
+
+        if git_redact_names_and_urls:
+            print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
+            raise BadConfigException()
+
     return ValidatedConfig(
         run_mode,
         run_mode_includes_download,
         run_mode_includes_send,
         run_mode_is_print_all_jira_fields,
+        run_mode_is_print_apparently_missing_git_repos,
         skip_ssl_verification,
         jira_url,
         jira_earliest_issue_dt,
@@ -528,6 +577,7 @@ def send_data(config, creds):
         return r.json()['signed_urls']
 
     thread_exceptions = []
+
     def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
             upload_file(filename, path_to_obj, signed_url)
@@ -563,8 +613,7 @@ def send_data(config, creds):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread,
-            args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]
@@ -588,6 +637,41 @@ def send_data(config, creds):
     Path(done_file_path).touch()
     done_file_dict = get_signed_url(['.done'])['.done']
     upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+
+
+def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):
+    base_url = config.jellyfish_api_base
+    api_token = creds.jellyfish_api_token
+
+    params = {}
+    if updated_within_last_x_months:
+        params.update({'monthsback': updated_within_last_x_months})
+
+    print(f'Fetching Jira issues that are missing Git repo data in Jellyfish...')
+
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/unlinked-dev-issues',
+        headers={'Jellyfish-API-Token': api_token},
+        params=params,
+    )
+
+    # try and grab any specific error messages sent over
+    try:
+        data = resp.json()
+        print(data.get('message', ''))
+    except json.decoder.JSONDecodeError:
+        print(
+            f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.'
+        )
+        return None
+
+    if resp.status_code == 400:
+        # additionally, indicate config needs alterations
+        raise BadConfigException()
+    elif not resp.ok:
+        return None
+
+    return data.get('issues')
 
 
 if __name__ == '__main__':

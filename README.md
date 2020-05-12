@@ -14,6 +14,8 @@ The agent has several different usage modes:
 
 4. Show the keys and field names for all of your Jira custom fields (to aid in agent configuration) (`print_all_jira_fields`).
 
+5. Show the names and urls of Git repositories that may be missing from Jellyfish by looking at the Development Jira custom field (to aid in agent configuration)(`print_apparently_missing_git_repos`).
+
 Data that you download from Jira and/or Git may be scrubbed to remove sensitive fields and values before you send it to Jellyfish.
 
 ## Installation / Configuration
@@ -91,7 +93,7 @@ You may also want to periodically perform that `docker pull` command, or prepend
 
 #### Specifying a usage mode
 
-The usage mode is provided to the agent via the `-m` argument. The value should be one of: `download_and_send`, `download_only`, `send_only`, `print_all_jira_fields`. If you don't provide a `-m` argument, the `download_and_send` mode is used.
+The usage mode is provided to the agent via the `-m` argument. The value should be one of: `download_and_send`, `download_only`, `send_only`, `print_all_jira_fields`, `print_apparently_missing_git_repos`. If you don't provide a `-m` argument, the `download_and_send` mode is used.
 
 #### Providing YAML configuration file as bind mount
 
@@ -183,6 +185,15 @@ docker run --rm \
 jellyfishco/jf_agent:latest -m print_all_jira_fields
 ```
 
+5. Print Git repos apparently missing from Jellyfish
+```
+docker pull jellyfishco/jf_agent:latest &&
+docker run --rm \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
+--env-file ./creds.env \
+jellyfishco/jf_agent:latest -m print_apparently_missing_git_repos
+```
+
 ## Jira Fields
 
 It is possible to configure the agent to pull a subset of fields from
@@ -224,6 +235,9 @@ Rank
 ```
 
 Make sure that at least these fields are configured for Jellyfish to pull.
+
+Note that the `print_apparently_missing_git_repos` mode requires that Jellyfish have access to the
+Development custom field and that we have already processed your data with this field included.
 
 Additional Jellyfish functionality is enabled if the following fields are pulled:
 ```

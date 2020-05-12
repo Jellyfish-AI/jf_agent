@@ -757,3 +757,140 @@ def _search_users(
             includeActive=include_active,
         )
     ]
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
+    from jf_agent.git import get_repos_from_git
+
+    print('Scanning Jira issues for Git repos...')
+    missing_repositories = {}
+
+    for issue_id, instance_types in issues_to_scan.items():
+        for instance_type in instance_types:
+            try:
+                repositories = _scan_jira_issue_for_repo_data(
+                    jira_connection, issue_id, instance_type
+                )
+            except JIRAError as e:
+                if e.status_code == 403:
+                    agent_logging.log_and_print(
+                        logger,
+                        logger.ERROR,
+                        f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
+                    )
+                    return []
+
+            for repo in repositories:
+                repo_name = repo['name']
+                repo_url = repo['url']
+
+                if repo_name not in missing_repositories:
+                    missing_repositories[repo_name] = {
+                        'name': repo_name,
+                        'url': repo_url,
+                        'instance_type': instance_type,
+                    }
+
+    try:
+        # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
+        # Jira may return inexact repo names/urls. Remove any mismatches found.
+        _remove_mismatched_repos(
+            missing_repositories, get_repos_from_git(git_connection, config), config
+        )
+    except Exception as e:
+        print(
+            f'WARNING: Got an error when trying to cross reference repos discoverd by '
+            f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
+            f'discovered by Jira...'
+        )
+    result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
+    return result
+
+
+def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
+
+    params = {
+        'issueId': issue_id,
+        'dataType': 'repository',
+        'applicationType': application_type,
+    }
+
+    try:
+        response = jira_connection._get_json(
+            '/rest/dev-status/1.0/issue/detail', params, base='{server}{path}'
+        )
+    except JIRAError as e:
+        if e.status_code == 400:
+            print(
+                f"WARNING: received a 400 when requesting development details for issue {issue_id}, "
+                f"likely because it doesn't exist anymore -- skipping"
+            )
+            return []
+        raise
+    except Exception as e:
+        print(
+            f'WARNING: caught {type(e)} exception requesting development details for '
+            f'{issue_id} -- skipping'
+        )
+        return []
+
+    if response.get('errors'):
+        print(
+            f"WARNING: received an error when requesting development details for {issue_id}: {response['errors']}"
+        )
+
+    detail = response.get('detail', [])
+    if not detail:
+        print(f'found no development details for {issue_id}')
+        return []
+
+    return detail[0]['repositories']
+
+
+def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
+    '''
+    Cross reference results with data from git to differentiate a 'missing repo' from a 'missed match'
+    '''
+    if not (repos_found_by_jira and git_repos):
+        return
+
+    print(f'comparing repos found by Jira against Git repos to find missing ones...')
+
+    git_repo_names = []
+    git_repo_urls = []
+    for normalized_repo in git_repos:
+        git_repo_names.extend([normalized_repo.get('full_name'), normalized_repo.get('name')])
+        git_repo_urls.append(normalized_repo.get('url'))
+
+    ignore_repos = []
+    for repo in list(repos_found_by_jira.values()):
+
+        repo_name = repo['name']
+        repo_url = repo['url']
+
+        # Jira sometimes responds with a different version of names/urls than
+        # what is returned from their respective git APIs. In order to cross reference
+        # the git repos given to us, we will try to query with something more similar:
+        # (url ex.) gitlab.com/group/@group/@subgroup/@myrepo >> gitlab.com/group/subgroup/myrepo
+        # (name ex.) @group@subgroup@myrepo >> myrepo
+        if '@' in repo_url:
+            repo_url = repo_url.replace('@', '/')
+            repo_url = repo_url.split('/')
+            seen = set()
+            repo_url = [x for x in repo_url if not (x in seen or seen.add(x))]
+            repo_url = '/'.join(repo_url)
+        if '@' in repo_name:
+            repo_name = repo_name.split('@')[-1]
+
+        if repo_url in git_repo_urls or repo_name in git_repo_names:
+            ignore_repos.append((repo['name'], repo['url']))
+            del repos_found_by_jira[repo['name']]
+
+    if len(ignore_repos):
+        print(
+            f'\nJira found the following repos but per your config file, Jellyfish already has access:'
+        )
+        for repo in ignore_repos:
+            print(f"* {repo[0]:30}\t{repo[1]}")
