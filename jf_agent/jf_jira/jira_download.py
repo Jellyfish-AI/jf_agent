@@ -892,7 +892,5 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
         print(
             f'\nJira found the following repos but per your config file, Jellyfish already has access:'
         )
-        if config.git_redact_names_and_urls:
-            print('(NOTE: names and urls are redacted in Jellyfish per your config)')
         for repo in ignore_repos:
             print(f"* {repo[0]:30}\t{repo[1]}")

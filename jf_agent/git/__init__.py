@@ -292,7 +292,6 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             f'Failed to download {config.git_provider} data:\n{e}',
             exc_info=True,
         )
-        
         return {'type': 'Git', 'status': 'failed'}
 
     return {'type': 'Git', 'status': 'success'}
@@ -358,10 +357,8 @@ def get_repos_from_git(git_connection, config):
 
         bbc_adapter = BitbucketCloudAdapter(git_connection)
 
-        projects = bbc_adapter.get_projects(config.git_include_projects, False)
-        repos = bbc_adapter.get_repos(
-            projects, config.git_include_repos, config.git_exclude_repos, False
-        )
+        projects = bbc_adapter.get_projects()
+        repos = bbc_adapter.get_repos(projects)
 
     elif config.git_provider == 'github':
 
@@ -383,10 +380,8 @@ def get_repos_from_git(git_connection, config):
 
         gl_adapter = GitLabAdapter(git_connection)
 
-        projects = gl_adapter.get_projects(config.git_include_projects, False)
-        repos = gl_adapter.get_repos(
-            projects, config.git_include_repos, config.git_exclude_repos, False
-        )
+        projects = gl_adapter.get_projects()
+        repos = gl_adapter.get_repos(projects)
     else:
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
 

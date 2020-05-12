@@ -404,9 +404,14 @@ def obtain_config(args):
         False if (run_mode_includes_download and not run_mode_includes_send) else True
     )
 
-    if run_mode_is_print_apparently_missing_git_repos and not (jira_url and git_url):
-        print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
-        raise BadConfigException()
+    if run_mode_is_print_apparently_missing_git_repos:
+        if not (jira_url and git_url):
+            print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
+            raise BadConfigException()
+
+        if git_redact_names_and_urls:
+            print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
+            raise BadConfigException()
 
     return ValidatedConfig(
         run_mode,
