@@ -162,7 +162,7 @@ def download_projects_and_versions(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
-    boards = []
+    boards_by_id = {}  # De-dup by id, since the same board might come back from more than one query
     for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
         b_start_at = 0
         while True:
@@ -181,12 +181,12 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             if not project_boards:
                 break
             b_start_at += len(project_boards)
-            boards.extend(project_boards)
+            boards_by_id.update({board['id']: board for board in project_boards})
 
     links = []
     sprints = {}
     if download_sprints:
-        for b in tqdm(boards, desc='downloading jira sprints', file=sys.stdout):
+        for b in tqdm(boards_by_id.values(), desc='downloading jira sprints', file=sys.stdout):
             s_start_at = 0
             sprints_for_board = []
             while True:
@@ -216,7 +216,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             links.append({'board_id': b['id'], 'sprint_ids': [s.id for s in sprints_for_board]})
             sprints.update({s.id: s for s in sprints_for_board})
 
-    return boards, [s.raw for s in sprints.values()], links
+    return boards_by_id.values(), [s.raw for s in sprints.values()], links
 
 
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
