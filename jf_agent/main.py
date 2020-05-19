@@ -26,7 +26,7 @@ from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
-JELLYFISH_API_BASE = 'https://jellyfish.co'
+JELLYFISH_API_BASE = 'https://app.jellyfish.co'
 VALID_RUN_MODES = (
     'download_and_send',
     'download_only',
@@ -34,7 +34,6 @@ VALID_RUN_MODES = (
     'print_all_jira_fields',
     'print_apparently_missing_git_repos',
 )
-
 
 def main():
     parser = argparse.ArgumentParser()
