@@ -121,7 +121,7 @@ class GithubClient:
                 if reset_wait_in_seconds <= 0:
                     reset_wait_in_seconds = 300
 
-                # Soemtimes github gives a reset time way in the
+                # Sometimes github gives a reset time way in the
                 # future. But rate limits reset each hour, so don't
                 # wait longer than that
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
