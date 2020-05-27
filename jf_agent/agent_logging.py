@@ -69,6 +69,6 @@ def log_and_print(logger, level, msg, exc_info=False):
     to stdout (for user visibility)
     '''
     logger.log(level, msg, exc_info=exc_info)
-    print(msg)
+    print(msg, flush=True)
     if exc_info:
         print(traceback.format_exc())

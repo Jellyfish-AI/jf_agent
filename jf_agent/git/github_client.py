@@ -1,5 +1,5 @@
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import pytz
 import requests
@@ -87,33 +87,52 @@ class GithubClient:
 
     def get_raw_result(self, url):
         # retry if rate-limited
-        max_retries = 3
+        max_retries = 5
         for i in range(1, max_retries + 1):
             try:
                 result = self.session.get(url)
                 result.raise_for_status()
                 return result
             except requests.exceptions.HTTPError as e:
-                if (
-                    'X-RateLimit-Remaining' in e.response.headers
-                    and e.response.headers['X-RateLimit-Remaining'] == '0'
-                    and i < max_retries
-                ):
-                    # rate-limited!  Sleep until it's oK, then try again
-                    reset_time = datetime.fromtimestamp(
-                        int(e.response.headers['X-RateLimit-Reset']), pytz.utc
-                    )
-                    now = datetime.utcnow().replace(tzinfo=pytz.utc)
-                    reset_wait = reset_time - now
+                remaining_ratelimit = e.response.headers.get('X-RateLimit-Remaining')
+                ratelimit_reset = e.response.headers.get('X-RateLimit-Reset')
+
+                if remaining_ratelimit != '0':
+                    # We hit a non-rate-limiting-related error.  Don't retry
+                    raise
+
+                if i >= max_retries:
                     agent_logging.log_and_print(
                         logger,
-                        logging.WARNING,
-                        f'Github rate limit exceeded.  Trying again in {str(reset_wait)}...',
+                        logging.ERROR,
+                        f'Request to {url} has failed {i} times -- giving up!',
                     )
-                    time.sleep(reset_wait.seconds)
-                    continue
+                    raise
 
-                raise
+                # rate-limited!  Sleep until it's ok, then try again
+                reset_time = datetime.fromtimestamp(int(ratelimit_reset), pytz.utc)
+                now = datetime.utcnow().replace(tzinfo=pytz.utc)
+                reset_wait = reset_time - now
+
+                reset_wait_in_seconds = reset_wait.total_seconds()
+
+                # Sometimes github gives a reset time in the
+                # past. In that case, wait for 5 mins just in case.
+                if reset_wait_in_seconds <= 0:
+                    reset_wait_in_seconds = 300
+
+                # Sometimes github gives a reset time way in the
+                # future. But rate limits reset each hour, so don't
+                # wait longer than that
+                reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
+                reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
+                )
+                time.sleep(reset_wait_in_seconds)
+                continue  # retry
 
     # Handle pagination
     def get_all_pages(self, url):
