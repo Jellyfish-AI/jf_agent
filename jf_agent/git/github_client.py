@@ -91,6 +91,14 @@ class GithubClient:
         for i in range(1, max_retries + 1):
             try:
                 result = self.session.get(url)
+
+                # HACK: This appears to happen after we have been
+                # rate-limited when hitting certain URLs, there is
+                # likely a more elegant way to solve this but it takes
+                # about an hour to test each time and it works.
+                if result.status_code == 403:
+                    result = self.session.get(url)
+
                 result.raise_for_status()
                 return result
             except requests.exceptions.HTTPError as e:
