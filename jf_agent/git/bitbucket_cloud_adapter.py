@@ -321,7 +321,8 @@ def _normalize_user(api_user):
             name=api_user['display_name'],
             login=api_user.get('username'),
             url=api_user['links']['html']['href'],
-            # TODO: email?
+            account_id=api_user['account_id'],
+            # no email available
         )
 
     # This is a raw commit from a git client that didn't match a
