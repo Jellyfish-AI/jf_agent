@@ -40,6 +40,7 @@ class NormalizedUser:
     login: str
     email: str = None
     url: str = None
+    account_id: str = None
 
 
 @dataclass
