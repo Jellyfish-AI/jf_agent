@@ -321,7 +321,7 @@ def _normalize_user(api_user):
             name=api_user['display_name'],
             login=api_user.get('username'),
             url=api_user['links']['html']['href'],
-            account_id=api_user['account_id'],
+            account_id=api_user.get('account_id'),
             # no email available
         )
 
