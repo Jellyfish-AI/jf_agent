@@ -35,6 +35,7 @@ VALID_RUN_MODES = (
     'print_apparently_missing_git_repos',
 )
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -518,7 +519,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     if not resp.ok:
         print(
-            f"ERROR: Couldn't get agent config info from {base_url}/agent/config "
+            f"ERROR: Couldn't get agent config info from {base_url}/agent/pull-state "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
         raise BadConfigException()
@@ -545,15 +546,11 @@ def download_data(
 
     if jira_connection:
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
-    else:
-        download_data_status.append({'type': 'Jira', 'status': 'failed'})
 
     if git_connection:
         download_data_status.append(
             load_and_dump_git(config, endpoint_git_instance_info, git_connection)
         )
-    else:
-        download_data_status.append({'type': 'Git', 'status': 'failed'})
 
     return download_data_status
 
