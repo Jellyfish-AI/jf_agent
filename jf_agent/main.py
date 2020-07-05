@@ -5,17 +5,15 @@ import os
 import shutil
 import threading
 from collections import namedtuple
-from datetime import datetime, date
 from glob import glob
 from pathlib import Path
 
 import requests
-import urllib3
-import yaml
 import json
 
-from jf_agent import agent_logging, diagnostics, write_file
+from jf_agent import agent_logging, diagnostics, write_file, VALID_RUN_MODES, JELLYFISH_API_BASE, BadConfigException
 from jf_agent.git import load_and_dump_git, get_git_client
+from jf_agent.config_file_reader import obtain_config
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -25,15 +23,6 @@ from jf_agent.jf_jira import (
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
-
-JELLYFISH_API_BASE = 'https://app.jellyfish.co'
-VALID_RUN_MODES = (
-    'download_and_send',
-    'download_only',
-    'send_only',
-    'print_all_jira_fields',
-    'print_apparently_missing_git_repos',
-)
 
 
 def main():
@@ -121,20 +110,10 @@ def main():
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
 
-            jira_connection = None
-            git_connection = None
-            if config.jira_url:
-                jira_connection = get_basic_jira_connection(config, creds)
-
-            if config.run_mode_is_print_all_jira_fields:
-                if jira_connection:
-                    print_all_jira_fields(config, jira_connection)
-                return
-
-            if config.git_url:
-                git_connection = get_git_client(config, creds)
-
             if config.run_mode_is_print_apparently_missing_git_repos:
+                # assume there is only a single git config
+                git_connection = get_git_client(config.git_configs[0], creds, skip_ssl_verification=config.skip_ssl_verification)
+                jira_connection = get_basic_jira_connection(config, creds)
                 if jira_connection and git_connection:
                     issues_to_scan = get_issues_to_scan_from_jellyfish(
                         config,
@@ -150,10 +129,9 @@ def main():
             if config.run_mode_includes_download:
                 download_data_status = download_data(
                     config,
+                    creds,
                     jellyfish_endpoint_info.jira_info,
-                    jellyfish_endpoint_info.git_instance_info,
-                    jira_connection,
-                    git_connection,
+                    jellyfish_endpoint_info.git_instance_info  # todo
                 )
 
                 write_file(
@@ -178,50 +156,6 @@ def main():
 
     print('Done!')
 
-
-class BadConfigException(Exception):
-    pass
-
-
-ValidatedConfig = namedtuple(
-    'ValidatedConfig',
-    [
-        'run_mode',
-        'run_mode_includes_download',
-        'run_mode_includes_send',
-        'run_mode_is_print_all_jira_fields',
-        'run_mode_is_print_apparently_missing_git_repos',
-        'skip_ssl_verification',
-        'jira_url',
-        'jira_earliest_issue_dt',
-        'jira_issue_download_concurrent_threads',
-        'jira_include_fields',
-        'jira_exclude_fields',
-        'jira_issue_batch_size',
-        'jira_gdpr_active',
-        'jira_include_projects',
-        'jira_exclude_projects',
-        'jira_include_project_categories',
-        'jira_exclude_project_categories',
-        'jira_issue_jql',
-        'jira_download_worklogs',
-        'jira_download_sprints',
-        'git_provider',
-        'git_url',
-        'git_include_projects',
-        'git_exclude_projects',
-        'git_include_bbcloud_projects',
-        'git_exclude_bbcloud_projects',
-        'git_include_repos',
-        'git_exclude_repos',
-        'git_strip_text_content',
-        'git_redact_names_and_urls',
-        'gitlab_per_page_override',
-        'outdir',
-        'compress_output_files',
-        'jellyfish_api_base',
-    ],
-)
 
 UserProvidedCreds = namedtuple(
     'UserProvidedCreds',
@@ -258,234 +192,6 @@ required_jira_fields = [
 ]
 
 
-def obtain_config(args):
-    run_mode = args.mode
-    if run_mode not in VALID_RUN_MODES:
-        print(f'''ERROR: Mode should be one of "{', '.join(VALID_RUN_MODES)}"''')
-        raise BadConfigException()
-
-    run_mode_includes_download = run_mode in ('download_and_send', 'download_only')
-    run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
-    run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
-    run_mode_is_print_apparently_missing_git_repos = (
-        run_mode == 'print_apparently_missing_git_repos'
-    )
-    jellyfish_api_base = args.jellyfish_api_base
-
-    try:
-        with open(args.config_file, 'r') as ymlfile:
-            yaml_config = yaml.safe_load(ymlfile)
-    except FileNotFoundError:
-        print(f'ERROR: Config file not found at "{args.config_file}"')
-        raise BadConfigException()
-
-    yaml_conf_global = yaml_config.get('global', {})
-    skip_ssl_verification = yaml_conf_global.get('no_verify_ssl', False)
-
-    jira_config = yaml_config.get('jira', {})
-    jira_url = jira_config.get('url', None)
-
-    jira_earliest_issue_dt = jira_config.get('earliest_issue_dt', None)
-    if jira_earliest_issue_dt is not None and type(jira_earliest_issue_dt) != date:
-        print(f'ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
-        raise BadConfigException()
-
-    jira_issue_download_concurrent_threads = jira_config.get(
-        'issue_download_concurrent_threads', 10
-    )
-    jira_include_fields = set(jira_config.get('include_fields', []))
-    jira_exclude_fields = set(jira_config.get('exclude_fields', []))
-    jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
-    jira_gdpr_active = jira_config.get('gdpr_active', False)
-    jira_include_projects = set(jira_config.get('include_projects', []))
-    jira_exclude_projects = set(jira_config.get('exclude_projects', []))
-    jira_include_project_categories = set(jira_config.get('include_project_categories', []))
-    jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
-    jira_issue_jql = jira_config.get('issue_jql', '')
-    jira_download_worklogs = jira_config.get('download_worklogs', True)
-    jira_download_sprints = jira_config.get('download_sprints', True)
-
-    # warn if any of the recommended fields are missing or excluded
-    if jira_include_fields:
-        missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
-        if missing_required_fields:
-            logger.warning(
-                f'Missing recommended jira_fields! For the best possible experience, '
-                f'please add the following to `include_fields` in the '
-                f'configuration file: {list(missing_required_fields)}'
-            )
-    if jira_exclude_fields:
-        excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
-        if excluded_required_fields:
-            logger.warning(
-                f'Excluding recommended jira_fields! For the best possible experience, '
-                f'please remove the following from `exclude_fields` in the '
-                f'configuration file: {list(excluded_required_fields)}'
-            )
-
-    if 'bitbucket' in yaml_config:
-        # support legacy yaml configuration (where the key _is_ the bitbucket)
-        git_config = yaml_config.get('bitbucket', {})
-        git_provider = 'bitbucket_server'
-    else:
-        git_config = yaml_config.get('git', {})
-        git_provider = git_config.get('provider')
-
-    git_url = git_config.get('url', None)
-    git_include_projects = set(git_config.get('include_projects', []))
-    git_exclude_projects = set(git_config.get('exclude_projects', []))
-    git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', []))
-    git_exclude_bbcloud_projects = set(git_config.get('exclude_bitbucket_cloud_projects', []))
-    git_include_repos = set(git_config.get('include_repos', []))
-    git_exclude_repos = set(git_config.get('exclude_repos', []))
-    git_strip_text_content = git_config.get('strip_text_content', False)
-    git_redact_names_and_urls = git_config.get('redact_names_and_urls', False)
-    gitlab_per_page_override = git_config.get('gitlab_per_page_override', None)
-
-    if 'git' in yaml_config and not git_provider:
-        print(
-            f'ERROR: Should add provider for git configuration. Provider should be one of `bitbucket_server`, `github` or `gitlab`'
-        )
-        raise BadConfigException()
-
-    if git_provider and git_provider not in (
-        'bitbucket_server',
-        'bitbucket_cloud',
-        'github',
-        'gitlab',
-    ):
-        print(
-            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of `bitbucket_server`, `bitbucket_cloud`, `github` or `gitlab`'
-        )
-        raise BadConfigException()
-
-    if args.since:
-        print(
-            f'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
-        )
-    if args.until:
-        print(
-            f'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
-        )
-
-    now = datetime.utcnow()
-
-    if not jira_url and not git_url:
-        print('ERROR: Config file must provide either a Jira or Git URL.')
-        raise BadConfigException()
-
-    if skip_ssl_verification:
-        print('WARNING: Disabling SSL certificate validation')
-        # To silence "Unverified HTTPS request is being made."
-        urllib3.disable_warnings()
-
-    if run_mode_includes_download:
-        if args.prev_output_dir:
-            print('ERROR: Provide output_basedir if downloading, not prev_output_dir')
-            raise BadConfigException()
-
-    output_basedir = args.output_basedir
-    output_dir_timestamp = now.strftime('%Y%m%d_%H%M%S')
-    outdir = os.path.join(output_basedir, output_dir_timestamp)
-    try:
-        os.makedirs(outdir, exist_ok=False)
-    except FileExistsError:
-        print(f"ERROR: Output dir {outdir} already exists")
-        raise BadConfigException()
-    except Exception:
-        print(
-            f"ERROR: Couldn't create output dir {outdir}.  Make sure the output directory you mapped as a docker volume exists on your host."
-        )
-        raise BadConfigException()
-
-    if run_mode_is_print_all_jira_fields and not jira_url:
-        print(f'ERROR: Must provide jira_url for mode {run_mode}')
-        raise BadConfigException()
-
-    if run_mode_includes_send and not run_mode_includes_download:
-        if not args.prev_output_dir:
-            print('ERROR: prev_output_dir must be provided if not downloading')
-            raise BadConfigException()
-
-        if not os.path.isdir(args.prev_output_dir):
-            print(f'ERROR: prev_output_dir ("{args.prev_output_dir}") is not a directory')
-            raise BadConfigException()
-
-        outdir = args.prev_output_dir
-
-    # github must be in whitelist mode
-    if git_provider == 'github' and (git_exclude_projects or not git_include_projects):
-        print(
-            'ERROR: GitHub requires a list of projects (i.e., GitHub organizations) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
-        )
-        raise BadConfigException()
-
-    # gitlab must be in whitelist mode
-    if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
-        print(
-            'ERROR: GitLab requires a list of projects (i.e., GitLab top-level groups) to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
-        )
-        raise BadConfigException()
-
-    # BBCloud must be in whitelist mode
-    if git_provider == 'bitbucket_cloud' and (git_exclude_projects or not git_include_projects):
-        print(
-            'ERROR: Bitbucket Cloud requires a list of projects to pull from. Make sure you set `include_projects` and not `exclude_projects`, and try again.'
-        )
-        raise BadConfigException()
-
-    # If we're only downloading, do not compress the output files (so they can be more easily inspected)
-    compress_output_files = (
-        False if (run_mode_includes_download and not run_mode_includes_send) else True
-    )
-
-    if run_mode_is_print_apparently_missing_git_repos:
-        if not (jira_url and git_url):
-            print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
-            raise BadConfigException()
-
-        if git_redact_names_and_urls:
-            print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
-            raise BadConfigException()
-
-    return ValidatedConfig(
-        run_mode,
-        run_mode_includes_download,
-        run_mode_includes_send,
-        run_mode_is_print_all_jira_fields,
-        run_mode_is_print_apparently_missing_git_repos,
-        skip_ssl_verification,
-        jira_url,
-        jira_earliest_issue_dt,
-        jira_issue_download_concurrent_threads,
-        jira_include_fields,
-        jira_exclude_fields,
-        jira_issue_batch_size,
-        jira_gdpr_active,
-        jira_include_projects,
-        jira_exclude_projects,
-        jira_include_project_categories,
-        jira_exclude_project_categories,
-        jira_issue_jql,
-        jira_download_worklogs,
-        jira_download_sprints,
-        git_provider,
-        git_url,
-        git_include_projects,
-        git_exclude_projects,
-        git_include_bbcloud_projects,
-        git_exclude_bbcloud_projects,
-        git_include_repos,
-        git_exclude_repos,
-        git_strip_text_content,
-        git_redact_names_and_urls,
-        gitlab_per_page_override,
-        outdir,
-        compress_output_files,
-        jellyfish_api_base,
-    )
-
-
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
@@ -507,28 +213,28 @@ def obtain_creds(config):
         )
         raise BadConfigException()
 
-    if config.git_url:
-        if config.git_provider == 'bitbucket_server' and not (
-            bb_server_username and bb_server_password
+    for git_config in config.git_configs:
+        if git_config.git_provider == 'bitbucket_server' and not (
+                bb_server_username and bb_server_password
         ):
             print(
                 'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
             )
             raise BadConfigException()
 
-        if config.git_provider == 'bitbucket_cloud' and not (
-            bb_cloud_username and bb_cloud_app_password
+        if git_config.git_provider == 'bitbucket_cloud' and not (
+                bb_cloud_username and bb_cloud_app_password
         ):
             print(
                 'ERROR: Bitbucket Cloud credentials not found. Set environment variables BITBUCKET_CLOUD_USERNAME and BITBUCKET_CLOUD_APP_PASSWORD.'
             )
             raise BadConfigException()
 
-        if config.git_provider == 'github' and not github_token:
+        if git_config.git_provider == 'github' and not github_token:
             print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
             raise BadConfigException()
 
-        if config.git_provider == 'gitlab' and not gitlab_token:
+        if git_config.git_provider == 'gitlab' and not gitlab_token:
             print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
             raise BadConfigException()
 
@@ -563,11 +269,26 @@ def obtain_jellyfish_endpoint_info(config, creds):
     jira_info = agent_config.get('jira_info')
     git_instance_info = agent_config.get('git_instance_info')
 
-    if config.git_url and len(git_instance_info) != 1:
+    # if no git info has returned from the endpoint, then an instance may not have been provisioned
+    if len(config.git_configs) > 0 and not len(git_instance_info.values()):
         print(
-            f'ERROR: Invalid Git instance info returned from the agent config endpoint -- please contact Jellyfish'
+            f'ERROR: A git instance is configured, but no git instance '
+            f'info returned from the jellyfish api -- please contact Jellyfish'
         )
         raise BadConfigException()
+
+    # if there are multiple git configurations
+    if len(config.git_configs) > 1:
+        for git_config in config.git_configs:
+            # assert that each instance in the config is mappable to the instances
+            # returned by the endpoint (we'll need this data later)
+            slug = git_config.git_instance_slug
+            if not git_instance_info.get(slug):
+                print(
+                    f'ERROR: The jellyfish api did not return an instance with the git_instance_slug `{slug}` -- '
+                    f'please check your configuration or contact Jellyfish'
+                )
+                raise BadConfigException()
 
     return JellyfishEndpointInfo(jira_info, git_instance_info)
 
@@ -575,16 +296,35 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_data(
-    config, endpoint_jira_info, endpoint_git_instance_info, jira_connection, git_connection
+        config, creds, endpoint_jira_info, endpoint_git_instances_info
 ):
     download_data_status = []
 
-    if jira_connection:
+    if config.jira_url:
+        jira_connection = get_basic_jira_connection(config, creds)
+        if config.run_mode_is_print_all_jira_fields:
+            print_all_jira_fields(config, jira_connection)
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    if git_connection:
+    is_multi_git_config = len(config.git_configs) > 1
+    for git_config in config.git_configs:
+        git_connection = get_git_client(git_config, creds, skip_ssl_verification=config.skip_ssl_verification)
+
+        if is_multi_git_config:
+            instance_slug = git_config.git_instance_slug
+            instance_info = endpoint_git_instances_info.get(instance_slug)
+        else:
+            # support legacy single-git support, of which assumes only one available git instance
+            instance_info = list(endpoint_git_instances_info.values())[0]
+
         download_data_status.append(
-            load_and_dump_git(config, endpoint_git_instance_info, git_connection)
+            load_and_dump_git(
+                config=git_config,
+                endpoint_git_instance_info=instance_info,
+                outdir=config.outdir,
+                compress_output_files=config.compress_output_files,
+                git_connection=git_connection
+            )
         )
 
     return download_data_status
@@ -640,7 +380,16 @@ def send_data(config, creds):
 
     print('Sending data to Jellyfish... ')
 
-    signed_urls = get_signed_url(os.listdir(config.outdir))
+    # obtain file names from the directory
+    _, directories, filenames = next(os.walk(config.outdir))
+
+    for directory in directories:
+        path = os.path.join(config.outdir, directory)
+        for file_name in os.listdir(path):
+            print(f'{directory}/{file_name}')
+            filenames.append(f'{directory}/{file_name}')
+
+    signed_urls = get_signed_url(filenames)
 
     threads = [
         threading.Thread(

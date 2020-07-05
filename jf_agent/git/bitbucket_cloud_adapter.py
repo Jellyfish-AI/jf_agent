@@ -22,6 +22,7 @@ from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 
 from jf_agent import diagnostics, agent_logging
 from jf_agent.name_redactor import NameRedactor, sanitize_text
+from jf_agent.config_file_reader import GitConfig
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,8 @@ _repo_redactor = NameRedactor()
 
 
 class BitbucketCloudAdapter(GitAdapter):
-    def __init__(self, config, client: BitbucketCloudClient):
-        super().__init__(config)
+    def __init__(self, config: GitConfig, outdir: str, compress_output_files: bool, client: BitbucketCloudClient):
+        super().__init__(config, outdir, compress_output_files)
         self.client = client
 
     @diagnostics.capture_timing()

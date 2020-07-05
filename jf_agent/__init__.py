@@ -3,8 +3,22 @@ import json
 import jsonstreams
 import dataclasses
 
+JELLYFISH_API_BASE = 'https://app.jellyfish.co'
+VALID_RUN_MODES = (
+    'download_and_send',
+    'download_only',
+    'send_only',
+    'print_all_jira_fields',
+    'print_apparently_missing_git_repos',
+)
+
+
+class BadConfigException(Exception):
+    pass
+
 
 def write_file(outdir, filename_prefix, compress, results):
+
     if compress:
         with gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wb') as outfile:
             outfile.write(json.dumps(results, indent=2, cls=StrDefaultEncoder).encode('utf-8'))
@@ -21,13 +35,13 @@ class StrDefaultEncoder(json.JSONEncoder):
 
 
 def download_and_write_streaming(
-    outdir,
-    filename_prefix,
-    compress,
-    generator_func,
-    generator_func_args,
-    item_id_dict_key,
-    addl_info_dict_key=None,
+        outdir,
+        filename_prefix,
+        compress,
+        generator_func,
+        generator_func_args,
+        item_id_dict_key,
+        addl_info_dict_key=None,
 ):
     if compress:
         outfile = gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wt')
