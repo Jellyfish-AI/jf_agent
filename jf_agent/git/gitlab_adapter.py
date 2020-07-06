@@ -41,7 +41,9 @@ _repo_redactor = NameRedactor()
 
 
 class GitLabAdapter(GitAdapter):
-    def __init__(self, config: GitConfig, outdir: str, compress_output_files: bool, client: GitLabClient):
+    def __init__(
+        self, config: GitConfig, outdir: str, compress_output_files: bool, client: GitLabClient
+    ):
         super().__init__(config, outdir, compress_output_files)
         self.client = client
 

@@ -155,7 +155,7 @@ class GitAdapter(ABC):
 
     @abstractmethod
     def get_default_branch_commits(
-            self, api_repos, server_git_instance_info
+        self, api_repos, server_git_instance_info
     ) -> List[NormalizedCommit]:
         pass
 
@@ -165,9 +165,7 @@ class GitAdapter(ABC):
 
     def load_and_dump_git(self, endpoint_git_instance_info):
         nrm_projects: List[NormalizedProject] = self.get_projects()
-        write_file(
-            self.outdir, 'bb_projects', self.compress_output_files, nrm_projects
-        )
+        write_file(self.outdir, 'bb_projects', self.compress_output_files, nrm_projects)
 
         write_file(
             self.outdir, 'bb_users', self.compress_output_files, self.get_users(),
@@ -179,7 +177,7 @@ class GitAdapter(ABC):
         def get_and_write_repos():
             nonlocal nrm_repos
 
-            nrm_repos = self.get_repos(nrm_projects, )
+            nrm_repos = self.get_repos(nrm_projects,)
 
             write_file(self.outdir, 'bb_repos', self.compress_output_files, nrm_repos)
             return len(nrm_repos)
@@ -266,9 +264,13 @@ def get_git_client(config, creds, skip_ssl_verification):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump_git(config: GitConfig,
-                      endpoint_git_instance_info: dict, outdir: str, compress_output_files: bool,
-                      git_connection):
+def load_and_dump_git(
+    config: GitConfig,
+    endpoint_git_instance_info: dict,
+    outdir: str,
+    compress_output_files: bool,
+    git_connection,
+):
 
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
@@ -292,9 +294,9 @@ def load_and_dump_git(config: GitConfig,
         elif config.git_provider == 'bitbucket_cloud':
             from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-            BitbucketCloudAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
-                endpoint_git_instance_info,
-            )
+            BitbucketCloudAdapter(
+                config, outdir, compress_output_files, git_connection
+            ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
@@ -309,7 +311,9 @@ def load_and_dump_git(config: GitConfig,
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-            GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(endpoint_git_instance_info)
+            GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
+                endpoint_git_instance_info
+            )
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
@@ -321,9 +325,19 @@ def load_and_dump_git(config: GitConfig,
             exc_info=True,
         )
 
-        return {'type': 'Git', 'instance': instance_slug, 'instance_key': instance_key, 'status': 'failed'}
+        return {
+            'type': 'Git',
+            'instance': instance_slug,
+            'instance_key': instance_key,
+            'status': 'failed',
+        }
 
-    return {'type': 'Git', 'instance': instance_slug, 'instance_key': instance_key, 'status': 'success'}
+    return {
+        'type': 'Git',
+        'instance': instance_slug,
+        'instance_key': instance_key,
+        'status': 'success',
+    }
 
 
 def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: str):

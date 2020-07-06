@@ -28,6 +28,7 @@ class GitConfig:
     git_include_bbcloud_projects: List
     git_exclude_bbcloud_projects: List
 
+
 # todo convert to dataclass
 ValidatedConfig = namedtuple(
     'ValidatedConfig',
@@ -98,7 +99,7 @@ def obtain_config(args) -> ValidatedConfig:
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
     run_mode_is_print_apparently_missing_git_repos = (
-            run_mode == 'print_apparently_missing_git_repos'
+        run_mode == 'print_apparently_missing_git_repos'
     )
 
     try:
@@ -242,11 +243,11 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
-        git_configs, # array of GitConfig
+        git_configs,  # array of GitConfig
         outdir,
         compress_output_files,
         jellyfish_api_base,
-        skip_ssl_verification
+        skip_ssl_verification,
     )
 
 
@@ -278,8 +279,8 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
     git_instance_slug = git_config.get('instance_slug', None)
-    git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', [])),
-    git_exclude_bbcloud_projects = set(git_config.get('exclude_bitbucket_cloud_projects', [])),
+    git_include_bbcloud_projects = (set(git_config.get('include_bitbucket_cloud_projects', [])),)
+    git_exclude_bbcloud_projects = (set(git_config.get('exclude_bitbucket_cloud_projects', [])),)
     git_include_repos = set(git_config.get('include_repos', []))
     git_exclude_repos = set(git_config.get('exclude_repos', []))
 
@@ -288,11 +289,15 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         raise BadConfigException()
 
     if git_provider is None:
-        print(f'ERROR: Should add provider for git configuration. Provider should be one of {git_providers}')
+        print(
+            f'ERROR: Should add provider for git configuration. Provider should be one of {git_providers}'
+        )
         raise BadConfigException()
 
     if git_provider not in git_providers:
-        print(f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of {git_providers}')
+        print(
+            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of {git_providers}'
+        )
         raise BadConfigException()
 
     # github must be in whitelist mode

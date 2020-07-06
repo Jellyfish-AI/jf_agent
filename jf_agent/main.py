@@ -11,7 +11,14 @@ from pathlib import Path
 import requests
 import json
 
-from jf_agent import agent_logging, diagnostics, write_file, VALID_RUN_MODES, JELLYFISH_API_BASE, BadConfigException
+from jf_agent import (
+    agent_logging,
+    diagnostics,
+    write_file,
+    VALID_RUN_MODES,
+    JELLYFISH_API_BASE,
+    BadConfigException,
+)
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.config_file_reader import obtain_config
 from jf_agent.jf_jira import (
@@ -112,7 +119,9 @@ def main():
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 # assume there is only a single git config
-                git_connection = get_git_client(config.git_configs[0], creds, skip_ssl_verification=config.skip_ssl_verification)
+                git_connection = get_git_client(
+                    config.git_configs[0], creds, skip_ssl_verification=config.skip_ssl_verification
+                )
                 jira_connection = get_basic_jira_connection(config, creds)
                 if jira_connection and git_connection:
                     issues_to_scan = get_issues_to_scan_from_jellyfish(
@@ -131,7 +140,7 @@ def main():
                     config,
                     creds,
                     jellyfish_endpoint_info.jira_info,
-                    jellyfish_endpoint_info.git_instance_info  # todo
+                    jellyfish_endpoint_info.git_instance_info,  # todo
                 )
 
                 write_file(
@@ -215,7 +224,7 @@ def obtain_creds(config):
 
     for git_config in config.git_configs:
         if git_config.git_provider == 'bitbucket_server' and not (
-                bb_server_username and bb_server_password
+            bb_server_username and bb_server_password
         ):
             print(
                 'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
@@ -223,7 +232,7 @@ def obtain_creds(config):
             raise BadConfigException()
 
         if git_config.git_provider == 'bitbucket_cloud' and not (
-                bb_cloud_username and bb_cloud_app_password
+            bb_cloud_username and bb_cloud_app_password
         ):
             print(
                 'ERROR: Bitbucket Cloud credentials not found. Set environment variables BITBUCKET_CLOUD_USERNAME and BITBUCKET_CLOUD_APP_PASSWORD.'
@@ -295,9 +304,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_data(
-        config, creds, endpoint_jira_info, endpoint_git_instances_info
-):
+def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info):
     download_data_status = []
 
     if config.jira_url:
@@ -308,7 +315,9 @@ def download_data(
 
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
-        git_connection = get_git_client(git_config, creds, skip_ssl_verification=config.skip_ssl_verification)
+        git_connection = get_git_client(
+            git_config, creds, skip_ssl_verification=config.skip_ssl_verification
+        )
 
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
@@ -323,7 +332,7 @@ def download_data(
                 endpoint_git_instance_info=instance_info,
                 outdir=config.outdir,
                 compress_output_files=config.compress_output_files,
-                git_connection=git_connection
+                git_connection=git_connection,
             )
         )
 

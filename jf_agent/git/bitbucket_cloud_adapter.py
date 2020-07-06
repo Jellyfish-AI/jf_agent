@@ -32,7 +32,13 @@ _repo_redactor = NameRedactor()
 
 
 class BitbucketCloudAdapter(GitAdapter):
-    def __init__(self, config: GitConfig, outdir: str, compress_output_files: bool, client: BitbucketCloudClient):
+    def __init__(
+        self,
+        config: GitConfig,
+        outdir: str,
+        compress_output_files: bool,
+        client: BitbucketCloudClient,
+    ):
         super().__init__(config, outdir, compress_output_files)
         self.client = client
 

@@ -18,8 +18,13 @@ _repo_redactor = NameRedactor()
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump(config: GitConfig, outdir: str, compress_output_files: bool, endpoint_git_instance_info: dict,
-                  bb_conn):
+def load_and_dump(
+    config: GitConfig,
+    outdir: str,
+    compress_output_files: bool,
+    endpoint_git_instance_info: dict,
+    bb_conn,
+):
     write_file(outdir, 'bb_users', compress_output_files, get_users(bb_conn))
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
@@ -229,7 +234,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
@@ -246,8 +251,8 @@ def get_default_branch_commits(
                 commits = api_project.repos[repo['name']].commits(until=default_branch)
 
                 for j, commit in enumerate(
-                        tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
-                        start=1,
+                    tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
+                    start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                         normalized_commit = _normalize_commit(
@@ -284,7 +289,7 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_pull_requests(
-        client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
@@ -295,9 +300,9 @@ def get_pull_requests(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
             )
             for pr in tqdm(
-                    api_repo.pull_requests.all(state='ALL', order='NEWEST'),
-                    desc=f'downloading PRs for {repo["name"]}',
-                    unit='prs',
+                api_repo.pull_requests.all(state='ALL', order='NEWEST'),
+                desc=f'downloading PRs for {repo["name"]}',
+                unit='prs',
             ):
                 updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
                 # PRs are ordered newest to oldest
@@ -331,7 +336,7 @@ def get_pull_requests(
                 merged_by = None
 
                 for activity in sorted(
-                        [a for a in api_pr.activities()], key=lambda x: x['createdDate']
+                    [a for a in api_pr.activities()], key=lambda x: x['createdDate']
                 ):
                     if activity['action'] == 'COMMENTED':
                         comments.append(

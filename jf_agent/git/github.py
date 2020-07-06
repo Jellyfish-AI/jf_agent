@@ -17,12 +17,15 @@ _repo_redactor = NameRedactor()
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump(config: GitConfig, outdir: str, compress_output_files: bool, endpoint_git_instance_info: dict, git_conn):
+def load_and_dump(
+    config: GitConfig,
+    outdir: str,
+    compress_output_files: bool,
+    endpoint_git_instance_info: dict,
+    git_conn,
+):
     write_file(
-        outdir,
-        'bb_users',
-        compress_output_files,
-        get_users(git_conn, config.git_include_projects),
+        outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
     )
 
     write_file(
