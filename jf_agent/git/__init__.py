@@ -1,4 +1,6 @@
 import pytz
+import os
+
 from typing import List
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -222,7 +224,7 @@ def get_git_client(config, creds, skip_ssl_verification):
                 base_url=config.git_url,
                 username=creds.bb_server_username,
                 password=creds.bb_server_password,
-                verify=not config.skip_ssl_verification,
+                verify=not skip_ssl_verification,
                 session=retry_session(),
             )
 
@@ -261,7 +263,6 @@ def get_git_client(config, creds, skip_ssl_verification):
     # if the git provider is none of the above, throw an error
     raise ValueError(f'unsupported git provider {config.git_provider}')
 
-import os
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
@@ -272,7 +273,7 @@ def load_and_dump_git(config: GitConfig,
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
     instance_key = endpoint_git_instance_info['key']
-    outdir = f'{outdir}/{instance_key}'
+    outdir = f'{outdir}/git_{instance_key}'
     os.mkdir(outdir)
 
     try:

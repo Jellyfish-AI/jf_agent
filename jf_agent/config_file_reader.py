@@ -280,8 +280,8 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_instance_slug = git_config.get('instance_slug', None)
     git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', [])),
     git_exclude_bbcloud_projects = set(git_config.get('exclude_bitbucket_cloud_projects', [])),
-    git_include_repos = set(git_config.get('include_repos', [])),
-    git_exclude_repos = set(git_config.get('exclude_repos', [])),
+    git_include_repos = set(git_config.get('include_repos', []))
+    git_exclude_repos = set(git_config.get('exclude_repos', []))
 
     if multiple and not git_instance_slug:
         print(f'ERROR: Git `instance_slug` is required for multiple git instances.')
