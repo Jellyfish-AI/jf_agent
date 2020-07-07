@@ -252,7 +252,7 @@ def obtain_config(args) -> ValidatedConfig:
 
 
 def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
-    # support legacy yaml configuration (where the key _is_ the bitbucket)
+    # support legacy yaml configuration (where the key _is_ bitbucket)
     if 'bitbucket' in yaml_config:
         git_config = yaml_config.get('bitbucket', {})
         return [_get_git_config(git_config, 'bitbucket_server')]
@@ -339,7 +339,3 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
     )
-
-
-class BadConfigException(Exception):
-    pass

@@ -140,7 +140,7 @@ def main():
                     config,
                     creds,
                     jellyfish_endpoint_info.jira_info,
-                    jellyfish_endpoint_info.git_instance_info,  # todo
+                    jellyfish_endpoint_info.git_instance_info,
                 )
 
                 write_file(
@@ -323,7 +323,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             instance_slug = git_config.git_instance_slug
             instance_info = endpoint_git_instances_info.get(instance_slug)
         else:
-            # support legacy single-git support, of which assumes only one available git instance
+            # support legacy single-git support, which assumes only one available git instance
             instance_info = list(endpoint_git_instances_info.values())[0]
 
         download_data_status.append(
@@ -392,10 +392,11 @@ def send_data(config, creds):
     # obtain file names from the directory
     _, directories, filenames = next(os.walk(config.outdir))
 
+    # get the full file paths for each of the immediate
+    # subdirectories (we're assuming only a single level)
     for directory in directories:
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
-            print(f'{directory}/{file_name}')
             filenames.append(f'{directory}/{file_name}')
 
     signed_urls = get_signed_url(filenames)
