@@ -299,6 +299,35 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 )
                 raise BadConfigException()
 
+    # If a single Git instance is configured in the YAML, but multiple instances are configured
+    # server-side, we don't have a way to map the YAML to the server-side
+    if len(config.git_configs) == 1 and len(git_instance_info.values()) > 1 and (
+         not config.git_configs[0].git_instance_slug or
+         not config.git_configs[0].git_instance_slug in git_instance_info
+    ):
+        print(
+            'ERROR: A single Git instance has been configured, but multiple Git instances were returned '
+            'from the Jellyfish API -- please contact Jellyfish'
+        )
+        raise BadConfigException()
+
+    # if multi git instance is configured in the YAML, assert there is a valid git_instance_slug
+    if len(config.git_configs) > 1:
+        for git_config in config.git_configs:
+            if not git_config.git_instance_slug:
+                print(
+                    'ERROR: Must specify git_instance slug in multi-git mode -- '
+                    'please check your configuration or contact Jellyfish'
+                )
+                raise BadConfigException()
+
+            if git_config.git_instance_slug not in git_instance_info:
+                print(
+                    f'ERROR: Invalid `instance_slug` {git_config.git_instance_slug} in configuration. -- '
+                    'please check your configuration or contact Jellyfish'
+                )
+                raise BadConfigException()
+
     return JellyfishEndpointInfo(jira_info, git_instance_info)
 
 
