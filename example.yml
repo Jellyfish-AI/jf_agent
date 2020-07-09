@@ -160,7 +160,7 @@ git:
     # Redact names and URLs for projects, repos, branches.
     redact_names_and_urls: False
 
-    # Git credentials environment variable names associated with this instance.
+    # Credential environment variable names associated with this instance
     bb_server_username_env_name: BITBUCKET_USERNAME
     bb_server_password_env_name: BITBUCKET_PASSWORD
     bb_cloud_username_env_name: BITBUCKET_CLOUD_USERNAME
