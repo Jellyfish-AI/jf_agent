@@ -101,58 +101,80 @@ jira:
   #   - description
   #   - comment
 
+git:
+
+  - instance_slug: orthogonal-networks-GH
+    provider: github
+    url: https://api.github.com
+    include_projects:
+      - Jellyfish-AI
+    strip_text_content: False
+    redact_names_and_urls: False
+    github_token_env_name: GITHUB_TOKEN
 
 git:
-  # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
-  # `gitlab` and `github`.
-  provider: bitbucket_server
 
-  # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
-  # For Bitbucket Cloud, this should be https://api.bitbucket.org
-  # For GitHub Cloud, this should be https://api.github.com
-  # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
-  # Otherwise, use the URL to your local git server.
-  url: https://bitbucket.yourcompany.com
+  # Instance identifier slug, provided by Jellyfish.
+  - instance_slug: git_instance_slug
 
-  # Only pull from specific projects / organizations / groups.
-  # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
-  # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
-  # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
-  # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
-  include_projects:
-      - PROJ1
+    # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
+    # `gitlab` and `github`.
+    provider: bitbucket_server
 
-  # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
-  # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
-  # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
-  #  exclude_projects:
-  #    - PROJ1
+    # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
+    # For Bitbucket Cloud, this should be https://api.bitbucket.org
+    # For GitHub Cloud, this should be https://api.github.com
+    # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
+    # Otherwise, use the URL to your local git server.
+    url: https://bitbucket.yourcompany.com
 
-  # Bitbucket cloud only: the include_projects filter above maps to
-  # top-level organization for bitbucket cloud. If you've grouped your
-  # repos into Bitbucket Cloud projects, use these filters instead to
-  # pull only from repos in particular projects.  Specify projects by
-  # key (e.g.: PROJ1)
-  # include_bitbucket_cloud_projects:
-  #     - PROJ1
-  #    
-  # exclude_bitbucket_cloud_projects:
-  #     - PROJ1
-  
-  # Only pull from specific repos.  Comment this out to pull from all repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-  # GitLab: use the GitLab "Project ID" (e.g.: 123)
-  include_repos:
-      - my_repository
+    # Only pull from specific projects / organizations / groups.
+    # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
+    # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
+    # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
+    # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
+    include_projects:
+        - PROJ1
 
-  # Uncomment this to pull from all but specific repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-  # GitLab: use the GitLab "Project ID" (e.g.: 123)
-  # exclude_repos:
-  #    - repo_to_skip
+    # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
+    # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
+    # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
+    #  exclude_projects:
+    #    - PROJ1
 
-  # Strip out long-form text content (commit messages, PR text, etc).
-  strip_text_content: False
+    # Bitbucket cloud only: the include_projects filter above maps to
+    # top-level organization for bitbucket cloud. If you've grouped your
+    # repos into Bitbucket Cloud projects, use these filters instead to
+    # pull only from repos in particular projects.  Specify projects by
+    # key (e.g.: PROJ1)
+    # include_bitbucket_cloud_projects:
+    #     - PROJ1
+    #
+    # exclude_bitbucket_cloud_projects:
+    #     - PROJ1
 
-  # Redact names and URLs for projects, repos, branches.
-  redact_names_and_urls: False
+    # Only pull from specific repos.  Comment this out to pull from all repos.
+    # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+    # GitLab: use the GitLab "Project ID" (e.g.: 123)
+    include_repos:
+        - my_repository
+
+    # Uncomment this to pull from all but specific repos.
+    # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+    # GitLab: use the GitLab "Project ID" (e.g.: 123)
+    # exclude_repos:
+    #    - repo_to_skip
+
+    # Strip out long-form text content (commit messages, PR text, etc).
+    strip_text_content: False
+
+    # Redact names and URLs for projects, repos, branches.
+    redact_names_and_urls: False
+
+    # Git credentials environment variable names associated with this instance.
+    bb_server_username_env_name: BITBUCKET_USERNAME
+    bb_server_password_env_name: BITBUCKET_PASSWORD
+    bb_cloud_username_env_name: BITBUCKET_CLOUD_USERNAME
+    bb_cloud_app_password_env_name: BITBUCKET_CLOUD_APP_PASSWORD
+    gitlab_token_env_name: GITHUB_TOKEN
+    github_token_env_name: GITHUB_TOKEN
