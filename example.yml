@@ -103,17 +103,6 @@ jira:
 
 git:
 
-  - instance_slug: orthogonal-networks-GH
-    provider: github
-    url: https://api.github.com
-    include_projects:
-      - Jellyfish-AI
-    strip_text_content: False
-    redact_names_and_urls: False
-    github_token_env_name: GITHUB_TOKEN
-
-git:
-
   # Instance identifier slug, provided by Jellyfish.
   - instance_slug: git_instance_slug
 
