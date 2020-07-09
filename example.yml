@@ -165,5 +165,5 @@ git:
     bb_server_password_env_name: BITBUCKET_PASSWORD
     bb_cloud_username_env_name: BITBUCKET_CLOUD_USERNAME
     bb_cloud_app_password_env_name: BITBUCKET_CLOUD_APP_PASSWORD
-    gitlab_token_env_name: GITHUB_TOKEN
+    gitlab_token_env_name: GITLAB_TOKEN
     github_token_env_name: GITHUB_TOKEN
