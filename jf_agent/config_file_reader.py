@@ -6,7 +6,6 @@ from collections import namedtuple
 from datetime import datetime, date
 from typing import List
 from dataclasses import dataclass
-
 from jf_agent import VALID_RUN_MODES, BadConfigException
 
 logger = logging.getLogger(__name__)
@@ -24,9 +23,43 @@ class GitConfig:
     git_strip_text_content: bool
     git_redact_names_and_urls: bool
     gitlab_per_page_override: bool
-    # legacy fields ===========
+    # creds env names for multi git ===
+    bb_server_username_env_name: str
+    bb_server_password_env_name: str
+    bb_cloud_username_env_name: str
+    bb_cloud_app_password_env_name: str
+    bb_server_password_env_name: str
+    github_token_env_name: str
+    gitlab_token_env_name: str
+    # legacy fields ==================
     git_include_bbcloud_projects: List
     git_exclude_bbcloud_projects: List
+
+
+PROVIDER_TO_REQUIRED_CRED_ENV_NAMES = {
+    'github': ['github_token_env_name'],
+    'gitlab': ['gitlab_token_env_name'],
+    'bitbucket_server': ['bb_server_username_env_name', 'bb_server_password_env_name'],
+    'bitbucket_cloud': ['bb_cloud_username_env_name', 'bb_cloud_app_password_env_name']
+}
+
+DEFAULT_CRED_ENV_NAME = {
+    'bb_server_username_env_name': 'BITBUCKET_USERNAME',
+    'bb_server_password_env_name': 'BITBUCKET_PASSWORD',
+    'bb_cloud_username_env_name': 'BITBUCKET_CLOUD_USERNAME',
+    'bb_cloud_app_password_env_name': 'BITBUCKET_CLOUD_APP_PASSWORD',
+    'github_token_env_name': 'GITHUB_TOKEN',
+    'gitlab_token_env_name': 'GITLAB_TOKEN'
+}
+
+CRED_ENV_TO_CRED_NAME = {
+    'bb_server_username_env_name': 'bb_server_username',
+    'bb_server_password_env_name': 'bb_server_password',
+    'bb_cloud_username_env_name': 'bb_cloud_username',
+    'bb_cloud_app_password_env_name': 'bb_cloud_app_password',
+    'github_token_env_name': 'github_token',
+    'gitlab_token_env_name': 'gitlab_token'
+}
 
 
 # todo convert to dataclass
@@ -285,8 +318,19 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_exclude_repos = set(git_config.get('exclude_repos', []))
 
     if multiple and not git_instance_slug:
-        print(f'ERROR: Git `instance_slug` is required for multiple git instances.')
+        print(f'ERROR: Git `instance_slug` is required for multiple git instance mode.')
         raise BadConfigException()
+
+    required_cred_envs = PROVIDER_TO_REQUIRED_CRED_ENV_NAMES[git_provider]
+    has_required_cred_envs = all([git_config.get(field) for field in required_cred_envs])
+    if multiple and not has_required_cred_envs:
+        # if multiple, ensure that the env names have been set
+        print(f'ERROR: {required_cred_envs} must be added for multiple git instance mode.')
+        raise BadConfigException()
+    if not multiple:
+        # otherwise, support single-git byt setting the default cred environment name
+        for cred_env in required_cred_envs:
+            git_config[cred_env] = DEFAULT_CRED_ENV_NAME[cred_env]
 
     if git_provider is None:
         print(
@@ -332,9 +376,16 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_exclude_projects=list(git_exclude_projects),
         git_include_repos=list(git_include_repos),
         git_exclude_repos=list(git_exclude_repos),
+        # creds env names for multi git ============
         git_strip_text_content=git_config.get('strip_text_content', False),
         git_redact_names_and_urls=git_config.get('redact_names_and_urls', False),
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
+        bb_server_username_env_name= git_config.get('bb_server_username_env_name'),
+        bb_server_password_env_name= git_config.get('bb_server_password_env_name'),
+        bb_cloud_username_env_name= git_config.get('bb_cloud_username_env_name'),
+        bb_cloud_app_password_env_name= git_config.get('bb_cloud_app_password_env_name'),
+        github_token_env_name=git_config.get('github_token_env_name'),
+        gitlab_token_env_name=git_config.get('gitlab_token_env_name'),
         # legacy fields ===========
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),

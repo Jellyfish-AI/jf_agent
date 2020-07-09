@@ -20,7 +20,7 @@ from jf_agent import (
     BadConfigException,
 )
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config
+from jf_agent.config_file_reader import obtain_config, PROVIDER_TO_REQUIRED_CRED_ENV_NAMES, CRED_ENV_TO_CRED_NAME
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -172,12 +172,7 @@ UserProvidedCreds = namedtuple(
         'jellyfish_api_token',
         'jira_username',
         'jira_password',
-        'bb_server_username',
-        'bb_server_password',
-        'bb_cloud_username',
-        'bb_cloud_app_password',
-        'github_token',
-        'gitlab_token',
+        'git_instance_to_creds'
     ],
 )
 
@@ -201,6 +196,26 @@ required_jira_fields = [
 ]
 
 
+def _get_git_instance_to_creds(git_config):
+    git_provider = git_config.git_provider
+    config_cred_fields = PROVIDER_TO_REQUIRED_CRED_ENV_NAMES[git_provider]
+
+    creds = {}
+    for config_field_name in config_cred_fields:
+        env_name = getattr(git_config, config_field_name)
+        env_value = os.environ.get(env_name)
+
+        if not env_value:
+            print(f'ERROR: Missing environment variable {env_name}. Required for {git_provider} instances.')
+            raise BadConfigException
+
+        # obtain the correct key (i.e gitlab_token)
+        cred_name = CRED_ENV_TO_CRED_NAME[config_field_name]
+        creds[cred_name] = env_value
+
+    return creds
+
+
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
@@ -209,12 +224,12 @@ def obtain_creds(config):
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
-    bb_server_username = os.environ.get('BITBUCKET_USERNAME', None)
-    bb_server_password = os.environ.get('BITBUCKET_PASSWORD', None)
-    bb_cloud_username = os.environ.get('BITBUCKET_CLOUD_USERNAME', None)
-    bb_cloud_app_password = os.environ.get('BITBUCKET_CLOUD_APP_PASSWORD', None)
-    github_token = os.environ.get('GITHUB_TOKEN', None)
-    gitlab_token = os.environ.get('GITLAB_TOKEN', None)
+
+    # obtain git slug to credentials
+    git_instance_to_creds = {
+        git_config.git_instance_slug: _get_git_instance_to_creds(git_config)
+        for git_config in config.git_configs
+    }
 
     if config.jira_url and not (jira_username and jira_password):
         print(
@@ -222,41 +237,11 @@ def obtain_creds(config):
         )
         raise BadConfigException()
 
-    for git_config in config.git_configs:
-        if git_config.git_provider == 'bitbucket_server' and not (
-            bb_server_username and bb_server_password
-        ):
-            print(
-                'ERROR: Bitbucket credentials not found. Set environment variables BITBUCKET_USERNAME and BITBUCKET_PASSWORD.'
-            )
-            raise BadConfigException()
-
-        if git_config.git_provider == 'bitbucket_cloud' and not (
-            bb_cloud_username and bb_cloud_app_password
-        ):
-            print(
-                'ERROR: Bitbucket Cloud credentials not found. Set environment variables BITBUCKET_CLOUD_USERNAME and BITBUCKET_CLOUD_APP_PASSWORD.'
-            )
-            raise BadConfigException()
-
-        if git_config.git_provider == 'github' and not github_token:
-            print('ERROR: GitHub credentials not found. Set environment variable GITHUB_TOKEN.')
-            raise BadConfigException()
-
-        if git_config.git_provider == 'gitlab' and not gitlab_token:
-            print('ERROR: GitLab credentials not found. Set environment variable GITLAB_TOKEN.')
-            raise BadConfigException()
-
     return UserProvidedCreds(
         jellyfish_api_token,
         jira_username,
         jira_password,
-        bb_server_username,
-        bb_server_password,
-        bb_cloud_username,
-        bb_cloud_app_password,
-        github_token,
-        gitlab_token,
+        git_instance_to_creds
     )
 
 
@@ -344,16 +329,19 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
-        git_connection = get_git_client(
-            git_config, creds, skip_ssl_verification=config.skip_ssl_verification
-        )
 
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
             instance_info = endpoint_git_instances_info.get(instance_slug)
+            instance_creds = creds.git_instance_to_creds.get(instance_slug)
         else:
             # support legacy single-git support, which assumes only one available git instance
             instance_info = list(endpoint_git_instances_info.values())[0]
+            instance_creds = list(creds.values())[0]
+
+        git_connection = get_git_client(
+            git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
+        )
 
         download_data_status.append(
             load_and_dump_git(

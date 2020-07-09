@@ -155,7 +155,7 @@ class GitAdapter(ABC):
 
     @abstractmethod
     def get_default_branch_commits(
-        self, api_repos, server_git_instance_info
+            self, api_repos, server_git_instance_info
     ) -> List[NormalizedCommit]:
         pass
 
@@ -215,13 +215,13 @@ class GitAdapter(ABC):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_git_client(config, creds, skip_ssl_verification):
+def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bool):
     try:
         if config.git_provider == BBS_PROVIDER:
             return Stash(
                 base_url=config.git_url,
-                username=creds.bb_server_username,
-                password=creds.bb_server_password,
+                username=git_creds['bb_server_username'],
+                password=git_creds['bb_server_password'],
                 verify=not skip_ssl_verification,
                 session=retry_session(),
             )
@@ -229,22 +229,22 @@ def get_git_client(config, creds, skip_ssl_verification):
         if config.git_provider == BBC_PROVIDER:
             return BitbucketCloudClient(
                 server_base_uri=config.git_url,
-                username=creds.bb_cloud_username,
-                app_password=creds.bb_cloud_app_password,
+                username=git_creds['bb_cloud_username'],
+                app_password=git_creds['bb_cloud_app_password'],
                 session=retry_session(),
             )
 
         if config.git_provider == GH_PROVIDER:
             return GithubClient(
                 base_url=config.git_url,
-                token=creds.github_token,
+                token=git_creds['github_token'],
                 verify=not skip_ssl_verification,
                 session=retry_session(),
             )
         if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
-                private_token=creds.gitlab_token,
+                private_token=git_creds['gitlab_token'],
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
@@ -265,13 +265,12 @@ def get_git_client(config, creds, skip_ssl_verification):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump_git(
-    config: GitConfig,
-    endpoint_git_instance_info: dict,
-    outdir: str,
-    compress_output_files: bool,
-    git_connection,
+        config: GitConfig,
+        endpoint_git_instance_info: dict,
+        outdir: str,
+        compress_output_files: bool,
+        git_connection,
 ):
-
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
     instance_key = endpoint_git_instance_info['key']
