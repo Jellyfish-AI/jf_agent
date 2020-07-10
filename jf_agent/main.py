@@ -20,11 +20,7 @@ from jf_agent import (
     BadConfigException,
 )
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import (
-    obtain_config,
-    PROVIDER_TO_REQUIRED_CRED_ENV_NAMES,
-    CRED_ENV_TO_CRED_NAME,
-)
+from jf_agent.config_file_reader import obtain_config
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -195,25 +191,31 @@ required_jira_fields = [
 
 
 def _get_git_instance_to_creds(git_config):
-    git_provider = git_config.git_provider
-    config_cred_fields = PROVIDER_TO_REQUIRED_CRED_ENV_NAMES[git_provider]
-
-    creds = {}
-    for config_field_name in config_cred_fields:
-        env_name = getattr(git_config, config_field_name)
-        env_value = os.environ.get(env_name)
-
-        if not env_value:
+    def _check_and_get(envvar_name):
+        envvar_val = os.environ.get(envvar_name)
+        if not envvar_val:
             print(
-                f'ERROR: Missing environment variable {env_name}. Required for {git_provider} instances.'
+                f'ERROR: Missing environment variable {envvar_name}. Required for instance {git_config.git_instance_slug}.'
             )
-            raise BadConfigException
+            raise BadConfigException()
+        return envvar_val
 
-        # obtain the correct key (i.e gitlab_token)
-        cred_name = CRED_ENV_TO_CRED_NAME[config_field_name]
-        creds[cred_name] = env_value
-
-    return creds
+    git_provider = git_config.git_provider
+    prefix = f'{git_config.creds_envvar_prefix}_' if git_config.creds_envvar_prefix else ''
+    if git_provider == 'github':
+        return {'github_token': _check_and_get(f'{prefix}GITHUB_TOKEN')}
+    elif git_provider == 'bitbucket_cloud':
+        return {
+            'bb_cloud_username': _check_and_get(f'{prefix}BITBUCKET_CLOUD_USERNAME'),
+            'bb_cloud_app_password': _check_and_get(f'{prefix}BITBUCKET_CLOUD_APP_PASSWORD'),
+        }
+    elif git_provider == 'bitbucket_server':
+        return {
+            'bb_server_username': _check_and_get(f'{prefix}BITBUCKET_USERNAME'),
+            'bb_server_password': _check_and_get(f'{prefix}BITBUCKET_PASSWORD'),
+        }
+    elif git_provider == 'gitlab':
+        return {'gitlab_token': _check_and_get(f'{prefix}GITLAB_TOKEN')}
 
 
 def obtain_creds(config):
