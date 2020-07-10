@@ -338,7 +338,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
         else:
             # support legacy single-git support, which assumes only one available git instance
             instance_info = list(endpoint_git_instances_info.values())[0]
-            instance_creds = list(creds.values())[0]
+            instance_creds = list(creds.git_instance_to_creds.values())[0]
 
         git_connection = get_git_client(
             git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
