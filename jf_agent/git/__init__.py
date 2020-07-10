@@ -155,7 +155,7 @@ class GitAdapter(ABC):
 
     @abstractmethod
     def get_default_branch_commits(
-            self, api_repos, server_git_instance_info
+        self, api_repos, server_git_instance_info
     ) -> List[NormalizedCommit]:
         pass
 
@@ -265,11 +265,11 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump_git(
-        config: GitConfig,
-        endpoint_git_instance_info: dict,
-        outdir: str,
-        compress_output_files: bool,
-        git_connection,
+    config: GitConfig,
+    endpoint_git_instance_info: dict,
+    outdir: str,
+    compress_output_files: bool,
+    git_connection,
 ):
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']

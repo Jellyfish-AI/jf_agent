@@ -40,7 +40,7 @@ PROVIDER_TO_REQUIRED_CRED_ENV_NAMES = {
     'github': ['github_token_env_name'],
     'gitlab': ['gitlab_token_env_name'],
     'bitbucket_server': ['bb_server_username_env_name', 'bb_server_password_env_name'],
-    'bitbucket_cloud': ['bb_cloud_username_env_name', 'bb_cloud_app_password_env_name']
+    'bitbucket_cloud': ['bb_cloud_username_env_name', 'bb_cloud_app_password_env_name'],
 }
 
 DEFAULT_CRED_ENV_NAME = {
@@ -49,7 +49,7 @@ DEFAULT_CRED_ENV_NAME = {
     'bb_cloud_username_env_name': 'BITBUCKET_CLOUD_USERNAME',
     'bb_cloud_app_password_env_name': 'BITBUCKET_CLOUD_APP_PASSWORD',
     'github_token_env_name': 'GITHUB_TOKEN',
-    'gitlab_token_env_name': 'GITLAB_TOKEN'
+    'gitlab_token_env_name': 'GITLAB_TOKEN',
 }
 
 CRED_ENV_TO_CRED_NAME = {
@@ -58,7 +58,7 @@ CRED_ENV_TO_CRED_NAME = {
     'bb_cloud_username_env_name': 'bb_cloud_username',
     'bb_cloud_app_password_env_name': 'bb_cloud_app_password',
     'github_token_env_name': 'github_token',
-    'gitlab_token_env_name': 'gitlab_token'
+    'gitlab_token_env_name': 'gitlab_token',
 }
 
 
@@ -380,10 +380,10 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_strip_text_content=git_config.get('strip_text_content', False),
         git_redact_names_and_urls=git_config.get('redact_names_and_urls', False),
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
-        bb_server_username_env_name= git_config.get('bb_server_username_env_name'),
-        bb_server_password_env_name= git_config.get('bb_server_password_env_name'),
-        bb_cloud_username_env_name= git_config.get('bb_cloud_username_env_name'),
-        bb_cloud_app_password_env_name= git_config.get('bb_cloud_app_password_env_name'),
+        bb_server_username_env_name=git_config.get('bb_server_username_env_name'),
+        bb_server_password_env_name=git_config.get('bb_server_password_env_name'),
+        bb_cloud_username_env_name=git_config.get('bb_cloud_username_env_name'),
+        bb_cloud_app_password_env_name=git_config.get('bb_cloud_app_password_env_name'),
         github_token_env_name=git_config.get('github_token_env_name'),
         gitlab_token_env_name=git_config.get('gitlab_token_env_name'),
         # legacy fields ===========

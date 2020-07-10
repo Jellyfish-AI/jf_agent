@@ -20,7 +20,11 @@ from jf_agent import (
     BadConfigException,
 )
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config, PROVIDER_TO_REQUIRED_CRED_ENV_NAMES, CRED_ENV_TO_CRED_NAME
+from jf_agent.config_file_reader import (
+    obtain_config,
+    PROVIDER_TO_REQUIRED_CRED_ENV_NAMES,
+    CRED_ENV_TO_CRED_NAME,
+)
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -93,7 +97,6 @@ def main():
     creds = obtain_creds(config)
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
-    status_json = []
 
     if config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
@@ -168,12 +171,7 @@ def main():
 
 UserProvidedCreds = namedtuple(
     'UserProvidedCreds',
-    [
-        'jellyfish_api_token',
-        'jira_username',
-        'jira_password',
-        'git_instance_to_creds'
-    ],
+    ['jellyfish_api_token', 'jira_username', 'jira_password', 'git_instance_to_creds'],
 )
 
 JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info'])
@@ -206,7 +204,9 @@ def _get_git_instance_to_creds(git_config):
         env_value = os.environ.get(env_name)
 
         if not env_value:
-            print(f'ERROR: Missing environment variable {env_name}. Required for {git_provider} instances.')
+            print(
+                f'ERROR: Missing environment variable {env_name}. Required for {git_provider} instances.'
+            )
             raise BadConfigException
 
         # obtain the correct key (i.e gitlab_token)
@@ -238,10 +238,7 @@ def obtain_creds(config):
         raise BadConfigException()
 
     return UserProvidedCreds(
-        jellyfish_api_token,
-        jira_username,
-        jira_password,
-        git_instance_to_creds
+        jellyfish_api_token, jira_username, jira_password, git_instance_to_creds
     )
 
 
@@ -286,9 +283,13 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     # If a single Git instance is configured in the YAML, but multiple instances are configured
     # server-side, we don't have a way to map the YAML to the server-side
-    if len(config.git_configs) == 1 and len(git_instance_info.values()) > 1 and (
-         not config.git_configs[0].git_instance_slug or
-         not config.git_configs[0].git_instance_slug in git_instance_info
+    if (
+        len(config.git_configs) == 1
+        and len(git_instance_info.values()) > 1
+        and (
+            not config.git_configs[0].git_instance_slug
+            or not config.git_configs[0].git_instance_slug in git_instance_info
+        )
     ):
         print(
             'ERROR: A single Git instance has been configured, but multiple Git instances were returned '
