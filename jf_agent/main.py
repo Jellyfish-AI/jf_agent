@@ -263,8 +263,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
         print(
-            f'ERROR: A git instance is configured, but no git instance '
-            f'info returned from the jellyfish api -- please contact Jellyfish'
+            f'ERROR: A Git instance is configured, but no Git instance '
+            f'info returned from the Jellyfish API -- please contact Jellyfish'
         )
         raise BadConfigException()
 
@@ -276,7 +276,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
             slug = git_config.git_instance_slug
             if not git_instance_info.get(slug):
                 print(
-                    f'ERROR: The jellyfish api did not return an instance with the git_instance_slug `{slug}` -- '
+                    f'ERROR: The Jellyfish API did not return an instance with the git_instance_slug `{slug}` -- '
                     f'please check your configuration or contact Jellyfish'
                 )
                 raise BadConfigException()

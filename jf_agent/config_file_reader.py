@@ -245,7 +245,7 @@ def obtain_config(args) -> ValidatedConfig:
             raise BadConfigException()
 
         if len(git_configs) > 1:
-            print(f'ERROR: {run_mode} is not currently supported for multiple git instances.')
+            print(f'ERROR: {run_mode} is not currently supported for multiple Git instances.')
             raise BadConfigException()
 
         if not (jira_url and git_configs[0].git_url):
@@ -318,7 +318,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_exclude_repos = set(git_config.get('exclude_repos', []))
 
     if multiple and not git_instance_slug:
-        print(f'ERROR: Git `instance_slug` is required for multiple git instance mode.')
+        print(f'ERROR: Git `instance_slug` is required for multiple Git instance mode.')
         raise BadConfigException()
 
     required_cred_envs = PROVIDER_TO_REQUIRED_CRED_ENV_NAMES[git_provider]
