@@ -1,7 +1,16 @@
+#############################
+# 1. Global configuration
+#############################
+
 global:
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
+
+
+#############################
+# 2. Jira configuration
+#############################
 
 jira:
   # URL to Jira
@@ -71,7 +80,6 @@ jira:
   # exclude_project_categories:
   #   - Support
 
-
   #############################
   # Options for filtering issues.  This filter is applied in addition
   # to any project-level filters above, to control which issues are
@@ -82,7 +90,6 @@ jira:
   # filter. Use this if you need more fine-grained control over pulling
   # just a subset of issues within a project.
   # issue_jql: 'text ~ pattern and issuetype != "Secret Type"'
-
 
   #############################
   # Options for filtering fileds.  Use these if you need fine-grained control
@@ -101,69 +108,98 @@ jira:
   #   - description
   #   - comment
 
+
+#############################
+# 3. Git configuration
+#############################
+
+# You can configure the agent to pull from a single Git instance or multiple Git
+# instances.
+#   - If you're pulling from a single Git instance, configure the "git"
+#     object as a SINGLE OBJECT as per the example below.
+#   - If you're pulling from multiple Git instances, configure the "git"
+#     object as a LIST OF OBJECTS as per the example below.  For this
+#     configuration, note that the instance_slug and creds_envvar_prefix
+#     are additional required fields.
+
+######################################
+# 3a. Single instance config example
+######################################
 git:
+  # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
+  # `gitlab` and `github`.
+  provider: bitbucket_server
 
-  # Instance identifier slug, provided by Jellyfish.
-  - instance_slug: git_instance_slug
+  # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
+  # For Bitbucket Cloud, this should be https://api.bitbucket.org
+  # For GitHub Cloud, this should be https://api.github.com
+  # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
+  # Otherwise, use the URL to your local git server.
+  url: https://bitbucket.yourcompany.com
 
-    # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
-    # `gitlab` and `github`.
-    provider: bitbucket_server
+  # Only pull from specific projects / organizations / groups.
+  # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
+  # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
+  # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
+  # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
+  include_projects:
+      - PROJ1
 
-    # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
-    # For Bitbucket Cloud, this should be https://api.bitbucket.org
-    # For GitHub Cloud, this should be https://api.github.com
-    # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
-    # Otherwise, use the URL to your local git server.
-    url: https://bitbucket.yourcompany.com
+  # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
+  # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
+  # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
+  #  exclude_projects:
+  #    - PROJ1
 
-    # Only pull from specific projects / organizations / groups.
-    # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
-    # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
-    # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
-    # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
-    include_projects:
-        - PROJ1
+  # Bitbucket cloud only: the include_projects filter above maps to
+  # top-level organization for bitbucket cloud. If you've grouped your
+  # repos into Bitbucket Cloud projects, use these filters instead to
+  # pull only from repos in particular projects.  Specify projects by
+  # key (e.g.: PROJ1)
+  # include_bitbucket_cloud_projects:
+  #     - PROJ1
+  #
+  # exclude_bitbucket_cloud_projects:
+  #     - PROJ1
 
-    # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
-    # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
-    # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
-    #  exclude_projects:
-    #    - PROJ1
+  # Only pull from specific repos.  Comment this out to pull from all repos.
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # GitLab: use the GitLab "Project ID" (e.g.: 123)
+  include_repos:
+      - my_repository
 
-    # Bitbucket cloud only: the include_projects filter above maps to
-    # top-level organization for bitbucket cloud. If you've grouped your
-    # repos into Bitbucket Cloud projects, use these filters instead to
-    # pull only from repos in particular projects.  Specify projects by
-    # key (e.g.: PROJ1)
-    # include_bitbucket_cloud_projects:
-    #     - PROJ1
-    #
-    # exclude_bitbucket_cloud_projects:
-    #     - PROJ1
+  # Uncomment this to pull from all but specific repos.
+  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # GitLab: use the GitLab "Project ID" (e.g.: 123)
+  # exclude_repos:
+  #    - repo_to_skip
 
-    # Only pull from specific repos.  Comment this out to pull from all repos.
-    # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-    # GitLab: use the GitLab "Project ID" (e.g.: 123)
-    include_repos:
-        - my_repository
+  # Strip out long-form text content (commit messages, PR text, etc).
+  strip_text_content: False
 
-    # Uncomment this to pull from all but specific repos.
-    # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-    # GitLab: use the GitLab "Project ID" (e.g.: 123)
-    # exclude_repos:
-    #    - repo_to_skip
+  # Redact names and URLs for projects, repos, branches.
+  redact_names_and_urls: False
 
-    # Strip out long-form text content (commit messages, PR text, etc).
-    strip_text_content: False
-
-    # Redact names and URLs for projects, repos, branches.
-    redact_names_and_urls: False
-
-    # Credential environment variable names associated with this instance
-    bb_server_username_env_name: BITBUCKET_USERNAME
-    bb_server_password_env_name: BITBUCKET_PASSWORD
-    bb_cloud_username_env_name: BITBUCKET_CLOUD_USERNAME
-    bb_cloud_app_password_env_name: BITBUCKET_CLOUD_APP_PASSWORD
-    gitlab_token_env_name: GITLAB_TOKEN
-    github_token_env_name: GITHUB_TOKEN
+######################################
+# 3b. Multiple instance config example
+#
+# Note: all of the fields from the single instance config example are available
+# to each instance in a multiple-instance configuration (include_projects,
+# exclude_projects, etc.), but for brevity most of those fields are excluded
+# from this example.
+######################################
+git:
+  - provider: bitbucket_server
+    url: https://bitbucket-org1.yourcompany.com
+    # Instance identifier slug, provided by Jellyfish.
+    instance_slug: git_instance_slug_1
+    # Prefix of your choice to append to the environment variables in creds.env
+    # for this instance.  E.g., for a Bitbucket Server instance, if this is set
+    # to ORG1, then the environment variables from which the Bitbucket Server
+    # credentials are taken will be ORG1_BITBUCKET_USERNAME and
+    # ORG1_BITBUCKET_PASSWORD.
+    creds_envvar_prefix: ORG1
+  - provider: bitbucket_server
+    url: https://bitbucket-org2.yourcompany.com
+    instance_slug: git_instance_slug_2
+    creds_envvar_prefix: ORG2
