@@ -206,6 +206,8 @@ for Jellyfish to work.  These required fields are:
 
 ```
 issuekey
+parent
+issuelinks
 project
 reporter
 assignee
