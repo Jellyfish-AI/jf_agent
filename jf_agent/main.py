@@ -254,8 +254,9 @@ required_jira_fields = [
     'status',
     'created',
     'updated',
-    'subtasks'
+    'subtasks',
 ]
+
 
 def obtain_config(args):
     run_mode = args.mode
@@ -308,15 +309,19 @@ def obtain_config(args):
     if jira_include_fields:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
-            logger.warning(f'Missing recommended jira_fields! For the best possible experience, '
-                           f'please add the following to `include_fields` in the '
-                           f'configuration file: {list(missing_required_fields)}')
+            logger.warning(
+                f'Missing recommended jira_fields! For the best possible experience, '
+                f'please add the following to `include_fields` in the '
+                f'configuration file: {list(missing_required_fields)}'
+            )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
-            logger.warning(f'Excluding recommended jira_fields! For the best possible experience, '
-                           f'please remove the following from `exclude_fields` in the '
-                           f'configuration file: {list(excluded_required_fields)}')
+            logger.warning(
+                f'Excluding recommended jira_fields! For the best possible experience, '
+                f'please remove the following from `exclude_fields` in the '
+                f'configuration file: {list(excluded_required_fields)}'
+            )
 
     if 'bitbucket' in yaml_config:
         # support legacy yaml configuration (where the key _is_ the bitbucket)
