@@ -44,7 +44,7 @@ You'll execute the agent by running a Docker container based on the distributed 
 
 2. Create a file that contains the credentials you gathered above, specified in the [environment variable syntax](https://docs.docker.com/engine/reference/commandline/run/#set-environment-variables--e---env---env-file). The file should look like this:
 
-For Jira and GitHub:
+#### For Jira and Single Git Mode:
 ```
 JELLYFISH_API_TOKEN=...
 JIRA_USERNAME=...
@@ -77,6 +77,17 @@ JIRA_USERNAME=...
 JIRA_PASSWORD=...
 GITLAB_TOKEN=...
 ```
+
+#### Multiple Git Instances
+If using multiple git instances, all git credentials must be prefixed with the corresponding `creds_envvar_prefix` provided in the config.yml.
+
+For example, if the  `creds_envvar_prefix` is set to ORG1 for a bitbucket instance, the configuration would include the following variables:
+```
+# ... other variables
+ORG1_BITBUCKET_USERNAME=...
+ORG1_BITBUCKET_PASSWORD=...
+```
+When in multi-git mode, `creds_envar_prefix` is required for all git instances. See the example.yml for more details.
 
 ## Execution
 
