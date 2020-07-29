@@ -7,6 +7,7 @@ from tqdm import tqdm
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent.config_file_reader import GitConfig
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,14 @@ _repo_redactor = NameRedactor()
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump(config, endpoint_git_instance_info, bb_conn):
-    write_file(config.outdir, 'bb_users', config.compress_output_files, get_users(bb_conn))
+def load_and_dump(
+    config: GitConfig,
+    outdir: str,
+    compress_output_files: bool,
+    endpoint_git_instance_info: dict,
+    bb_conn,
+):
+    write_file(outdir, 'bb_users', compress_output_files, get_users(bb_conn))
 
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_projects, projects = zip(
@@ -29,7 +36,7 @@ def load_and_dump(config, endpoint_git_instance_info, bb_conn):
             config.git_redact_names_and_urls,
         )
     )
-    write_file(config.outdir, 'bb_projects', config.compress_output_files, projects)
+    write_file(outdir, 'bb_projects', compress_output_files, projects)
 
     api_repos = None
 
@@ -47,7 +54,7 @@ def load_and_dump(config, endpoint_git_instance_info, bb_conn):
                 config.git_redact_names_and_urls,
             )
         )
-        write_file(config.outdir, 'bb_repos', config.compress_output_files, repos)
+        write_file(outdir, 'bb_repos', compress_output_files, repos)
         return len(api_repos)
 
     get_and_write_repos()
@@ -56,9 +63,9 @@ def load_and_dump(config, endpoint_git_instance_info, bb_conn):
     @agent_logging.log_entry_exit(logger)
     def download_and_write_commits():
         return download_and_write_streaming(
-            config.outdir,
+            outdir,
             'bb_commits',
-            config.compress_output_files,
+            compress_output_files,
             generator_func=get_default_branch_commits,
             generator_func_args=(
                 bb_conn,
@@ -76,9 +83,9 @@ def load_and_dump(config, endpoint_git_instance_info, bb_conn):
     @agent_logging.log_entry_exit(logger)
     def download_and_write_prs():
         return download_and_write_streaming(
-            config.outdir,
+            outdir,
             'bb_prs',
-            config.compress_output_files,
+            compress_output_files,
             generator_func=get_pull_requests,
             generator_func_args=(
                 bb_conn,

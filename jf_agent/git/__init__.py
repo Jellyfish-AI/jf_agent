@@ -1,4 +1,6 @@
 import pytz
+import os
+
 from typing import List
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -10,6 +12,7 @@ from jf_agent.session import retry_session
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 from jf_agent.git.github_client import GithubClient
 from jf_agent.git.gitlab_client import GitLabClient
+from jf_agent.config_file_reader import GitConfig
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 
@@ -133,8 +136,10 @@ class NormalizedPullRequest:
 
 
 class GitAdapter(ABC):
-    def __init__(self, config):
+    def __init__(self, config: GitConfig, outdir: str, compress_output_files: bool):
         self.config = config
+        self.outdir = outdir
+        self.compress_output_files = compress_output_files
 
     @abstractmethod
     def get_users(self) -> List[NormalizedUser]:
@@ -160,12 +165,10 @@ class GitAdapter(ABC):
 
     def load_and_dump_git(self, endpoint_git_instance_info):
         nrm_projects: List[NormalizedProject] = self.get_projects()
-        write_file(
-            self.config.outdir, 'bb_projects', self.config.compress_output_files, nrm_projects
-        )
+        write_file(self.outdir, 'bb_projects', self.compress_output_files, nrm_projects)
 
         write_file(
-            self.config.outdir, 'bb_users', self.config.compress_output_files, self.get_users(),
+            self.outdir, 'bb_users', self.compress_output_files, self.get_users(),
         )
         nrm_repos = None
 
@@ -176,7 +179,7 @@ class GitAdapter(ABC):
 
             nrm_repos = self.get_repos(nrm_projects,)
 
-            write_file(self.config.outdir, 'bb_repos', self.config.compress_output_files, nrm_repos)
+            write_file(self.outdir, 'bb_repos', self.compress_output_files, nrm_repos)
             return len(nrm_repos)
 
         get_and_write_repos()
@@ -185,9 +188,9 @@ class GitAdapter(ABC):
         @agent_logging.log_entry_exit(logger)
         def download_and_write_commits():
             return download_and_write_streaming(
-                self.config.outdir,
+                self.outdir,
                 'bb_commits',
-                self.config.compress_output_files,
+                self.compress_output_files,
                 generator_func=self.get_default_branch_commits,
                 generator_func_args=(nrm_repos, endpoint_git_instance_info,),
                 item_id_dict_key='hash',
@@ -199,9 +202,9 @@ class GitAdapter(ABC):
         @agent_logging.log_entry_exit(logger)
         def download_and_write_prs():
             return download_and_write_streaming(
-                self.config.outdir,
+                self.outdir,
                 'bb_prs',
-                self.config.compress_output_files,
+                self.compress_output_files,
                 generator_func=self.get_pull_requests,
                 generator_func_args=(nrm_repos, endpoint_git_instance_info,),
                 item_id_dict_key='id',
@@ -212,36 +215,36 @@ class GitAdapter(ABC):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_git_client(config, creds):
+def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bool):
     try:
         if config.git_provider == BBS_PROVIDER:
             return Stash(
                 base_url=config.git_url,
-                username=creds.bb_server_username,
-                password=creds.bb_server_password,
-                verify=not config.skip_ssl_verification,
+                username=git_creds['bb_server_username'],
+                password=git_creds['bb_server_password'],
+                verify=not skip_ssl_verification,
                 session=retry_session(),
             )
 
         if config.git_provider == BBC_PROVIDER:
             return BitbucketCloudClient(
                 server_base_uri=config.git_url,
-                username=creds.bb_cloud_username,
-                app_password=creds.bb_cloud_app_password,
+                username=git_creds['bb_cloud_username'],
+                app_password=git_creds['bb_cloud_app_password'],
                 session=retry_session(),
             )
 
         if config.git_provider == GH_PROVIDER:
             return GithubClient(
                 base_url=config.git_url,
-                token=creds.github_token,
-                verify=not config.skip_ssl_verification,
+                token=git_creds['github_token'],
+                verify=not skip_ssl_verification,
                 session=retry_session(),
             )
         if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
-                private_token=creds.gitlab_token,
+                private_token=git_creds['gitlab_token'],
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
@@ -261,28 +264,55 @@ def get_git_client(config, creds):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
+def load_and_dump_git(
+    config: GitConfig,
+    endpoint_git_instance_info: dict,
+    outdir: str,
+    compress_output_files: bool,
+    git_connection,
+):
+    # use the unique git instance agent key to collate files
+    instance_slug = endpoint_git_instance_info['slug']
+    instance_key = endpoint_git_instance_info['key']
+    outdir = f'{outdir}/git_{instance_key}'
+    os.mkdir(outdir)
+
     try:
         if config.git_provider == 'bitbucket_server':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.bitbucket_server import load_and_dump as load_and_dump_bbs
 
-            load_and_dump_bbs(config, endpoint_git_instance_info, git_connection)
+            load_and_dump_bbs(
+                config=config,
+                outdir=outdir,
+                compress_output_files=compress_output_files,
+                endpoint_git_instance_info=endpoint_git_instance_info,
+                git_connection=git_connection,
+            )
+
         elif config.git_provider == 'bitbucket_cloud':
             from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-            BitbucketCloudAdapter(config, git_connection).load_and_dump_git(
-                endpoint_git_instance_info
-            )
+            BitbucketCloudAdapter(
+                config, outdir, compress_output_files, git_connection
+            ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
 
-            load_and_dump_gh(config, endpoint_git_instance_info, git_connection)
+            load_and_dump_gh(
+                config=config,
+                outdir=outdir,
+                compress_output_files=compress_output_files,
+                endpoint_git_instance_info=endpoint_git_instance_info,
+                git_conn=git_connection,
+            )
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-            GitLabAdapter(config, git_connection).load_and_dump_git(endpoint_git_instance_info)
+            GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
+                endpoint_git_instance_info
+            )
         else:
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
@@ -294,16 +324,23 @@ def load_and_dump_git(config, endpoint_git_instance_info, git_connection):
             exc_info=True,
         )
 
-        return {'type': 'Git', 'status': 'failed'}
+        return {
+            'type': 'Git',
+            'instance': instance_slug,
+            'instance_key': instance_key,
+            'status': 'failed',
+        }
 
-    return {'type': 'Git', 'status': 'success'}
+    return {
+        'type': 'Git',
+        'instance': instance_slug,
+        'instance_key': instance_key,
+        'status': 'success',
+    }
 
 
-def pull_since_date_for_repo(server_git_instance_info, org_login, repo_id, commits_or_prs: str):
+def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: str):
     assert commits_or_prs in ('commits', 'prs')
-
-    # Only a single instance is supported / sent from the server
-    instance_info = list(server_git_instance_info.values())[0]
 
     instance_pull_from_dt = pytz.utc.localize(datetime.fromisoformat(instance_info['pull_from']))
     instance_info_this_repo = instance_info['repos_dict'].get(f'{org_login}-{repo_id}')

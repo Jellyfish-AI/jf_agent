@@ -1,7 +1,16 @@
+#############################
+# 1. Global configuration
+#############################
+
 global:
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
+
+
+#############################
+# 2. Jira configuration
+#############################
 
 jira:
   # URL to Jira
@@ -71,7 +80,6 @@ jira:
   # exclude_project_categories:
   #   - Support
 
-
   #############################
   # Options for filtering issues.  This filter is applied in addition
   # to any project-level filters above, to control which issues are
@@ -82,7 +90,6 @@ jira:
   # filter. Use this if you need more fine-grained control over pulling
   # just a subset of issues within a project.
   # issue_jql: 'text ~ pattern and issuetype != "Secret Type"'
-
 
   #############################
   # Options for filtering fileds.  Use these if you need fine-grained control
@@ -102,6 +109,22 @@ jira:
   #   - comment
 
 
+#############################
+# 3. Git configuration
+#############################
+
+# You can configure the agent to pull from a single Git instance or multiple Git
+# instances.
+#   - If you're pulling from a single Git instance, configure the "git"
+#     object as a SINGLE OBJECT as per the example below.
+#   - If you're pulling from multiple Git instances, configure the "git"
+#     object as a LIST OF OBJECTS as per the example below.  For this
+#     configuration, note that the instance_slug and creds_envvar_prefix
+#     are additional required fields.
+
+######################################
+# 3a. Single instance config example
+######################################
 git:
   # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
   # `gitlab` and `github`.
@@ -135,10 +158,10 @@ git:
   # key (e.g.: PROJ1)
   # include_bitbucket_cloud_projects:
   #     - PROJ1
-  #    
+  #
   # exclude_bitbucket_cloud_projects:
   #     - PROJ1
-  
+
   # Only pull from specific repos.  Comment this out to pull from all repos.
   # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
   # GitLab: use the GitLab "Project ID" (e.g.: 123)
@@ -156,3 +179,27 @@ git:
 
   # Redact names and URLs for projects, repos, branches.
   redact_names_and_urls: False
+
+######################################
+# 3b. Multiple instance config example
+#
+# Note: all of the fields from the single instance config example are available
+# to each instance in a multiple-instance configuration (include_projects,
+# exclude_projects, etc.), but for brevity most of those fields are excluded
+# from this example.
+######################################
+git:
+  - provider: bitbucket_server
+    url: https://bitbucket-org1.yourcompany.com
+    # Instance identifier slug, provided by Jellyfish.
+    instance_slug: git_instance_slug_1
+    # Prefix of your choice to append to the environment variables in creds.env
+    # for this instance.  E.g., for a Bitbucket Server instance, if this is set
+    # to ORG1, then the environment variables from which the Bitbucket Server
+    # credentials are taken will be ORG1_BITBUCKET_USERNAME and
+    # ORG1_BITBUCKET_PASSWORD.
+    creds_envvar_prefix: ORG1
+  - provider: bitbucket_server
+    url: https://bitbucket-org2.yourcompany.com
+    instance_slug: git_instance_slug_2
+    creds_envvar_prefix: ORG2
