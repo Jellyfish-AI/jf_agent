@@ -87,7 +87,7 @@ For example, if the  `creds_envvar_prefix` is set to ORG1 for a bitbucket instan
 ORG1_BITBUCKET_USERNAME=...
 ORG1_BITBUCKET_PASSWORD=...
 ```
-When in multi-git mode, `creds_envar_prefix` is required for all git instances. See the example.yml for more details.
+When in multi-git mode, `creds_envvar_prefix` is required for all git instances. See the example.yml for more details.
 
 ## Execution
 
