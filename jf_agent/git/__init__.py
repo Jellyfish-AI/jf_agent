@@ -287,7 +287,7 @@ def load_and_dump_git(
                 outdir=outdir,
                 compress_output_files=compress_output_files,
                 endpoint_git_instance_info=endpoint_git_instance_info,
-                git_connection=git_connection,
+                bb_conn=git_connection,
             )
 
         elif config.git_provider == 'bitbucket_cloud':
