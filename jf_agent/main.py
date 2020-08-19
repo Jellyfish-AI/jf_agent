@@ -325,6 +325,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
+        agent_logging.log_and_print(
+            logger, logging.INFO, 'Obtained Jira configuration, attempting download...'
+        )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -332,7 +335,11 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
-
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            f'Obtained {git_config.git_provider} configuration, attempting download...',
+        )
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
             instance_info = endpoint_git_instances_info.get(instance_slug)
