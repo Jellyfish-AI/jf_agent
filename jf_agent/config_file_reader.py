@@ -78,6 +78,7 @@ required_jira_fields = [
     'subtasks',
 ]
 
+
 def obtain_config(args) -> ValidatedConfig:
     if args.since:
         print(
