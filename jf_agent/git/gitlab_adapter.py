@@ -414,6 +414,12 @@ def _normalize_pr(
     # normalize comments, approvals, and commits
     additions, deletions, changed_files = _calculate_diff_counts(merge_request.diff)
 
+    # OJ-7701: GitLab merge requests have a PATCH in the diff attribute, not standard diff format. We can't
+    # determine the number of files changed from a patch, but we can get the number of lines added and deleted.
+    # To get the number of files changed, we can just use the length of the list returned from changes(), which
+    # contains file information for each file changed in the merge request.
+    changed_files = len(merge_request.changes()['changes'])
+
     return NormalizedPullRequest(
         id=merge_request.id,
         additions=additions,
