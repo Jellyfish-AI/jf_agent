@@ -408,8 +408,8 @@ def _normalize_pr(
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
-    base_branch_name = merge_request.source_branch
-    head_branch_name = merge_request.target_branch
+    base_branch_name = merge_request.target_branch
+    head_branch_name = merge_request.source_branch
 
     # normalize comments, approvals, and commits
     additions, deletions, changed_files = _calculate_diff_counts(merge_request.diff)
@@ -452,8 +452,8 @@ def _normalize_pr(
         merged_by=_normalize_user(merge_request.merged_by),
         approvals=_get_normalized_approvals(merge_request),
         comments=_get_normalized_pr_comments(merge_request, strip_text_content),
-        base_repo=_normalize_short_form_repo(merge_request.source_project, redact_names_and_urls),
-        head_repo=_normalize_short_form_repo(merge_request.target_project, redact_names_and_urls),
+        base_repo=_normalize_short_form_repo(merge_request.target_project, redact_names_and_urls),
+        head_repo=_normalize_short_form_repo(merge_request.source_project, redact_names_and_urls),
     )
 
 
