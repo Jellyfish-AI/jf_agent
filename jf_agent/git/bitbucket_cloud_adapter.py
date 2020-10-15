@@ -360,8 +360,11 @@ def _normalize_pr(
                 logging.WARN,
                 f'Unable to parse the diff For PR {api_pr["id"]} in repo {repo.id}; proceeding as though no files were changed.',
             )
-    # except request exception to catch HTTPError and RetryErrors
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RetryError:
+        # Server threw a 500 on the request for the diff and we started retrying;
+        # this happens consistently for certain PRs (if the PR has no commits yet). Just proceed with no diff
+        pass
+    except requests.exceptions.HTTPError as e:
         if e.response.status_code >= 500:
             # Server threw a 500 on the request for the diff; this happens consistently for certain PRs
             # (if the PR has no commits yet). Just proceed with no diff
