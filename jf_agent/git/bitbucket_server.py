@@ -318,8 +318,8 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.NotFoundException:
                     additions, deletions, changed_files = None, None, None
-                except RetryError:
-                    logging.warning(f"Could not retrieve diff data for {pr['id']}")
+                except RetryError as e:
+                    print(f"Could not retrieve diff data for {pr['id']}")
                     additions, deletions, changed_files = None, None, None
                 else:
                     additions, deletions, changed_files = 0, 0, 0
