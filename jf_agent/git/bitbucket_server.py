@@ -3,7 +3,7 @@ import logging
 import stashy
 import pytz
 from tqdm import tqdm
-
+from requests.exceptions import RetryError
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -317,6 +317,9 @@ def get_pull_requests(
                 except TypeError:
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.NotFoundException:
+                    additions, deletions, changed_files = None, None, None
+                except RetryError as e:
+                    print(f"Could not retrieve diff data for {pr['id']}")
                     additions, deletions, changed_files = None, None, None
                 else:
                     additions, deletions, changed_files = 0, 0, 0
