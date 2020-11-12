@@ -321,6 +321,11 @@ def get_pull_requests(
                 except RetryError as e:
                     print(f"Could not retrieve diff data for {pr['id']}")
                     additions, deletions, changed_files = None, None, None
+                except stashy.errors.GenericException as e:
+                    agent_logging.log_and_print(
+                        logger, logging.INFO, f'Got error {e} on diffs for repo {pr["id"]}, skipping...'
+                    )
+                    additions, deletions, changed_files = None, None, None
                 else:
                     additions, deletions, changed_files = 0, 0, 0
 
