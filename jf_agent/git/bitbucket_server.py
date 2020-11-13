@@ -216,7 +216,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
-def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
+def _normalize_commit(commit, repo, api_project, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
@@ -229,7 +229,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         ),
         'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
-        'repo': _normalize_pr_repo(repo, redact_names_and_urls),
+        'repo': _normalize_pr_repo(api_project=api_project, repo=repo, redact_names_and_urls=redact_names_and_urls),
     }
 
 
@@ -256,7 +256,11 @@ def get_default_branch_commits(
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                         normalized_commit = _normalize_commit(
-                            commit, repo, strip_text_content, redact_names_and_urls
+                            commit=commit,
+                            repo=repo,
+                            api_project=api_project,
+                            strip_text_content=strip_text_content,
+                            redact_names_and_urls=redact_names_and_urls,
                         )
                         # commits are ordered newest to oldest
                         # if this is too old, we're done with this repo
@@ -271,12 +275,13 @@ def get_default_branch_commits(
                 )
 
 
-def _normalize_pr_repo(repo, redact_names_and_urls):
+def _normalize_pr_repo(api_project, repo, redact_names_and_urls):
     normal_repo = {
         'id': repo['id'],
         'name': (
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])
         ),
+        'project': _normalize_project(api_project, redact_names_and_urls)
     }
 
     if not redact_names_and_urls:
@@ -382,7 +387,13 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+                        _normalize_commit(
+                            commit=c,
+                            repo=repo,
+                            api_project=api_project,
+                            strip_text_content=strip_text_content,
+                            redact_names_and_urls=redact_names_and_urls
+                        )
                         for c in tqdm(
                             api_pr.commits(),
                             f'downloading commits for PR {pr["id"]}',
@@ -408,7 +419,9 @@ def get_pull_requests(
                     'closed_date': closed_date,
                     'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
                     'base_repo': _normalize_pr_repo(
-                        pr['toRef']['repository'], redact_names_and_urls
+                        api_project=api_project,
+                        repo=pr['toRef']['repository'],
+                        redact_names_and_urls=redact_names_and_urls
                     ),
                     'base_branch': (
                         pr['toRef']['displayId']
@@ -416,7 +429,9 @@ def get_pull_requests(
                         else _branch_redactor.redact_name(pr['toRef']['displayId'])
                     ),
                     'head_repo': _normalize_pr_repo(
-                        pr['fromRef']['repository'], redact_names_and_urls
+                        api_project=api_project,
+                        repo=pr['fromRef']['repository'],
+                        redact_names_and_urls=redact_names_and_urls
                     ),
                     'head_branch': (
                         pr['fromRef']['displayId']
