@@ -115,7 +115,12 @@ class BitbucketCloudAdapter(GitAdapter):
 
                 branches = self.get_branches(p, api_repo)
                 repos.append(
-                    _normalize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
+                    _normalize_repo(
+                        api_repo=api_repo,
+                        normalized_branches=branches,
+                        normalized_project=p,
+                        redact_names_and_urls=self.config.git_redact_names_and_urls
+                    )
                 )
 
         print('✓')
@@ -202,11 +207,11 @@ class BitbucketCloudAdapter(GitAdapter):
                                 continue
 
                             yield _normalize_pr(
-                                self.client,
-                                repo,
-                                api_pr,
-                                self.config.git_strip_text_content,
-                                self.config.git_redact_names_and_urls,
+                                client=self.client,
+                                repo=repo,
+                                api_pr=api_pr,
+                                strip_text_content=self.config.git_strip_text_content,
+                                redact_names_and_urls=self.config.git_redact_names_and_urls,
                             )
 
                             # PRs are ordered newest to oldest if this
@@ -280,6 +285,15 @@ def _normalize_repo(
 
 
 def _normalize_short_form_repo(api_repo, redact_names_and_urls):
+
+    # bitbucket cloud project names prefix the repo's full name
+    # example: full_name: "project-name/name-of-repository"
+    project_name = api_repo['full_name'].split('/')[0]
+    normalized_project = _normalize_project(
+        project_name=project_name,
+        redact_names_and_urls=redact_names_and_urls
+    )
+
     return NormalizedShortRepository(
         id=api_repo['uuid'],
         name=(
@@ -288,6 +302,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
             else _repo_redactor.redact_name(api_repo['name'])
         ),
         url=api_repo['links']['self']['href'] if not redact_names_and_urls else None,
+        project=normalized_project
     )
 
 
@@ -440,15 +455,22 @@ def _normalize_pr(
 
     # Commits
     commits = [
-        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+        _normalize_commit(api_commit=c,
+                          normalized_repo=repo,
+                          strip_text_content=strip_text_content,
+                          redact_names_and_urls=redact_names_and_urls)
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
 
     # Repo links
     base_repo = _normalize_short_form_repo(
-        api_pr['destination']['repository'], redact_names_and_urls
+        api_repo=api_pr['destination']['repository'],
+        redact_names_and_urls=redact_names_and_urls
     )
-    head_repo = _normalize_short_form_repo(api_pr['source']['repository'], redact_names_and_urls)
+    head_repo = _normalize_short_form_repo(
+        api_repo=api_pr['source']['repository'],
+        redact_names_and_urls=redact_names_and_urls
+    )
 
     return NormalizedPullRequest(
         id=api_pr['id'],

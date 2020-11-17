@@ -65,6 +65,7 @@ class NormalizedShortRepository:
     id: int
     name: str
     url: str
+    project: NormalizedProject
 
 
 @dataclass
@@ -80,7 +81,7 @@ class NormalizedRepository:
 
     def short(self):
         # return the short form of Normalized Repository
-        return NormalizedShortRepository(id=self.id, name=self.name, url=self.url)
+        return NormalizedShortRepository(id=self.id, name=self.name, url=self.url, project=self.project)
 
 
 @dataclass
