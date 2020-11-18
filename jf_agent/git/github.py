@@ -238,6 +238,10 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])
         ),
         'url': repo['html_url'] if not redact_names_and_urls else None,
+        # the head.repo or base.repo have the id, and login of their respective orgs in
+        # head.repo.owner (all except the name field)
+        'project': _normalize_project(repo['owner'], redact_names_and_urls=redact_names_and_urls
+                                      )
     }
 
 
