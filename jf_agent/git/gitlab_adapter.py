@@ -369,6 +369,12 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
         if not redact_names_and_urls
         else _repo_redactor.redact_name(api_repo.name),
         url=api_repo.web_url if not redact_names_and_urls else None,
+        # the short form for gitlab can omit the project, since api repo ids are unique
+        # regardless of what group they belong to. trying to get this data for
+        # a head or base repo will cause us to unnecessarily fetch group data for each
+        # pr, of which would highly increase the total number of requests
+        # (and slow processing down)
+        project=None
     )
 
 

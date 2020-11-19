@@ -1,7 +1,7 @@
 import pytz
 import os
 
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
@@ -65,7 +65,7 @@ class NormalizedShortRepository:
     id: int
     name: str
     url: str
-    project: NormalizedProject
+    project: Optional[NormalizedProject] = None
 
 
 @dataclass
