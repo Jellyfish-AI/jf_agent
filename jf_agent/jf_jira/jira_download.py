@@ -26,8 +26,9 @@ logger = logging.getLogger(__name__)
 # Returns an array of User dicts
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_users(jira_connection, gdpr_active):
-    print('downloading jira users... ', end='', flush=True)
+def download_users(jira_connection, gdpr_active, quiet=False):
+    if not quiet:
+        print('downloading jira users... ', end='', flush=True)
 
     jira_users = _search_all_users(jira_connection, gdpr_active)
 
@@ -37,7 +38,13 @@ def download_users(jira_connection, gdpr_active):
     if len(jira_users) == 1000:
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
-    print('✓')
+    if len(jira_users) == 0:
+        raise RuntimeError(
+            'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
+        )
+
+    if not quiet:
+        print('✓')
     return jira_users
 
 

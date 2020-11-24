@@ -16,6 +16,8 @@ The agent has several different usage modes:
 
 5. Show the names and urls of Git repositories that may be missing from Jellyfish by looking at the Development Jira custom field (to aid in agent configuration)(`print_apparently_missing_git_repos`).
 
+6. Validate the configuration file using APIs (`validate`).
+
 Data that you download from Jira and/or Git may be scrubbed to remove sensitive fields and values before you send it to Jellyfish.
 
 ## Installation / Configuration
@@ -204,6 +206,15 @@ docker run --rm \
 --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
 --env-file ./creds.env \
 jellyfishco/jf_agent:stable -m print_apparently_missing_git_repos
+```
+
+6. Validate configuration
+```
+docker pull jellyfishco/jf_agent:stable &&
+docker run --rm \
+--mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
+--env-file ./creds.env \
+jellyfishco/jf_agent:stable -m validate
 ```
 
 ## Jira Fields
