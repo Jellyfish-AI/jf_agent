@@ -27,15 +27,12 @@ You'll execute the agent by running a Docker container based on the distributed 
 ### Prerequisites
 
 1. Obtain your API token from Jellyfish.
-
-2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with the password for that user (for Jira server) or a personal API token for that user (for Jira cloud).
-
+2. For Jira: Gather your Jira credentials. You'll need a Jira username with read access to the right projects, along with an appropriate credential:
+   1. If using Jira server, use the password for that user.
+   2. If using Jira Cloud, create a personal API token (https://confluence.atlassian.com/cloud/api-tokens-938839638.html).
 3. For Bitbucket Server: Gather your Bitbucket Server credentials.
-
 4. For Bitbucket Cloud: Create an app password (https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword).
-
 5. For GitHub: Create a personal access token (https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
-
 6. For GitLab: Create a personal access token (https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
 
 ### Configuration
@@ -45,6 +42,7 @@ You'll execute the agent by running a Docker container based on the distributed 
 2. Create a file that contains the credentials you gathered above, specified in the [environment variable syntax](https://docs.docker.com/engine/reference/commandline/run/#set-environment-variables--e---env---env-file). The file should look like this:
 
 #### For Jira and Single Git Mode:
+If using Jira Cloud, use your personal API token for `JIRA_PASSWORD`
 ```
 JELLYFISH_API_TOKEN=...
 JIRA_USERNAME=...
@@ -52,7 +50,8 @@ JIRA_PASSWORD=...
 GITHUB_TOKEN=...
 ```
 
-For Jira and Bitbucket Server:
+#### For Jira and Bitbucket Server:
+If using Jira Cloud, use your personal API token for `JIRA_PASSWORD`
 ```
 JELLYFISH_API_TOKEN=...
 JIRA_USERNAME=...
@@ -61,7 +60,8 @@ BITBUCKET_USERNAME=...
 BITBUCKET_PASSWORD=...
 ```
 
-For Jira and Bitbucket Cloud:
+#### For Jira and Bitbucket Cloud:
+If using Jira Cloud, use your personal API token for `JIRA_PASSWORD`
 ```
 JELLYFISH_API_TOKEN=...
 JIRA_USERNAME=...
@@ -70,7 +70,8 @@ BITBUCKET_CLOUD_USERNAME=...
 BITBUCKET_CLOUD_APP_PASSWORD=...
 ```
 
-For Jira and GitLab:
+#### For Jira and GitLab:
+If using Jira Cloud, use your personal API token for `JIRA_PASSWORD`
 ```
 JELLYFISH_API_TOKEN=...
 JIRA_USERNAME=...
