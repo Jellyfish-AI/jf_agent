@@ -275,6 +275,7 @@ git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:
     git_provider = git_config.get('provider', git_provider_override)
+    git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
     git_instance_slug = git_config.get('instance_slug', None)
@@ -312,6 +313,10 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         )
         raise BadConfigException()
 
+    if git_provider == 'github' and ('api.github.com' not in git_url and '/api/v3' not in git_url):
+        print(f'ERROR: Github enterprise URL appears malformed.  Did you mean "{git_url}/api/v3"?')
+        raise BadConfigException()
+
     # gitlab must be in whitelist mode
     if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
         print(
@@ -331,7 +336,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     return GitConfig(
         git_provider=git_provider,
         git_instance_slug=git_instance_slug,
-        git_url=git_config.get('url', None),
+        git_url=git_url,
         git_include_projects=list(git_include_projects),
         git_exclude_projects=list(git_exclude_projects),
         git_include_repos=list(git_include_repos),
