@@ -773,6 +773,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
     # cross-reference them with git sources
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
+        print(f'Checking against the {git_config.git_provider} instance {git_config.git_instance_slug} ..')
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
             instance_creds = creds.git_instance_to_creds.get(instance_slug)
