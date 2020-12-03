@@ -119,10 +119,23 @@ def main():
             if config.run_mode_is_print_apparently_missing_git_repos:
 
                 jira_connection = get_basic_jira_connection(config, creds)
-                git_connections = [
-                    get_git_client(git_config, creds, skip_ssl_verification=config.skip_ssl_verification)
-                    for git_config in config.git_configs
-                ]
+
+                if len(config.git_configs) == 1:
+                    # support legacy single-git support, which assumes only one available git instance
+                    git_config = config.git_configs[0]
+                    instance_creds = list(creds.git_instance_to_creds.values())[0]
+                    git_connections = [
+                        get_git_client(git_config,instance_creds,skip_ssl_verification=config.skip_ssl_verification )
+                    ]
+                else:
+                    git_connections = [
+                        get_git_client(
+                            config=git_config,
+                            git_creds=creds.git_instance_to_creds.get(git_config.git_instance_slug),
+                            skip_ssl_verification = config.skip_ssl_verification
+                         )
+                        for git_config in config.git_configs
+                    ]
 
                 if jira_connection and git_connections:
                     issues_to_scan = get_issues_to_scan_from_jellyfish(
