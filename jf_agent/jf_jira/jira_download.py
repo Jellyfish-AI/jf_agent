@@ -761,7 +761,7 @@ def _search_users(
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
+def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connections):
     from jf_agent.git import get_repos_from_git
 
     print('Scanning Jira issues for Git repos...')
@@ -793,18 +793,20 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
                         'instance_type': instance_type,
                     }
 
-    try:
-        # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
-        # Jira may return inexact repo names/urls. Remove any mismatches found.
-        _remove_mismatched_repos(
-            missing_repositories, get_repos_from_git(git_connection, config), config
-        )
-    except Exception as e:
-        print(
-            f'WARNING: Got an error when trying to cross reference repos discoverd by '
-            f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
-            f'discovered by Jira...'
-        )
+    for git_connection in git_connections:
+        try:
+            # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
+            # Jira may return inexact repo names/urls. Remove any mismatches found.
+            _remove_mismatched_repos(
+                missing_repositories, get_repos_from_git(git_connection, config), config
+            )
+        except Exception as e:
+            print(
+                f'WARNING: Got an error when trying to cross-reference repos discovered by '
+                f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
+                f'discovered by Jira...'
+            )
+
     result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
     return result
 
