@@ -213,17 +213,14 @@ def obtain_config(args) -> ValidatedConfig:
             print(f'ERROR: {run_mode} requires git configuration.')
             raise BadConfigException()
 
-        if len(git_configs) > 1:
-            print(f'ERROR: {run_mode} is not currently supported for multiple Git instances.')
-            raise BadConfigException()
-
         if not (jira_url and git_configs[0].git_url):
             print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
             raise BadConfigException()
 
-        if git_configs[0].git_redact_names_and_urls:
-            print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
-            raise BadConfigException()
+        for git_config in git_configs:
+            if git_config.git_redact_names_and_urls:
+                print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
+                raise BadConfigException()
 
     return ValidatedConfig(
         run_mode,

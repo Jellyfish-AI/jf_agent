@@ -66,10 +66,8 @@ def print_all_jira_fields(config, jira_connection):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def print_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
-    missing_repos = download_missing_repos_found_by_jira(
-        issues_to_scan, config, jira_connection, git_connection
-    )
+def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
+    missing_repos = download_missing_repos_found_by_jira( config, creds, issues_to_scan)
     print(
         f'\nScanning the "Development" field on the Jira issues revealed {len(missing_repos)} Git repos apparently missing from Jellyfish'
     )

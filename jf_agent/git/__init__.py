@@ -371,7 +371,7 @@ def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: 
         return instance_pull_from_dt
 
 
-def get_repos_from_git(git_connection, config):
+def get_repos_from_git(git_connection, config: GitConfig):
     '''
     Gets git repositories for use in the `print_apparently_missing_git_repos` run mode
     to compare git repos from git sources against git repos found by jira
@@ -417,7 +417,11 @@ def get_repos_from_git(git_connection, config):
 
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-        gl_adapter = GitLabAdapter(git_connection)
+        gl_adapter = GitLabAdapter(
+            config=config,
+            outdir='', compress_output_files=False,
+            client=git_connection
+        )
 
         projects = gl_adapter.get_projects()
         repos = gl_adapter.get_repos(projects)
