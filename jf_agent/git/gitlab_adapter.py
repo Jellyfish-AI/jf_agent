@@ -88,6 +88,8 @@ class GitLabAdapter(GitAdapter):
         nrm_repos: List[NormalizedRepository] = []
         for nrm_project in normalized_projects:
 
+            repos_that_failed_to_download = []
+
             for i, api_repo in enumerate(
                 tqdm(
                     self.client.list_group_projects(nrm_project.id),
@@ -104,11 +106,41 @@ class GitLabAdapter(GitAdapter):
                 if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
                     continue  # skip this repo
 
-                nrm_branches = self.get_branches(api_repo)
+                try:
+                    nrm_branches = self.get_branches(api_repo)
+                except gitlab.exceptions.GitlabListError:
+                    # this is likely due to fine-tuned permissions defined on the repo (gitlab project)
+                    # that is not allowing us to access to its repo details. if this happens, make a note of it and
+                    # don't blow up the rest of the pull
+                    repos_that_failed_to_download.append(api_repo)
+                    continue  # skip this repo
+
                 nrm_repos.append(
                     _normalize_repo(
                         api_repo, nrm_branches, nrm_project, self.config.git_redact_names_and_urls
                     )
+                )
+
+            # if there were any repositories we had issues with... print them out now.
+            if repos_that_failed_to_download:
+
+                def __repo_log_string(api_repo):
+                    # build log string
+                    name = (
+                        api_repo.name
+                        if not self.config.git_redact_names_and_urls
+                        else _repo_redactor.redact_name(api_repo.name)
+                    )
+                    return {"id": api_repo.id, "name": name}.__str__()
+
+                repos_failed_string = ", ".join(
+                    [__repo_log_string(api_repo) for api_repo in repos_that_failed_to_download]
+                )
+                total_failed = len(repos_that_failed_to_download)
+
+                print(
+                    f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
+                    f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
                 )
 
         print('✓')
