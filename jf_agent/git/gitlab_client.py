@@ -96,8 +96,8 @@ class GitLabClient:
                 f'fetching approvals for merge_request {merge_request.id} -- '
                 f'handling it as if it has no approvals',
             )
-            merge_request.approved_by = []
-            merge_request.approvals = []
+            merge_request.approved_by = merge_request.approved_by if merge_request.approved_by else []
+            merge_request.approvals = merge_request.approvals if merge_request.approvals else []
 
         # convert the 'commit_list' generator into a list of objects
         merge_request.commit_list = merge_request.commits()
