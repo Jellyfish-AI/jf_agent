@@ -90,7 +90,7 @@ class GitLabClient:
             approvals = merge_request.approvals.get()
             merge_request.approved_by = approvals.approved_by
             merge_request.approvers = approvals.approvers
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
+        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError, AttributeError) as e:
             log_and_print_request_error(
                 e,
                 f'fetching approvals for merge_request {merge_request.id} -- '
