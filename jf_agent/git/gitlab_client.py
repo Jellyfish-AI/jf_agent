@@ -86,6 +86,7 @@ class GitLabClient:
             )
             merge_request.diff = ''
 
+        approvals = None
         try:
             approvals = merge_request.approvals.get()
             merge_request.approved_by = approvals.approved_by
@@ -98,6 +99,9 @@ class GitLabClient:
             )
             merge_request.approved_by = merge_request.approved_by if merge_request.approved_by else []
             merge_request.approvals = merge_request.approvals if merge_request.approvals else []
+            # OJ-8678: Diagnostics for AttributeError
+            print(f'DIAGNOSTIC: Merge Request = {merge_request}')
+            print(f'DIAGNOSTIC: Approvals = {approvals}')
 
         # convert the 'commit_list' generator into a list of objects
         merge_request.commit_list = merge_request.commits()
