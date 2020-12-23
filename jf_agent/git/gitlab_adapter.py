@@ -138,10 +138,12 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                print(
+                msg = (
                     f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
                     f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
                 )
+                logger.warning(msg)
+                print(msg)
 
         print('✓')
         if not nrm_repos:
