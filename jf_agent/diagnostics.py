@@ -23,7 +23,9 @@ def _write_diagnostic(obj):
 
 def capture_agent_version():
     git_head_hash = os.getenv('SHA')
+    build_timestamp = os.getenv('BUILD_TIMESTAMP')
     _write_diagnostic({'type': 'agent_version', 'sha': git_head_hash})
+    _write_diagnostic({'type': 'agent_version', 'timestamp': build_timestamp})
 
 
 def capture_timing(*args, **kwargs):
