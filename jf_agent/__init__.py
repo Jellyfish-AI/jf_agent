@@ -5,6 +5,7 @@ import dataclasses
 
 JELLYFISH_API_BASE = 'https://app.jellyfish.co'
 VALID_RUN_MODES = (
+    'validate',
     'download_and_send',
     'download_only',
     'send_only',

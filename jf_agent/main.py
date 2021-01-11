@@ -91,14 +91,69 @@ def main():
     args = parser.parse_args()
     config = obtain_config(args)
     creds = obtain_creds(config)
-    jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
 
-    if config.run_mode == 'send_only':
+    if config.run_mode == 'validate':
+        print('Validating configuration...')
+        from jf_jira import _get_raw_jira_connection
+
+        print('Jira details:')
+        print(f'  Jira URL:      {config.jira_url}')
+        print(f'  Jira Username: {creds.jira_username}')
+        pw_len = len(creds.jira_password) - 2
+        print(f'  Jira Password: {creds.jira_password[:2]:*<{pw_len}}')
+        # test Jira connection
+        try:
+            print('==> Testing jira connection...')
+            jira_connection = _get_raw_jira_connection(config, creds, max_retries=1)
+            jira_connection.myself()
+        except Exception as e:
+            if 'Basic authentication with passwords is deprecated.' in str(e):
+                print(
+                    f'Error connecting to Jira instance at {config.jira_url}. Please use a Jira API token, see https://confluence.atlassian.com/cloud/api-tokens-938839638.html.'
+                )
+            else:
+                print(
+                    f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
+                )
+            return
+
+        # test jira users permission
+        try:
+            print('==> Testing jira user browsing permissions...')
+            from jf_jira.jira_download import download_users
+
+            user_count = len(download_users(jira_connection, config.jira_gdpr_active, quiet=True))
+            print(f'The agent is aware of {user_count} Jira users.')
+
+        except Exception as e:
+            print(
+                f'Error downloading users from Jira instance at {config.jira_url}, please verify that this user has the "browse all users" permission. Error: {e}'
+            )
+            return
+
+        # test jira project access
+        print('==> Testing jira project permissions...')
+        accessible_projects = [p.key for p in jira_connection.projects()]
+        print(f'The agent has access to projects {accessible_projects}.')
+
+        if config.jira_include_projects:
+            for proj in config.jira_include_projects:
+                if proj not in accessible_projects:
+                    print(f'Error: Unable to access explicitly-included project {proj}.')
+                    return
+
+        print('Success!')
+
+        return
+
+    elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
 
     else:
+        jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
 
