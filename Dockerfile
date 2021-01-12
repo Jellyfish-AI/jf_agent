@@ -8,6 +8,9 @@ FROM python:3.7.4-slim
 ARG SHA=develop
 ENV SHA="${SHA}"
 
+ARG BUILDTIME=unknown
+ENV BUILDTIME="${BUILDTIME}"
+
 COPY --from=py-deps /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
 RUN pip install awscli && \
     mkdir -p /home/jf_agent && \
@@ -18,10 +21,6 @@ COPY --chown=jf_agent:jf_agent . /home/jf_agent
 RUN rm /home/jf_agent/Pipfile /home/jf_agent/Pipfile.lock
 WORKDIR /home/jf_agent
 ENV PYTHONPATH=/home/jf_agent
-
-# Run as last command to prevent caching
-ARG TIMESTAMP=$(date -u "+%Y%m%dT%H%M%SZ")
-ENV BUILD_TIMESTAMP="${TIMESTAMP}"
 
 USER jf_agent
 ENTRYPOINT ["python", "jf_agent/main.py"]
