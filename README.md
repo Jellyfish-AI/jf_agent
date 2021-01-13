@@ -37,6 +37,12 @@ You'll execute the agent by running a Docker container based on the distributed 
 5. For GitHub: Create a personal access token (https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
 6. For GitLab: Create a personal access token (https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
 
+7. Please ensure that your network firewall/proxies are configured such that the agent is able to:
+
+ - Make GET requests to the Jellyfish API at https://app.jellyfish.co:443/
+ - Make GET requests to your Jira and Git host(s) on port 443
+ - Make POST requests to URLs under s3.amazonaws.com on port 443
+
 ### Configuration
 
 1. Create a YAML config file to tell the agent how to run. You can base this on our [example config file](https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml). Save the YAML file on the host that will execute the agent.
