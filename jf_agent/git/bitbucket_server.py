@@ -319,13 +319,15 @@ def get_pull_requests(
                 except stashy.errors.NotFoundException:
                     additions, deletions, changed_files = None, None, None
                 except RetryError as e:
-                    print(f"Could not retrieve diff data for {pr['id']}")
+                    print(
+                        f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo['name']}"
+                    )
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.GenericException as e:
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
-                        f'Got error {e} on diffs for repo {pr["id"]}, skipping...',
+                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo["name"]}.  Skipping that PR...',
                     )
                     additions, deletions, changed_files = None, None, None
                 else:
@@ -345,9 +347,19 @@ def get_pull_requests(
                 merge_date = None
                 merged_by = None
 
-                for activity in sorted(
-                    [a for a in api_pr.activities()], key=lambda x: x['createdDate']
-                ):
+                activites = []
+                try:
+                    activites = sorted(
+                        [a for a in api_pr.activities()], key=lambda x: x['createdDate']
+                    )
+                except stashy.errors.GenericException as e:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.INFO,
+                        f'Error retrieving activity data for PR {api_pr["id"]} in repo {api_repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                    )
+
+                for activity in activites:
                     if activity['action'] == 'COMMENTED':
                         comments.append(
                             {
