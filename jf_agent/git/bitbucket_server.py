@@ -320,14 +320,14 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except RetryError as e:
                     print(
-                        f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo['name']}"
+                        f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo.get()['name']}"
                     )
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.GenericException as e:
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
-                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo["name"]}.  Skipping that PR...',
+                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
                     )
                     additions, deletions, changed_files = None, None, None
                 else:
@@ -356,7 +356,7 @@ def get_pull_requests(
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
-                        f'Error retrieving activity data for PR {api_pr["id"]} in repo {api_repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                        f'Error retrieving activity data for PR {api_pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
                     )
 
                 for activity in activites:
