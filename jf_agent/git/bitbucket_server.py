@@ -356,7 +356,7 @@ def get_pull_requests(
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
-                        f'Error retrieving activity data for PR {api_pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                        f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
                     )
 
                 for activity in activites:
