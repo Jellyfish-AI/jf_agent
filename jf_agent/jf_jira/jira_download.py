@@ -827,7 +827,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 if e.status_code == 403:
                     agent_logging.log_and_print(
                         logger,
-                        logger.ERROR,
+                        logging.ERROR,
                         f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
                     )
                     return []
