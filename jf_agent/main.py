@@ -174,9 +174,7 @@ def main():
             if config.run_mode_is_print_apparently_missing_git_repos:
 
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config,
-                    creds,
-                    args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(config, creds, issues_to_scan)

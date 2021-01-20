@@ -5,7 +5,7 @@ import math
 import random
 import re
 import traceback
-from typing import Dict
+from typing import Dict, List
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -138,8 +138,35 @@ def download_projects_and_versions(
     if exclude_categories:
         filters.append(lambda proj: proj.projectCategory.name not in exclude_categories)
 
+    def project_is_accessible(project_id):
+        try:
+            jira_connection.search_issues(f'project = {project_id}', fields=['id'])
+            return True
+        except JIRAError as e:
+            # Handle zombie projects that appear in the project list
+            # but are not actually accessible.  I don't know wtf Black
+            # is doing with this formatting, but whatever.
+            if (
+                e.status_code == 400
+                and e.text
+                == f"A value with ID '{project_id}' does not exist for the field 'project'."
+            ):
+                agent_logging.log_and_print(
+                    logger,
+                    logging.ERROR,
+                    f'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...',
+                )
+                return False
+            else:
+                raise
+
     all_projects = jira_connection.projects()
-    projects = [proj for proj in all_projects if all(filt(proj) for filt in filters)]
+    projects = [
+        proj
+        for proj in all_projects
+        if all(filt(proj) for filt in filters) and project_is_accessible(proj.id)
+    ]
+
     if not projects:
         raise Exception(
             'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
@@ -780,7 +807,9 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
     # cross-reference them with git sources
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
-        print(f'Checking against the {git_config.git_provider} instance {git_config.git_instance_slug} ..')
+        print(
+            f'Checking against the {git_config.git_provider} instance {git_config.git_instance_slug} ..'
+        )
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
             instance_creds = creds.git_instance_to_creds.get(instance_slug)
@@ -791,7 +820,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
         git_connection = get_git_client(
             config=git_config,
             git_creds=instance_creds,
-            skip_ssl_verification=config.skip_ssl_verification
+            skip_ssl_verification=config.skip_ssl_verification,
         )
         _remove_repos_present_in_git_instance(git_connection, git_config, missing_repositories)
 
