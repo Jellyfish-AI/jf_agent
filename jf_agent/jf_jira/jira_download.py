@@ -173,20 +173,32 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
     for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
         b_start_at = 0
         while True:
-            # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
-            project_boards = jira_connection._session.get(
-                url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
-                params={
-                    'maxResults': 50,
-                    'startAt': b_start_at,
-                    'type': 'scrum',
-                    'includePrivate': 'false',
-                    'projectKeyOrId': project_id,
-                },
-            ).json()['values']
+            try:
+                # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
+                project_boards = jira_connection._session.get(
+                    url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
+                    params={
+                        'maxResults': 50,
+                        'startAt': b_start_at,
+                        'type': 'scrum',
+                        'includePrivate': 'false',
+                        'projectKeyOrId': project_id,
+                    },
+                ).json()['values']
+            except JIRAError as e:
+                if e.status_code == 400:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.ERROR,
+                        f"You do not have the required permissions in jira required to "
+                        f"fetch boards for the project {project_id}",
+                    )
+                    break
+                raise
 
             if not project_boards:
                 break
+
             b_start_at += len(project_boards)
             boards_by_id.update({board['id']: board for board in project_boards})
 
@@ -815,7 +827,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 if e.status_code == 403:
                     agent_logging.log_and_print(
                         logger,
-                        logger.ERROR,
+                        logging.ERROR,
                         f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
                     )
                     return []
