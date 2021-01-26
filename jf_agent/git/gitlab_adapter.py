@@ -289,6 +289,43 @@ class GitLabAdapter(GitAdapter):
 
     print('✓')
 
+    def get_pr(self, jf_repo, pr_id):
+        project_id = _get_project_id(jf_repo)
+        project = self.client.get_project(project_id)
+
+        for mr in project.mergerequests.list():
+            if mr.id == pr_id:
+                return mr
+
+        logger.error(f"Merge request with id {pr_id} not in project {project.name}")
+        return None
+
+    @diagnostics.capture_timing()
+    @agent_logging.log_entry_exit(logger)
+    def get_mergerequest_files(self, jf_repo, mergerequest_id):
+        merge_request = self.get_pr(jf_repo, mergerequest_id)
+
+        # re-assign merge request to have more information
+        formatted_response = {}
+        if merge_request:
+            merge_request = self.client.expand_merge_request_data(merge_request)
+
+            changes = merge_request.changes()['changes']
+            for x in changes:
+                additions, deletions, changed_files = calculate_diff_counts(
+                    merge_request.id, x['diff']
+                )
+                formatted_response[x['new_path']] = {
+                    'additions': additions,
+                    'deletions': deletions,
+                    'changes': additions + deletions,
+                    'sha': merge_request.sha,
+                    'status': 'modified'
+                    if not (x['new_file'] or x['deleted_file'])
+                    else ('added' if x['new_file'] else 'deleted'),
+                }
+        return formatted_response
+
 
 '''
     
@@ -535,3 +572,6 @@ def _get_attribute(object, property, default=None):
         return value if value else default
     except AttributeError:
         return default
+
+def _get_project_id(jf_repo):
+    return jf_repo.repo_id

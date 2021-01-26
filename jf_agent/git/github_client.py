@@ -69,6 +69,20 @@ class GithubClient:
         url = f'{self.base_url}/repos/{full_repo}/pulls?state=all&sort=updated&direction=desc'
         return (self.get_json(m['url']) for m in self.get_all_pages(url))
 
+    def get_pr_files(self, jf_repo, pr_id):
+        raw_result = self.get_all_pages(f'{self.base_url}/repos/{jf_repo}/pulls/{pr_id}/files')
+        blacklisted_keys = ['patch', '_url', 'filename']
+
+        filtered_result = {
+            x['filename']: {
+                key: value
+                for key, value in x.items()
+                if not any(blacklisted_key in key for blacklisted_key in blacklisted_keys)
+            }
+            for x in raw_result
+        }
+        return filtered_result
+
     def get_pr_comments(self, full_repo, pr_id):
         url = f'{self.base_url}/repos/{full_repo}/pulls/{pr_id}/comments'
         return self.get_all_pages(url)

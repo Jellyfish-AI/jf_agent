@@ -216,6 +216,41 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
+@agent_logging.log_entry_exit(logger)
+def get_pr_files(client, jf_repo, pr_id):
+    api_pr = _get_pr(client, jf_repo, pr_id)
+    files = {}
+    # Parse pr diffs to get additions, deletions, and changed files
+    try:
+        diffs = api_pr.diff().diffs
+    except stashy.errors.NotFoundException:
+        logger.warning(f"PR #{pr_id} not found in repo {jf_repo}, skipping...")
+        return files
+    for diff in diffs:
+        source = diff.source
+        destination = diff.destination
+
+        file_status = 'modified' if source and destination else 'removed' if source else 'added'
+        filename = source.toString if source else destination.toString
+
+        additions, deletions = 0, 0
+        for hunk in diff.hunks:
+            for segment in hunk['segments']:
+                if segment['type'] == 'ADDED':
+                    additions += len(segment['lines'])
+                if segment['type'] == 'REMOVED':
+                    deletions += len(segment['lines'])
+        files[filename] = {
+            "sha": None,  # not needed (yet)
+            "status": file_status,
+            "changes": additions + deletions,
+            "additions": additions,
+            "deletions": deletions,
+        }
+
+    return files
+
+
 def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
@@ -446,3 +481,12 @@ def get_pull_requests(
                 }
 
                 yield normalized_pr
+
+
+def _get_pr(client, jf_repo, pr_id):
+    return (
+        client
+        .projects[jf_repo.organization.login]
+        .repos[jf_repo.name]
+        .pull_requests[pr_id]
+    )

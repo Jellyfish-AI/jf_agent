@@ -2,6 +2,7 @@ from collections import deque
 from datetime import datetime, timedelta
 import logging
 import time
+import json
 
 import requests
 from requests.utils import default_user_agent
@@ -89,6 +90,25 @@ class BitbucketCloudClient:
     def pr_commits(self, owner, repository_uuid, pr_id):
         url = f'{self.server_base_uri}/2.0/repositories/{owner}/{repository_uuid}/pullrequests/{pr_id}/commits'
         return self.get_all_pages(url, ignore404=True)  # no rate limiting
+
+    def get_pullrequest_files(self, owner, repository_uuid, pull_request_id):
+        pullrequest_data = self.get_pullrequest(owner, repository_uuid, pull_request_id)
+        diffstat_url = pullrequest_data['links']['diffstat']['href']
+
+        diffstat_data = json.loads(self.get_raw_result(diffstat_url).text)
+
+        file_metadata = {
+            diff['new']['path']: {
+                "sha": None,  # not necessary info (for now)
+                "status": diff['status'],
+                "changes": diff['lines_added'] + diff['lines_removed'],
+                "additions": diff['lines_added'],
+                "deletions": diff['lines_removed'],
+            }
+            for diff in diffstat_data['values']
+        }
+
+        return file_metadata
 
     # Raw web service operations with optional rate limiting
     def get_json(self, url, rate_limit_realm=None):
