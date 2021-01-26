@@ -504,7 +504,10 @@ def download_necessary_issues(
 # The Jira API can sometimes include fields in the changelog that
 # were excluded from the list of fields. Strip them out.
 def _filter_changelogs(issues, include_fields, exclude_fields):
-    def _strip_history_items(items, key):
+    def _strip_history_items(items):
+        # Skip items that:
+        #  - don't have a fieldId at all (occasional internal stuff?)
+        #  - were a change of a field that's filtered out
         for i in items:
             if 'fieldId' not in i:
                 continue
@@ -514,16 +517,20 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
                 continue
             yield i
 
-    def _strip_changelog_histories(histories, key):
+    def _strip_changelog_histories(histories):
+        # omit any histories that, when filtered, have no items.  ie, if
+        # a user only changed fields that we've stripped, cut out that
+        # history record entirely
         for h in histories:
-            stripped_items = list(_strip_history_items(h['items'], key))
+            stripped_items = list(_strip_history_items(h['items']))
             if stripped_items:
                 yield {**h, 'items': stripped_items}
 
-    def _strip_changelog(c, key):
-        return {**c, 'histories': list(_strip_changelog_histories(c['histories'], key))}
+    def _strip_changelog(c):
+        # copy a changelog, stripping excluded fields from the history
+        return {**c, 'histories': list(_strip_changelog_histories(c['histories']))}
 
-    return [{**i, 'changelog': _strip_changelog(i['changelog'], i['key'])} for i in issues]
+    return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
 
 
 @agent_logging.log_entry_exit(logger)
