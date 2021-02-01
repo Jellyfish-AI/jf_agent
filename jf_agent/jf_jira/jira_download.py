@@ -495,10 +495,7 @@ def download_necessary_issues(
                     new_issues_this_batch.append(issue)
             prog_bar.update(len(new_issues_this_batch))
 
-            if not include_fields and not exclude_fields:
-                yield new_issues_this_batch
-            else:
-                yield _filter_changelogs(new_issues_this_batch, include_fields, exclude_fields)
+            yield _filter_changelogs(new_issues_this_batch, include_fields, exclude_fields)
 
     for t in threads:
         t.join()
@@ -512,8 +509,10 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         for i in items:
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
-                logger.warning(
-                    f"OJ-9084: Changlog history item with no 'fieldId' or 'field' key: {i}"
+                agent_logging.log_and_print(
+                    logger=logger,
+                    level=logger.warning,
+                    msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -537,7 +536,10 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         # copy a changelog, stripping excluded fields from the history
         return {**c, 'histories': list(_strip_changelog_histories(c['histories']))}
 
-    return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
+    if not include_fields and not exclude_fields:
+        return issues
+    else:
+        return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
 
 
 @agent_logging.log_entry_exit(logger)
