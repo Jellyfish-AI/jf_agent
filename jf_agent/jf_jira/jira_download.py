@@ -536,10 +536,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         # copy a changelog, stripping excluded fields from the history
         return {**c, 'histories': list(_strip_changelog_histories(c['histories']))}
 
-    if not include_fields and not exclude_fields:
-        return issues
-    else:
-        return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
+    return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
 
 
 @agent_logging.log_entry_exit(logger)
