@@ -343,7 +343,7 @@ def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: 
     assert commits_or_prs in ('commits', 'prs')
 
     instance_pull_from_dt = pytz.utc.localize(datetime.fromisoformat(instance_info['pull_from']))
-    instance_info_this_repo = instance_info['repos_dict_v2'].get(repo_id)
+    instance_info_this_repo = instance_info['repos_dict_v2'].get(str(repo_id))
 
     if instance_info_this_repo:
         if commits_or_prs == 'commits':
