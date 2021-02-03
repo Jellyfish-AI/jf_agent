@@ -505,17 +505,23 @@ def download_necessary_issues(
 # were excluded from the list of fields. Strip them out.
 def _filter_changelogs(issues, include_fields, exclude_fields):
     def _strip_history_items(items):
-        # Skip items that:
-        #  - don't have a fieldId at all (occasional internal stuff?)
-        #  - were a change of a field that's filtered out
+        # Skip items that are a change of a field that's filtered out
         for i in items:
-            if 'fieldId' not in i:
+            field_id_field = _get_field_identifier(i)
+            if not field_id_field:
+                agent_logging.log_and_print(
+                    logger=logger,
+                    level=logger.warning,
+                    msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
+                )
+            if include_fields and i.get(field_id_field) not in include_fields:
                 continue
-            if include_fields and i['fieldId'] not in include_fields:
-                continue
-            if i['fieldId'] in exclude_fields:
+            if i.get(field_id_field) in exclude_fields:
                 continue
             yield i
+
+    def _get_field_identifier(item) -> str:
+        return 'fieldId' if 'fieldId' in item else 'field' if 'field' in item else None
 
     def _strip_changelog_histories(histories):
         # omit any histories that, when filtered, have no items.  ie, if
