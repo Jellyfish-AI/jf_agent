@@ -142,19 +142,15 @@ def obtain_config(args) -> ValidatedConfig:
     if jira_include_fields:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
-            logger.warning(
-                f'Missing recommended jira_fields! For the best possible experience, '
+            raise Exception(f'Missing recommended jira_fields! For the best possible experience, '
                 f'please add the following to `include_fields` in the '
-                f'configuration file: {list(missing_required_fields)}'
-            )
+                f'configuration file: {list(missing_required_fields)}')
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
-            logger.warning(
-                f'Excluding recommended jira_fields! For the best possible experience, '
+            raise Exception(f'Excluding recommended jira_fields! For the best possible experience, '
                 f'please remove the following from `exclude_fields` in the '
-                f'configuration file: {list(excluded_required_fields)}'
-            )
+                f'configuration file: {list(excluded_required_fields)}')
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
 
