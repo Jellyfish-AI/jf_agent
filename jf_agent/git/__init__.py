@@ -245,6 +245,7 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             return GitLabClient(
                 server_url=config.git_url,
                 private_token=git_creds['gitlab_token'],
+                verify=not skip_ssl_verification,
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
