@@ -291,9 +291,9 @@ class GitLabAdapter(GitAdapter):
 
 
 '''
-    
+
     Massage Functions
-    
+
 '''
 
 
@@ -389,7 +389,7 @@ def _normalize_commit(
         author=author,
         url=commit_url,
         commit_date=api_commit.committed_date,
-        author_date=api_commit.committed_date,
+        author_date=api_commit.authored_date,
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=normalized_repo.short(),  # use short form of repo
@@ -493,8 +493,8 @@ def _normalize_pr(
 
 '''
 
-    Helpers 
-    
+    Helpers
+
 '''
 
 
