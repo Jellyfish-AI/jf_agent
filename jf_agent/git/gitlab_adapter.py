@@ -420,6 +420,7 @@ def _get_normalized_pr_comments(
                 user=_normalize_user(note.author),
                 body=sanitize_text(note.body, strip_text_content),
                 created_at=note.created_at,
+                system_generated=note.system,
             )
             for note in merge_request.note_list
         ]
