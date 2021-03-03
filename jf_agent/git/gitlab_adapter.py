@@ -138,12 +138,14 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                msg = (
-                    f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
-                    f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    (
+                        f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
+                        f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
+                    ),
                 )
-                logger.warning(msg)
-                print(msg)
 
         print('✓')
         if not nrm_repos:
@@ -227,8 +229,11 @@ class GitLabAdapter(GitAdapter):
                     total_api_prs = api_prs.total
 
                     if total_api_prs == 0:
-                        print(f'no prs found for repo {nrm_repo.id}. Skipping... ')
-                        logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'no prs found for repo {nrm_repo.id}. Skipping... ',
+                        )
                         continue
 
                     for api_pr in tqdm(

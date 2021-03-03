@@ -2,6 +2,8 @@ import gitlab
 import logging
 import requests
 
+from jf_agent import agent_logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,10 +21,13 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
     error_name = type(e).__name__
 
     if log_as_exception:
-        logger.exception(f'Got {error_name} {response_code} when {action} ({e})')
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Got {error_name} {response_code} when {action} ({e})'
+        )
     else:
-        logger.warning(f'Got {error_name} {response_code} when {action}')
-    print(f'Got {error_name} ({e}) when {action}')
+        agent_logging.log_and_print(
+            logger, logging.WARNING, f'Got {error_name} {response_code} when {action}'
+        )
 
 
 class GitLabClient:
