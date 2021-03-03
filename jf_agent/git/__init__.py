@@ -419,9 +419,7 @@ def get_repos_from_git(git_connection, config: GitConfig):
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
         gl_adapter = GitLabAdapter(
-            config=config,
-            outdir='', compress_output_files=False,
-            client=git_connection
+            config=config, outdir='', compress_output_files=False, client=git_connection
         )
 
         projects = gl_adapter.get_projects()

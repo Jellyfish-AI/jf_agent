@@ -213,7 +213,7 @@ class GitLabAdapter(GitAdapter):
         print('downloading gitlab prs... ', end='', flush=True)
 
         for i, nrm_repo in enumerate(
-            tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
+            tqdm(normalized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):

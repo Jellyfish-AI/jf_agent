@@ -24,7 +24,7 @@ class BitbucketCloudClient:
             }
         )
         self.session.headers.update(
-            {'Accept': 'application/json', 'User-Agent': f'jellyfish/1.0 ({default_user_agent()})',}
+            {'Accept': 'application/json', 'User-Agent': f'jellyfish/1.0 ({default_user_agent()})'}
         )
 
     def get_all_repos(self, owner):
