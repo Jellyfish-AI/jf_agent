@@ -5,7 +5,7 @@ import math
 import random
 import re
 import traceback
-from typing import Dict, List
+from typing import Dict
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -174,7 +174,7 @@ def download_projects_and_versions(
 
     print('✓')
 
-    print(f'downloading jira project components... ', end='', flush=True)
+    print('downloading jira project components... ', end='', flush=True)
     for p in projects:
         p.raw.update({'components': [c.raw for c in jira_connection.project_components(p)]})
     print('✓')
@@ -438,7 +438,7 @@ def download_necessary_issues(
     field_spec.extend(f'-{field}' for field in exclude_fields)
 
     actual_batch_size = jira_connection.search_issues(
-        f'order by id asc',
+        'order by id asc',
         fields=field_spec,
         expand='renderedFields,changelog',
         startAt=0,
@@ -658,7 +658,7 @@ def _expand_changelog(jira_issues, jira_connection):
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
 def download_worklogs(jira_connection, issue_ids):
-    print(f'downloading jira worklogs... ', end='', flush=True)
+    print('downloading jira worklogs... ', end='', flush=True)
     updated = []
     since = 0
     while True:
@@ -698,7 +698,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print(
-                logger, logging.ERROR, f'Error calling createmeta JIRA endpoint', exc_info=True
+                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', exc_info=True
             )
             return []
 
@@ -895,7 +895,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                     agent_logging.log_and_print(
                         logger,
                         logging.ERROR,
-                        f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
+                        "you do not have the required 'development field' permissions in jira required to scan for missing repos",
                     )
                     return []
 
@@ -976,7 +976,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
     if not (repos_found_by_jira and git_repos):
         return
 
-    print(f'comparing repos found by Jira against Git repos to find missing ones...')
+    print('comparing repos found by Jira against Git repos to find missing ones...')
 
     git_repo_names = []
     git_repo_urls = []
@@ -1010,7 +1010,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
 
     if len(ignore_repos):
         print(
-            f'\nJira found the following repos but per your config file, Jellyfish already has access:'
+            '\nJira found the following repos but per your config file, Jellyfish already has access:'
         )
         for repo in ignore_repos:
             print(f"* {repo[0]:30}\t{repo[1]}")

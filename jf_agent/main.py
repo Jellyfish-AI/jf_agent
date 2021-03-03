@@ -77,8 +77,8 @@ def main():
         type=int,
         choices=range(1, 7),
         help=(
-            f'scan jira issues that have been updated since the given number of months back (max is 6) '
-            f'for git repo data, leave blank to only check issues updated in the past month'
+            'scan jira issues that have been updated since the given number of months back (max is 6) '
+            'for git repo data, leave blank to only check issues updated in the past month'
         ),
     )
     parser.add_argument(
@@ -267,7 +267,7 @@ def _get_git_instance_to_creds(git_config):
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
-        print(f'ERROR: JELLYFISH_API_TOKEN not found in the environment.')
+        print('ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         raise BadConfigException()
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
@@ -311,8 +311,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
         print(
-            f'ERROR: A Git instance is configured, but no Git instance '
-            f'info returned from the Jellyfish API -- please contact Jellyfish'
+            'ERROR: A Git instance is configured, but no Git instance '
+            'info returned from the Jellyfish API -- please contact Jellyfish'
         )
         raise BadConfigException()
 
@@ -491,7 +491,7 @@ def send_data(config, creds):
 
     if any(thread_exceptions):
         print(
-            f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
+            'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         return
 
@@ -510,7 +510,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     if updated_within_last_x_months:
         params.update({'monthsback': updated_within_last_x_months})
 
-    print(f'Fetching Jira issues that are missing Git repo data in Jellyfish...')
+    print('Fetching Jira issues that are missing Git repo data in Jellyfish...')
 
     resp = requests.get(
         f'{base_url}/endpoints/agent/unlinked-dev-issues',

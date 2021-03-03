@@ -1,11 +1,12 @@
+from collections import namedtuple
+from dataclasses import dataclass
+from datetime import datetime, date
 import logging
 import os
+from typing import List
 import urllib3
 import yaml
-from collections import namedtuple
-from datetime import datetime, date
-from typing import List
-from dataclasses import dataclass
+
 from jf_agent import VALID_RUN_MODES, BadConfigException
 
 logger = logging.getLogger(__name__)
@@ -82,11 +83,11 @@ required_jira_fields = [
 def obtain_config(args) -> ValidatedConfig:
     if args.since:
         print(
-            f'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
+            'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
         )
     if args.until:
         print(
-            f'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
+            'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
         )
 
     jellyfish_api_base = args.jellyfish_api_base
@@ -120,7 +121,7 @@ def obtain_config(args) -> ValidatedConfig:
 
     jira_earliest_issue_dt = jira_config.get('earliest_issue_dt', None)
     if jira_earliest_issue_dt is not None and type(jira_earliest_issue_dt) != date:
-        print(f'ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
+        print('ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
         raise BadConfigException()
 
     jira_issue_download_concurrent_threads = jira_config.get(
@@ -286,11 +287,11 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_exclude_repos = set(git_config.get('exclude_repos', []))
 
     if multiple and not git_instance_slug:
-        print(f'ERROR: Git `instance_slug` is required for multiple Git instance mode.')
+        print('ERROR: Git `instance_slug` is required for multiple Git instance mode.')
         raise BadConfigException()
 
     if multiple and not creds_envvar_prefix:
-        print(f'ERROR: `creds_envvar_prefix` is required for multiple Git instance mode.')
+        print('ERROR: `creds_envvar_prefix` is required for multiple Git instance mode.')
         raise BadConfigException()
 
     if git_provider is None:
