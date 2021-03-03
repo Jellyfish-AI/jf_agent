@@ -100,6 +100,7 @@ class NormalizedPullRequestComment:
     user: NormalizedUser
     body: str
     created_at: str
+    system_generated: bool = None
 
 
 @dataclass
