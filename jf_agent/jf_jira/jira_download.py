@@ -511,7 +511,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
             if not field_id_field:
                 agent_logging.log_and_print(
                     logger=logger,
-                    level=logger.warning,
+                    level=logging.WARNING,
                     msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
                 )
             if include_fields and i.get(field_id_field) not in include_fields:

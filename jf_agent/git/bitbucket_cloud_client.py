@@ -142,7 +142,9 @@ class BitbucketCloudClient:
                     page = self.get_json(url, rate_limit_realm)
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404 and ignore404:
-                        logger.info(f'Caught a 404 for {url} - ignoring')
+                        agent_logging.log_and_print(
+                            logger, logging.INFO, f'Caught a 404 for {url} - ignoring'
+                        )
                         return
                     raise
 
