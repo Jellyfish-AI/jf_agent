@@ -443,6 +443,7 @@ def get_pull_requests(
                     'merge_date': merge_date,
                     'merged_by': merged_by,
                     'commits': commits,
+                    'merge_commit': None,
                 }
 
                 yield normalized_pr

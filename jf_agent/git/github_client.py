@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import logging
 import pytz
 import requests
+from requests import HTTPError
 from requests.utils import default_user_agent
 import time
 
@@ -80,6 +81,18 @@ class GithubClient:
     def get_pr_commits(self, full_repo, pr_id):
         url = f'{self.base_url}/repos/{full_repo}/pulls/{pr_id}/commits'
         return self.get_all_pages(url)
+
+    def get_commit_by_ref(self, full_repo_name, ref):
+        url = f'{self.base_url}/repos/{full_repo_name}/commits/{ref}'
+        try:
+            raw = self.get_raw_result(url)
+            return raw.json()
+        except HTTPError as e:
+            if e.response.status_code in (422,):
+                logger.warning(
+                    f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref'
+                )
+                return None
 
     # Raw web service operations with optional rate limiting
     def get_json(self, url):

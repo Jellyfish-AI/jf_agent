@@ -18,11 +18,11 @@ _repo_redactor = NameRedactor()
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def load_and_dump(
-    config: GitConfig,
-    outdir: str,
-    compress_output_files: bool,
-    endpoint_git_instance_info: dict,
-    git_conn,
+        config: GitConfig,
+        outdir: str,
+        compress_output_files: bool,
+        endpoint_git_instance_info: dict,
+        git_conn,
 ):
     write_file(
         outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
@@ -189,7 +189,7 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
 
 @agent_logging.log_entry_exit(logger)
 def get_repos(
-    client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
+        client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
 ):
     print('downloading github repos... ', end='', flush=True)
 
@@ -242,11 +242,11 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-    client: GithubClient,
-    api_repos,
-    strip_text_content,
-    server_git_instance_info,
-    redact_names_and_urls,
+        client: GithubClient,
+        api_repos,
+        strip_text_content,
+        server_git_instance_info,
+        redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
@@ -255,14 +255,14 @@ def get_default_branch_commits(
             )
             try:
                 for j, commit in enumerate(
-                    tqdm(
-                        client.get_commits(
-                            repo['full_name'], repo['default_branch'], since=pull_since, until=None
+                        tqdm(
+                            client.get_commits(
+                                repo['full_name'], repo['default_branch'], since=pull_since, until=None
+                            ),
+                            desc=f'downloading commits for {repo["name"]}',
+                            unit='commits',
                         ),
-                        desc=f'downloading commits for {repo["name"]}',
-                        unit='commits',
-                    ),
-                    start=1,
+                        start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                         yield _normalize_commit(
@@ -271,6 +271,19 @@ def get_default_branch_commits(
 
             except Exception as e:
                 print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
+
+
+def _get_merge_commit(client: GithubClient, pr):
+    if pr['merged'] and pr['merge_commit_sha']:
+        api_merge_commit = client.get_commit_by_ref(
+            pr['base']['repo']['full_name'], pr['merge_commit_sha']
+        )
+        if api_merge_commit:
+            return _normalize_commit(pr['base']['repo']['full_name'], api_merge_commit)
+        else:
+            return None
+    else:
+        return None
 
 
 def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
@@ -329,15 +342,16 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
                 unit='commits',
             )
         ],
+        'merge_commit': _get_merge_commit()
     }
 
 
 def get_pull_requests(
-    client: GithubClient,
-    api_repos,
-    strip_text_content,
-    server_git_instance_info,
-    redact_names_and_urls,
+        client: GithubClient,
+        api_repos,
+        strip_text_content,
+        server_git_instance_info,
+        redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
@@ -346,12 +360,12 @@ def get_pull_requests(
             )
             try:
                 for j, pr in enumerate(
-                    tqdm(
-                        client.get_pullrequests(repo['full_name']),
-                        desc=f'downloading PRs for {repo["name"]}',
-                        unit='prs',
-                    ),
-                    start=1,
+                        tqdm(
+                            client.get_pullrequests(repo['full_name']),
+                            desc=f'downloading PRs for {repo["name"]}',
+                            unit='prs',
+                        ),
+                        start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
                         updated_at = parser.parse(pr['updated_at'])

@@ -443,6 +443,13 @@ def _normalize_pr(
         _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
+    if api_pr['state'] == 'MERGED' and api_pr['merge_commit'].get('hash'):
+        api_merge_commit = client.get_commit(
+            repo.organization.login,
+            api_pr['source']['repository']['uuid'],
+            api_pr['merge_commit']['hash']
+        )
+        merge_commit = _normalize_commit(api_merge_commit, repo, strip_text_content, redact_names_and_urls)
 
     # Repo links
     base_repo = _normalize_short_form_repo(
@@ -472,6 +479,7 @@ def _normalize_pr(
         merged_by=merged_by,
         approvals=approvals,
         commits=commits,
+        merge_commit=merge_commit,
         comments=comments,
     )
 
