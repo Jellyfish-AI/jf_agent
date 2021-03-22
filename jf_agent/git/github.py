@@ -1,7 +1,7 @@
 from dateutil import parser
 import logging
 from tqdm import tqdm
-
+import traceback
 from jf_agent.git import GithubClient
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
@@ -273,13 +273,14 @@ def get_default_branch_commits(
                 print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
 
 
-def _get_merge_commit(client: GithubClient, pr):
+def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
     if pr['merged'] and pr['merge_commit_sha']:
         api_merge_commit = client.get_commit_by_ref(
             pr['base']['repo']['full_name'], pr['merge_commit_sha']
         )
         if api_merge_commit:
-            return _normalize_commit(pr['base']['repo']['full_name'], api_merge_commit)
+            return _normalize_commit(api_merge_commit, pr['base']['repo'],
+                                     strip_text_content, redact_names_and_urls)
         else:
             return None
     else:
@@ -342,7 +343,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
                 unit='commits',
             )
         ],
-        'merge_commit': _get_merge_commit()
+        'merge_commit': _get_merge_commit(client, pr, strip_text_content, redact_names_and_urls)
     }
 
 
@@ -378,5 +379,5 @@ def get_pull_requests(
                         yield _normalize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
             except Exception as e:
-                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
+                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. {traceback.format_exc()} Skipping...')
     print()
