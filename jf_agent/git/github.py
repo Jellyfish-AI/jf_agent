@@ -1,7 +1,7 @@
 from dateutil import parser
 import logging
 from tqdm import tqdm
-import traceback
+
 from jf_agent.git import GithubClient
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
@@ -379,5 +379,5 @@ def get_pull_requests(
                         yield _normalize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
             except Exception as e:
-                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. {traceback.format_exc()} Skipping...')
+                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
     print()
