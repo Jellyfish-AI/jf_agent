@@ -445,7 +445,7 @@ def _normalize_pr(
     ]
     if api_pr['state'] == 'MERGED' and api_pr['merge_commit'].get('hash'):
         api_merge_commit = client.get_commit(
-            repo.organization.login,
+            repo.project.id,
             api_pr['source']['repository']['uuid'],
             api_pr['merge_commit']['hash']
         )

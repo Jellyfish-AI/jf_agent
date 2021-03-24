@@ -139,3 +139,10 @@ class GitLabClient:
     def list_project_commits(self, project_id, since_date):
         project = self.get_project(project_id)
         return project.commits.list(since=since_date, as_list=False)
+
+    def get_project_commit(self, project_id, sha):
+        project = self.get_project(project_id)
+        try:
+            return project.commits.get(sha)
+        except gitlab.exceptions.GitlabGetError:
+            return None
