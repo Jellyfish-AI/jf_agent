@@ -443,7 +443,12 @@ def _normalize_pr(
         _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
-    if api_pr['state'] == 'MERGED' and api_pr['merge_commit'].get('hash'):
+    if (
+        api_pr['state'] == 'MERGED'
+        and 'merge_commit' in api_pr
+        and api_pr['merge_commit']
+        and api_pr['merge_commit'].get('hash')
+    ):
         api_merge_commit = client.get_commit(
             repo.project.id,
             api_pr['source']['repository']['uuid'],
