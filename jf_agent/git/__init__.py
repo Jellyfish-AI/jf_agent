@@ -130,6 +130,7 @@ class NormalizedPullRequest:
     author: NormalizedUser
     merged_by: NormalizedUser
     commits: List[NormalizedCommit]
+    merge_commit: NormalizedCommit
     comments: List[NormalizedPullRequestComment]
     approvals: List[NormalizedPullRequestReview]
     base_repo: NormalizedShortRepository
