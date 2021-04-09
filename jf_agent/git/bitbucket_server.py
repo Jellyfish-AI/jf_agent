@@ -239,10 +239,10 @@ def get_default_branch_commits(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose,
 ):
     for i, api_repo in enumerate(api_repos, start=1):
-        if verbose:
-            print(f"Beginning download of commits for repo {api_repo}")
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             repo = api_repo.get()
+            if verbose:
+                print(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
@@ -253,7 +253,7 @@ def get_default_branch_commits(
                     api_repo.default_branch['displayId'] if api_repo.default_branch else ''
                 )
                 if verbose:
-                    print("Getting list of commits.")
+                    print(f"Beginning download of commits for repo {repo['name']}.")
                 commits = api_project.repos[repo['name']].commits(until=default_branch)
 
                 for j, commit in enumerate(
@@ -277,8 +277,6 @@ def get_default_branch_commits(
                 print(
                     f'WARN: Got NotFoundException for branch \"{repo.get("default_branch_name", "")}\": {e}. Skipping...'
                 )
-        if verbose:
-            print(f"End of commits for repo {api_repo}")
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
@@ -461,5 +459,3 @@ def get_pull_requests(
                 }
 
                 yield normalized_pr
-        if verbose:
-            print(f"Ending download of PRs for repo {repo}")
