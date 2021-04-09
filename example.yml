@@ -180,7 +180,10 @@ git:
   # Redact names and URLs for projects, repos, branches.
   redact_names_and_urls: False
 
-######################################
+  # More verbose local logging (currently only available on Bitbucket Server).
+  verbose: False
+
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 # 3b. Multiple instance config example
 #
 # Note: all of the fields from the single instance config example are available
