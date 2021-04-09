@@ -1,12 +1,13 @@
+from collections import namedtuple
+from dataclasses import dataclass
+from datetime import datetime, date
 import logging
 import os
+from typing import List
 import urllib3
 import yaml
-from collections import namedtuple
-from datetime import datetime, date
-from typing import List
-from dataclasses import dataclass
-from jf_agent import VALID_RUN_MODES, BadConfigException
+
+from jf_agent import VALID_RUN_MODES, BadConfigException, agent_logging
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,11 @@ required_jira_fields = [
 def obtain_config(args) -> ValidatedConfig:
     if args.since:
         print(
-            f'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
+            'WARNING: The -s / --since argument is deprecated and has no effect. You can remove its setting.'
         )
     if args.until:
         print(
-            f'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
+            'WARNING: The -u / --until argument is deprecated and has no effect. You can remove its setting.'
         )
 
     jellyfish_api_base = args.jellyfish_api_base
@@ -121,7 +122,7 @@ def obtain_config(args) -> ValidatedConfig:
 
     jira_earliest_issue_dt = jira_config.get('earliest_issue_dt', None)
     if jira_earliest_issue_dt is not None and type(jira_earliest_issue_dt) != date:
-        print(f'ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
+        print('ERROR: Invalid format for earliest_issue_dt; should be YYYY-MM-DD')
         raise BadConfigException()
 
     jira_issue_download_concurrent_threads = jira_config.get(
@@ -143,18 +144,26 @@ def obtain_config(args) -> ValidatedConfig:
     if jira_include_fields:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
-            logger.warning(
-                f'Missing recommended jira_fields! For the best possible experience, '
-                f'please add the following to `include_fields` in the '
-                f'configuration file: {list(missing_required_fields)}'
+            agent_logging.log_and_print(
+                logger,
+                logging.WARNING,
+                (
+                    f'Missing recommended jira_fields! For the best possible experience, '
+                    f'please add the following to `include_fields` in the '
+                    f'configuration file: {list(missing_required_fields)}'
+                ),
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
-            logger.warning(
-                f'Excluding recommended jira_fields! For the best possible experience, '
-                f'please remove the following from `exclude_fields` in the '
-                f'configuration file: {list(excluded_required_fields)}'
+            agent_logging.log_and_print(
+                logger,
+                logging.WARNING,
+                (
+                    f'Excluding recommended jira_fields! For the best possible experience, '
+                    f'please remove the following from `exclude_fields` in the '
+                    f'configuration file: {list(excluded_required_fields)}',
+                ),
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
@@ -214,17 +223,14 @@ def obtain_config(args) -> ValidatedConfig:
             print(f'ERROR: {run_mode} requires git configuration.')
             raise BadConfigException()
 
-        if len(git_configs) > 1:
-            print(f'ERROR: {run_mode} is not currently supported for multiple Git instances.')
-            raise BadConfigException()
-
         if not (jira_url and git_configs[0].git_url):
             print(f'ERROR: Must provide jira_url and git_url for mode {run_mode}')
             raise BadConfigException()
 
-        if git_configs[0].git_redact_names_and_urls:
-            print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
-            raise BadConfigException()
+        for git_config in git_configs:
+            if git_config.git_redact_names_and_urls:
+                print(f'ERROR: git_redact_names_and_urls must be False for mode {run_mode}')
+                raise BadConfigException()
 
     return ValidatedConfig(
         run_mode,
@@ -279,6 +285,7 @@ git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:
     git_provider = git_config.get('provider', git_provider_override)
+    git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
     git_instance_slug = git_config.get('instance_slug', None)
@@ -289,11 +296,11 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_exclude_repos = set(git_config.get('exclude_repos', []))
 
     if multiple and not git_instance_slug:
-        print(f'ERROR: Git `instance_slug` is required for multiple Git instance mode.')
+        print('ERROR: Git `instance_slug` is required for multiple Git instance mode.')
         raise BadConfigException()
 
     if multiple and not creds_envvar_prefix:
-        print(f'ERROR: `creds_envvar_prefix` is required for multiple Git instance mode.')
+        print('ERROR: `creds_envvar_prefix` is required for multiple Git instance mode.')
         raise BadConfigException()
 
     if git_provider is None:
@@ -316,6 +323,10 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         )
         raise BadConfigException()
 
+    if git_provider == 'github' and ('api.github.com' not in git_url and '/api/v3' not in git_url):
+        print(f'ERROR: Github enterprise URL appears malformed.  Did you mean "{git_url}/api/v3"?')
+        raise BadConfigException()
+
     # gitlab must be in whitelist mode
     if git_provider == 'gitlab' and (git_exclude_projects or not git_include_projects):
         print(
@@ -335,7 +346,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     return GitConfig(
         git_provider=git_provider,
         git_instance_slug=git_instance_slug,
-        git_url=git_config.get('url', None),
+        git_url=git_url,
         git_include_projects=list(git_include_projects),
         git_exclude_projects=list(git_exclude_projects),
         git_include_repos=list(git_include_repos),

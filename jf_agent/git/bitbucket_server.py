@@ -333,7 +333,16 @@ def get_pull_requests(
                 except stashy.errors.NotFoundException:
                     additions, deletions, changed_files = None, None, None
                 except RetryError as e:
-                    print(f"Could not retrieve diff data for {pr['id']}")
+                    print(
+                        f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo.get()['name']}"
+                    )
+                    additions, deletions, changed_files = None, None, None
+                except stashy.errors.GenericException as e:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.INFO,
+                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
+                    )
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.GenericException as e:
                     agent_logging.log_and_print(
@@ -359,9 +368,19 @@ def get_pull_requests(
                 merge_date = None
                 merged_by = None
 
-                for activity in sorted(
-                    [a for a in api_pr.activities()], key=lambda x: x['createdDate']
-                ):
+                activites = []
+                try:
+                    activites = sorted(
+                        [a for a in api_pr.activities()], key=lambda x: x['createdDate']
+                    )
+                except stashy.errors.GenericException as e:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.INFO,
+                        f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                    )
+
+                for activity in activites:
                     if activity['action'] == 'COMMENTED':
                         comments.append(
                             {
@@ -445,6 +464,7 @@ def get_pull_requests(
                     'merge_date': merge_date,
                     'merged_by': merged_by,
                     'commits': commits,
+                    'merge_commit': None,
                 }
 
                 yield normalized_pr

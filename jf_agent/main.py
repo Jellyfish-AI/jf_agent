@@ -77,8 +77,8 @@ def main():
         type=int,
         choices=range(1, 7),
         help=(
-            f'scan jira issues that have been updated since the given number of months back (max is 6) '
-            f'for git repo data, leave blank to only check issues updated in the past month'
+            'scan jira issues that have been updated since the given number of months back (max is 6) '
+            'for git repo data, leave blank to only check issues updated in the past month'
         ),
     )
     parser.add_argument(
@@ -91,14 +91,69 @@ def main():
     args = parser.parse_args()
     config = obtain_config(args)
     creds = obtain_creds(config)
-    jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
     agent_logging.configure(config.outdir)
 
-    if config.run_mode == 'send_only':
+    if config.run_mode == 'validate':
+        print('Validating configuration...')
+        from jf_jira import _get_raw_jira_connection
+
+        print('Jira details:')
+        print(f'  Jira URL:      {config.jira_url}')
+        print(f'  Jira Username: {creds.jira_username}')
+        pw_len = len(creds.jira_password) - 2
+        print(f'  Jira Password: {creds.jira_password[:2]:*<{pw_len}}')
+        # test Jira connection
+        try:
+            print('==> Testing jira connection...')
+            jira_connection = _get_raw_jira_connection(config, creds, max_retries=1)
+            jira_connection.myself()
+        except Exception as e:
+            if 'Basic authentication with passwords is deprecated.' in str(e):
+                print(
+                    f'Error connecting to Jira instance at {config.jira_url}. Please use a Jira API token, see https://confluence.atlassian.com/cloud/api-tokens-938839638.html.'
+                )
+            else:
+                print(
+                    f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
+                )
+            return
+
+        # test jira users permission
+        try:
+            print('==> Testing jira user browsing permissions...')
+            from jf_jira.jira_download import download_users
+
+            user_count = len(download_users(jira_connection, config.jira_gdpr_active, quiet=True))
+            print(f'The agent is aware of {user_count} Jira users.')
+
+        except Exception as e:
+            print(
+                f'Error downloading users from Jira instance at {config.jira_url}, please verify that this user has the "browse all users" permission. Error: {e}'
+            )
+            return
+
+        # test jira project access
+        print('==> Testing jira project permissions...')
+        accessible_projects = [p.key for p in jira_connection.projects()]
+        print(f'The agent has access to projects {accessible_projects}.')
+
+        if config.jira_include_projects:
+            for proj in config.jira_include_projects:
+                if proj not in accessible_projects:
+                    print(f'Error: Unable to access explicitly-included project {proj}.')
+                    return
+
+        print('Success!')
+
+        return
+
+    elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
 
     else:
+        jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
 
@@ -117,21 +172,12 @@ def main():
             )
 
             if config.run_mode_is_print_apparently_missing_git_repos:
-                # assume there is only a single git config
-                git_connection = get_git_client(
-                    config.git_configs[0], creds, skip_ssl_verification=config.skip_ssl_verification
+
+                issues_to_scan = get_issues_to_scan_from_jellyfish(
+                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
-                jira_connection = get_basic_jira_connection(config, creds)
-                if jira_connection and git_connection:
-                    issues_to_scan = get_issues_to_scan_from_jellyfish(
-                        config,
-                        creds,
-                        args.for_print_missing_repos_issues_updated_within_last_x_months,
-                    )
-                    if issues_to_scan:
-                        print_missing_repos_found_by_jira(
-                            issues_to_scan, config, jira_connection, git_connection
-                        )
+                if issues_to_scan:
+                    print_missing_repos_found_by_jira(config, creds, issues_to_scan)
                 return
 
             if config.run_mode_includes_download:
@@ -221,7 +267,7 @@ def _get_git_instance_to_creds(git_config):
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
-        print(f'ERROR: JELLYFISH_API_TOKEN not found in the environment.')
+        print('ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         raise BadConfigException()
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
@@ -265,8 +311,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
         print(
-            f'ERROR: A Git instance is configured, but no Git instance '
-            f'info returned from the Jellyfish API -- please contact Jellyfish'
+            'ERROR: A Git instance is configured, but no Git instance '
+            'info returned from the Jellyfish API -- please contact Jellyfish'
         )
         raise BadConfigException()
 
@@ -445,7 +491,7 @@ def send_data(config, creds):
 
     if any(thread_exceptions):
         print(
-            f'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
+            'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         return
 
@@ -464,7 +510,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     if updated_within_last_x_months:
         params.update({'monthsback': updated_within_last_x_months})
 
-    print(f'Fetching Jira issues that are missing Git repo data in Jellyfish...')
+    print('Fetching Jira issues that are missing Git repo data in Jellyfish...')
 
     resp = requests.get(
         f'{base_url}/endpoints/agent/unlinked-dev-issues',

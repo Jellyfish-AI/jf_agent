@@ -29,26 +29,29 @@ from jf_agent.jf_jira.jira_download import (
 logger = logging.getLogger(__name__)
 
 
+def _get_raw_jira_connection(config, creds, max_retries=3):
+    jira_conn = JIRA(
+        server=config.jira_url,
+        basic_auth=(creds.jira_username, creds.jira_password),
+        max_retries=max_retries,
+        options={
+            'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
+            'verify': not config.skip_ssl_verification,
+        },
+    )
+
+    jira_conn._session.headers[
+        'User-Agent'
+    ] = f'jellyfish/1.0 ({jira_conn._session.headers["User-Agent"]})'
+
+    return jira_conn
+
+
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_basic_jira_connection(config, creds):
     try:
-        jira_conn = JIRA(
-            server=config.jira_url,
-            basic_auth=(creds.jira_username, creds.jira_password),
-            max_retries=3,
-            options={
-                'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
-                'verify': not config.skip_ssl_verification,
-            },
-        )
-
-        jira_conn._session.headers[
-            'User-Agent'
-        ] = f'jellyfish/1.0 ({jira_conn._session.headers["User-Agent"]})'
-
-        return jira_conn
-
+        return _get_raw_jira_connection(config, creds)
     except Exception as e:
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
@@ -66,10 +69,8 @@ def print_all_jira_fields(config, jira_connection):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def print_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
-    missing_repos = download_missing_repos_found_by_jira(
-        issues_to_scan, config, jira_connection, git_connection
-    )
+def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
+    missing_repos = download_missing_repos_found_by_jira(config, creds, issues_to_scan)
     print(
         f'\nScanning the "Development" field on the Jira issues revealed {len(missing_repos)} Git repos apparently missing from Jellyfish'
     )

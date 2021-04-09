@@ -100,6 +100,7 @@ class NormalizedPullRequestComment:
     user: NormalizedUser
     body: str
     created_at: str
+    system_generated: bool = None
 
 
 @dataclass
@@ -129,6 +130,7 @@ class NormalizedPullRequest:
     author: NormalizedUser
     merged_by: NormalizedUser
     commits: List[NormalizedCommit]
+    merge_commit: NormalizedCommit
     comments: List[NormalizedPullRequestComment]
     approvals: List[NormalizedPullRequestReview]
     base_repo: NormalizedShortRepository
@@ -245,6 +247,7 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             return GitLabClient(
                 server_url=config.git_url,
                 private_token=git_creds['gitlab_token'],
+                verify=not skip_ssl_verification,
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
@@ -343,7 +346,7 @@ def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: 
     assert commits_or_prs in ('commits', 'prs')
 
     instance_pull_from_dt = pytz.utc.localize(datetime.fromisoformat(instance_info['pull_from']))
-    instance_info_this_repo = instance_info['repos_dict'].get(f'{org_login}-{repo_id}')
+    instance_info_this_repo = instance_info['repos_dict_v2'].get(str(repo_id))
 
     if instance_info_this_repo:
         if commits_or_prs == 'commits':
@@ -371,7 +374,7 @@ def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: 
         return instance_pull_from_dt
 
 
-def get_repos_from_git(git_connection, config):
+def get_repos_from_git(git_connection, config: GitConfig):
     '''
     Gets git repositories for use in the `print_apparently_missing_git_repos` run mode
     to compare git repos from git sources against git repos found by jira
@@ -417,7 +420,9 @@ def get_repos_from_git(git_connection, config):
 
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-        gl_adapter = GitLabAdapter(git_connection)
+        gl_adapter = GitLabAdapter(
+            config=config, outdir='', compress_output_files=False, client=git_connection
+        )
 
         projects = gl_adapter.get_projects()
         repos = gl_adapter.get_repos(projects)

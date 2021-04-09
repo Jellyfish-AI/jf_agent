@@ -26,8 +26,9 @@ logger = logging.getLogger(__name__)
 # Returns an array of User dicts
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_users(jira_connection, gdpr_active):
-    print('downloading jira users... ', end='', flush=True)
+def download_users(jira_connection, gdpr_active, quiet=False):
+    if not quiet:
+        print('downloading jira users... ', end='', flush=True)
 
     jira_users = _search_all_users(jira_connection, gdpr_active)
 
@@ -37,7 +38,13 @@ def download_users(jira_connection, gdpr_active):
     if len(jira_users) == 1000:
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
-    print('✓')
+    if len(jira_users) == 0:
+        raise RuntimeError(
+            'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
+        )
+
+    if not quiet:
+        print('✓')
     return jira_users
 
 
@@ -131,8 +138,35 @@ def download_projects_and_versions(
     if exclude_categories:
         filters.append(lambda proj: proj.projectCategory.name not in exclude_categories)
 
+    def project_is_accessible(project_id):
+        try:
+            jira_connection.search_issues(f'project = {project_id}', fields=['id'])
+            return True
+        except JIRAError as e:
+            # Handle zombie projects that appear in the project list
+            # but are not actually accessible.  I don't know wtf Black
+            # is doing with this formatting, but whatever.
+            if (
+                e.status_code == 400
+                and e.text
+                == f"A value with ID '{project_id}' does not exist for the field 'project'."
+            ):
+                agent_logging.log_and_print(
+                    logger,
+                    logging.ERROR,
+                    f'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...',
+                )
+                return False
+            else:
+                raise
+
     all_projects = jira_connection.projects()
-    projects = [proj for proj in all_projects if all(filt(proj) for filt in filters)]
+    projects = [
+        proj
+        for proj in all_projects
+        if all(filt(proj) for filt in filters) and project_is_accessible(proj.id)
+    ]
+
     if not projects:
         raise Exception(
             'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
@@ -140,7 +174,7 @@ def download_projects_and_versions(
 
     print('✓')
 
-    print(f'downloading jira project components... ', end='', flush=True)
+    print('downloading jira project components... ', end='', flush=True)
     for p in projects:
         p.raw.update({'components': [c.raw for c in jira_connection.project_components(p)]})
     print('✓')
@@ -166,20 +200,32 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
     for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
         b_start_at = 0
         while True:
-            # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
-            project_boards = jira_connection._session.get(
-                url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
-                params={
-                    'maxResults': 50,
-                    'startAt': b_start_at,
-                    'type': 'scrum',
-                    'includePrivate': 'false',
-                    'projectKeyOrId': project_id,
-                },
-            ).json()['values']
+            try:
+                # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
+                project_boards = jira_connection._session.get(
+                    url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
+                    params={
+                        'maxResults': 50,
+                        'startAt': b_start_at,
+                        'type': 'scrum',
+                        'includePrivate': 'false',
+                        'projectKeyOrId': project_id,
+                    },
+                ).json()['values']
+            except JIRAError as e:
+                if e.status_code == 400:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.ERROR,
+                        f"You do not have the required permissions in jira required to "
+                        f"fetch boards for the project {project_id}",
+                    )
+                    break
+                raise
 
             if not project_boards:
                 break
+
             b_start_at += len(project_boards)
             boards_by_id.update({board['id']: board for board in project_boards})
 
@@ -392,7 +438,7 @@ def download_necessary_issues(
     field_spec.extend(f'-{field}' for field in exclude_fields)
 
     actual_batch_size = jira_connection.search_issues(
-        f'order by id asc',
+        'order by id asc',
         fields=field_spec,
         expand='renderedFields,changelog',
         startAt=0,
@@ -449,10 +495,48 @@ def download_necessary_issues(
                     new_issues_this_batch.append(issue)
             prog_bar.update(len(new_issues_this_batch))
 
-            yield new_issues_this_batch
+            yield _filter_changelogs(new_issues_this_batch, include_fields, exclude_fields)
 
     for t in threads:
         t.join()
+
+
+# The Jira API can sometimes include fields in the changelog that
+# were excluded from the list of fields. Strip them out.
+def _filter_changelogs(issues, include_fields, exclude_fields):
+    def _strip_history_items(items):
+        # Skip items that are a change of a field that's filtered out
+        for i in items:
+            field_id_field = _get_field_identifier(i)
+            if not field_id_field:
+                agent_logging.log_and_print(
+                    logger=logger,
+                    level=logging.WARNING,
+                    msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
+                )
+            if include_fields and i.get(field_id_field) not in include_fields:
+                continue
+            if i.get(field_id_field) in exclude_fields:
+                continue
+            yield i
+
+    def _get_field_identifier(item) -> str:
+        return 'fieldId' if 'fieldId' in item else 'field' if 'field' in item else None
+
+    def _strip_changelog_histories(histories):
+        # omit any histories that, when filtered, have no items.  ie, if
+        # a user only changed fields that we've stripped, cut out that
+        # history record entirely
+        for h in histories:
+            stripped_items = list(_strip_history_items(h['items']))
+            if stripped_items:
+                yield {**h, 'items': stripped_items}
+
+    def _strip_changelog(c):
+        # copy a changelog, stripping excluded fields from the history
+        return {**c, 'histories': list(_strip_changelog_histories(c['histories']))}
+
+    return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
 
 
 @agent_logging.log_entry_exit(logger)
@@ -574,7 +658,7 @@ def _expand_changelog(jira_issues, jira_connection):
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
 def download_worklogs(jira_connection, issue_ids):
-    print(f'downloading jira worklogs... ', end='', flush=True)
+    print('downloading jira worklogs... ', end='', flush=True)
     updated = []
     since = 0
     while True:
@@ -614,7 +698,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print(
-                logger, logging.ERROR, f'Error calling createmeta JIRA endpoint', exc_info=True
+                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', exc_info=True
             )
             return []
 
@@ -761,8 +845,41 @@ def _search_users(
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection, git_connection):
-    from jf_agent.git import get_repos_from_git
+def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
+
+    from jf_agent.jf_jira import get_basic_jira_connection
+    from jf_agent.git import get_git_client
+
+    # obtain list of repos in jira
+    jira_connection = get_basic_jira_connection(config, creds)
+    missing_repositories = _get_repos_list_in_jira(issues_to_scan, jira_connection)
+
+    # cross-reference them with git sources
+    is_multi_git_config = len(config.git_configs) > 1
+    for git_config in config.git_configs:
+        print(
+            f'Checking against the {git_config.git_provider} instance {git_config.git_instance_slug} ..'
+        )
+        if is_multi_git_config:
+            instance_slug = git_config.git_instance_slug
+            instance_creds = creds.git_instance_to_creds.get(instance_slug)
+        else:
+            # support legacy single-git support, which assumes only one available git instance
+            instance_creds = list(creds.git_instance_to_creds.values())[0]
+
+        git_connection = get_git_client(
+            config=git_config,
+            git_creds=instance_creds,
+            skip_ssl_verification=config.skip_ssl_verification,
+        )
+        _remove_repos_present_in_git_instance(git_connection, git_config, missing_repositories)
+
+    # return the final list of missing repositories
+    result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
+    return result
+
+
+def _get_repos_list_in_jira(issues_to_scan, jira_connection):
 
     print('Scanning Jira issues for Git repos...')
     missing_repositories = {}
@@ -777,8 +894,8 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
                 if e.status_code == 403:
                     agent_logging.log_and_print(
                         logger,
-                        logger.ERROR,
-                        f"you do not have the required 'development field' permissions in jira required to scan for missing repos",
+                        logging.ERROR,
+                        "you do not have the required 'development field' permissions in jira required to scan for missing repos",
                     )
                     return []
 
@@ -792,21 +909,24 @@ def download_missing_repos_found_by_jira(issues_to_scan, config, jira_connection
                         'url': repo_url,
                         'instance_type': instance_type,
                     }
+        return missing_repositories
+
+
+def _remove_repos_present_in_git_instance(git_connection, git_config, missing_repositories):
+    from jf_agent.git import get_repos_from_git
 
     try:
         # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
         # Jira may return inexact repo names/urls. Remove any mismatches found.
         _remove_mismatched_repos(
-            missing_repositories, get_repos_from_git(git_connection, config), config
+            missing_repositories, get_repos_from_git(git_connection, git_config), git_config
         )
     except Exception as e:
         print(
-            f'WARNING: Got an error when trying to cross reference repos discoverd by '
+            f'WARNING: Got an error when trying to cross-reference repos discovered by '
             f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
             f'discovered by Jira...'
         )
-    result = [{'name': k, 'url': v['url']} for k, v in missing_repositories.items()]
-    return result
 
 
 def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
@@ -856,7 +976,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
     if not (repos_found_by_jira and git_repos):
         return
 
-    print(f'comparing repos found by Jira against Git repos to find missing ones...')
+    print('comparing repos found by Jira against Git repos to find missing ones...')
 
     git_repo_names = []
     git_repo_urls = []
@@ -890,7 +1010,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
 
     if len(ignore_repos):
         print(
-            f'\nJira found the following repos but per your config file, Jellyfish already has access:'
+            '\nJira found the following repos but per your config file, Jellyfish already has access:'
         )
         for repo in ignore_repos:
             print(f"* {repo[0]:30}\t{repo[1]}")

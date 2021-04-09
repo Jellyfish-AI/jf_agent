@@ -2,6 +2,8 @@ import gitlab
 import logging
 import requests
 
+from jf_agent import agent_logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,17 +21,22 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
     error_name = type(e).__name__
 
     if log_as_exception:
-        logger.exception(f'Got {error_name} {response_code} when {action} ({e})')
+        agent_logging.log_and_print(
+            logger, logging.ERROR, f'Got {error_name} {response_code} when {action} ({e})'
+        )
     else:
-        logger.warning(f'Got {error_name} {response_code} when {action}')
-    print(f'Got {error_name} ({e}) when {action}')
+        agent_logging.log_and_print(
+            logger, logging.WARNING, f'Got {error_name} {response_code} when {action}'
+        )
 
 
 class GitLabClient:
-    def __init__(self, server_url, private_token, per_page_override, session):
+    def __init__(self, server_url, private_token, verify, per_page_override, session):
         kwargs = {'private_token': private_token, 'session': session}
         if per_page_override is not None:
             kwargs['per_page'] = per_page_override
+        if not verify:
+            kwargs['ssl_verify'] = False
         self.client = gitlab.Gitlab(server_url, **kwargs)
 
     @staticmethod
@@ -42,7 +49,6 @@ class GitLabClient:
         """
         Modifies the merge_request object by obtaining and adding the following attributes:
             - 'approved_by'     [object]
-            - 'approvers'       [object]
             - 'note_list'       [object]
             - 'commit_list'     [object]
             - 'target_project'  object
@@ -89,15 +95,17 @@ class GitLabClient:
         try:
             approvals = merge_request.approvals.get()
             merge_request.approved_by = approvals.approved_by
-            merge_request.approvers = approvals.approvers
-        except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
+        except (
+            requests.exceptions.RetryError,
+            gitlab.exceptions.GitlabGetError,
+            AttributeError,
+        ) as e:
             log_and_print_request_error(
                 e,
                 f'fetching approvals for merge_request {merge_request.id} -- '
                 f'handling it as if it has no approvals',
             )
             merge_request.approved_by = []
-            merge_request.approvals = []
 
         # convert the 'commit_list' generator into a list of objects
         merge_request.commit_list = merge_request.commits()
@@ -128,6 +136,13 @@ class GitLabClient:
             state=state_filter, as_list=False, order_by='updated_at', sort='desc'
         )
 
-    def list_project_commits(self, project_id, until_date):
+    def list_project_commits(self, project_id, since_date):
         project = self.get_project(project_id)
-        return project.commits.list(until=until_date, as_list=False)
+        return project.commits.list(since=since_date, as_list=False)
+
+    def get_project_commit(self, project_id, sha):
+        project = self.get_project(project_id)
+        try:
+            return project.commits.get(sha)
+        except gitlab.exceptions.GitlabGetError:
+            return None

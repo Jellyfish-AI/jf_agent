@@ -16,6 +16,9 @@ DIAGNOSTICS_FILE = None
 
 
 def _write_diagnostic(obj):
+    if not DIAGNOSTICS_FILE:
+        return
+
     json.dump(obj, DIAGNOSTICS_FILE)
     DIAGNOSTICS_FILE.write('\n')  # facilitate parsing
     DIAGNOSTICS_FILE.flush()
@@ -23,7 +26,8 @@ def _write_diagnostic(obj):
 
 def capture_agent_version():
     git_head_hash = os.getenv('SHA')
-    _write_diagnostic({'type': 'agent_version', 'sha': git_head_hash})
+    build_timestamp = os.getenv('BUILDTIME')
+    _write_diagnostic({'type': 'agent_version', 'sha': git_head_hash, 'timestamp': build_timestamp})
 
 
 def capture_timing(*args, **kwargs):

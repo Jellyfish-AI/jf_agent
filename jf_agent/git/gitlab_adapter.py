@@ -88,6 +88,8 @@ class GitLabAdapter(GitAdapter):
         nrm_repos: List[NormalizedRepository] = []
         for nrm_project in normalized_projects:
 
+            repos_that_failed_to_download = []
+
             for i, api_repo in enumerate(
                 tqdm(
                     self.client.list_group_projects(nrm_project.id),
@@ -100,15 +102,58 @@ class GitLabAdapter(GitAdapter):
                     self.config.git_include_repos
                     and api_repo.id not in self.config.git_include_repos
                 ):
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.INFO,
+                        f'skipping repo {api_repo.id} because not in include_repos...',
+                    )
                     continue  # skip this repo
                 if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.INFO,
+                        f'skipping repo {api_repo.id} because in exclude_repos...',
+                    )
                     continue  # skip this repo
 
-                nrm_branches = self.get_branches(api_repo)
+                try:
+                    nrm_branches = self.get_branches(api_repo)
+                except gitlab.exceptions.GitlabListError:
+                    # this is likely due to fine-tuned permissions defined on the repo (gitlab project)
+                    # that is not allowing us to access to its repo details. if this happens, make a note of it and
+                    # don't blow up the rest of the pull
+                    repos_that_failed_to_download.append(api_repo)
+                    continue  # skip this repo
+
                 nrm_repos.append(
                     _normalize_repo(
                         api_repo, nrm_branches, nrm_project, self.config.git_redact_names_and_urls
                     )
+                )
+
+            # if there were any repositories we had issues with... print them out now.
+            if repos_that_failed_to_download:
+                def __repo_log_string(api_repo):
+                    # build log string
+                    name = (
+                        api_repo.name
+                        if not self.config.git_redact_names_and_urls
+                        else _repo_redactor.redact_name(api_repo.name)
+                    )
+                    return {"id": api_repo.id, "name": name}.__str__()
+
+                repos_failed_string = ", ".join(
+                    [__repo_log_string(api_repo) for api_repo in repos_that_failed_to_download]
+                )
+                total_failed = len(repos_that_failed_to_download)
+
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    (
+                        f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
+                        f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
+                    ),
                 )
 
         print('✓')
@@ -179,7 +224,7 @@ class GitLabAdapter(GitAdapter):
         print('downloading gitlab prs... ', end='', flush=True)
 
         for i, nrm_repo in enumerate(
-            tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
+            tqdm(normalized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
@@ -193,8 +238,11 @@ class GitLabAdapter(GitAdapter):
                     total_api_prs = api_prs.total
 
                     if total_api_prs == 0:
-                        print(f'no prs found for repo {nrm_repo.id}. Skipping... ')
-                        logger.info(f'no prs found for repo {nrm_repo.id}. Skipping... ')
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'no prs found for repo {nrm_repo.id}. Skipping... ',
+                        )
                         continue
 
                     for api_pr in tqdm(
@@ -230,12 +278,24 @@ class GitLabAdapter(GitAdapter):
                                 )
                                 for commit in api_pr.commit_list
                             ]
+                            merge_request = self.client.expand_merge_request_data(api_pr)
+                            merge_commit = None
+                            if merge_request.state == 'merged' and nrm_commits is not None and merge_request.merge_commit_sha:
+                                merge_commit = _normalize_commit(
+                                    self.client.get_project_commit(
+                                        merge_request.project_id, merge_request.merge_commit_sha
+                                    ),
+                                    nrm_repo,
+                                    self.config.git_strip_text_content,
+                                    self.config.git_redact_names_and_urls,
+                                )
 
                             yield _normalize_pr(
                                 api_pr,
                                 nrm_commits,
                                 self.config.git_strip_text_content,
                                 self.config.git_redact_names_and_urls,
+                                merge_commit
                             )
                         except Exception as e:
                             # if something goes wrong with normalizing one of the prs - don't stop pulling. try
@@ -257,9 +317,9 @@ class GitLabAdapter(GitAdapter):
 
 
 '''
-    
+
     Massage Functions
-    
+
 '''
 
 
@@ -306,10 +366,10 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_repo(
-    api_repo,
-    normalized_branches: List[NormalizedBranch],
-    normalized_project: NormalizedProject,
-    redact_names_and_urls: bool,
+        api_repo,
+        normalized_branches: List[NormalizedBranch],
+        normalized_project: NormalizedProject,
+        redact_names_and_urls: bool,
 ) -> NormalizedRepository:
     repo_name = (
         api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
@@ -339,7 +399,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
 
 
 def _normalize_commit(
-    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+        api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = NormalizedUser(
         id=f'{api_commit.author_name}<{api_commit.author_email}>',
@@ -355,7 +415,7 @@ def _normalize_commit(
         author=author,
         url=commit_url,
         commit_date=api_commit.committed_date,
-        author_date=api_commit.committed_date,
+        author_date=api_commit.authored_date,
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=normalized_repo.short(),  # use short form of repo
@@ -363,7 +423,7 @@ def _normalize_commit(
 
 
 def _get_normalized_pr_comments(
-    merge_request, strip_text_content
+        merge_request, strip_text_content
 ) -> List[NormalizedPullRequestComment]:
     try:
         return [
@@ -371,6 +431,7 @@ def _get_normalized_pr_comments(
                 user=_normalize_user(note.author),
                 body=sanitize_text(note.body, strip_text_content),
                 created_at=note.created_at,
+                system_generated=note.system,
             )
             for note in merge_request.note_list
         ]
@@ -403,10 +464,11 @@ def _get_normalized_approvals(merge_request):
 
 
 def _normalize_pr(
-    merge_request,
-    normalized_commits: List[NormalizedCommit],
-    strip_text_content: bool,
-    redact_names_and_urls: bool,
+        merge_request,
+        normalized_commits: List[NormalizedCommit],
+        strip_text_content: bool,
+        redact_names_and_urls: bool,
+        merge_commit
 ):
     base_branch_name = merge_request.target_branch
     head_branch_name = merge_request.source_branch
@@ -448,6 +510,7 @@ def _normalize_pr(
         body=sanitize_text(merge_request.description, strip_text_content),
         # normalized fields
         commits=normalized_commits,
+        merge_commit=merge_commit,
         author=_normalize_user(merge_request.author),
         merged_by=_normalize_user(merge_request.merged_by),
         approvals=_get_normalized_approvals(merge_request),
@@ -459,8 +522,8 @@ def _normalize_pr(
 
 '''
 
-    Helpers 
-    
+    Helpers
+
 '''
 
 
