@@ -73,6 +73,7 @@ def load_and_dump(
                 config.git_strip_text_content,
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
+                config.git_verbose,
             ),
             item_id_dict_key='hash',
         )
@@ -93,6 +94,7 @@ def load_and_dump(
                 config.git_strip_text_content,
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
+                config.git_verbose,
             ),
             item_id_dict_key='id',
         )
@@ -234,11 +236,13 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 
 
 def get_default_branch_commits(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose,
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             repo = api_repo.get()
+            if verbose:
+                print(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
@@ -248,6 +252,8 @@ def get_default_branch_commits(
                 default_branch = (
                     api_repo.default_branch['displayId'] if api_repo.default_branch else ''
                 )
+                if verbose:
+                    print(f"Beginning download of commits for repo {repo['name']}.")
                 commits = api_project.repos[repo['name']].commits(until=default_branch)
 
                 for j, commit in enumerate(
@@ -255,6 +261,8 @@ def get_default_branch_commits(
                     start=1,
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                        if verbose:
+                            print(f"Getting {commit['id']} ({repo['name']})")
                         normalized_commit = _normalize_commit(
                             commit, repo, strip_text_content, redact_names_and_urls
                         )
@@ -289,11 +297,13 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_pull_requests(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls
+    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
             repo = api_repo.get()
+            if verbose:
+                print(f"Beginning download of PRs for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             api_repo = api_project.repos[repo['name']]
             pull_since = pull_since_date_for_repo(
@@ -304,6 +314,8 @@ def get_pull_requests(
                 desc=f'downloading PRs for {repo["name"]}',
                 unit='prs',
             ):
+                if verbose:
+                    print(f"Processing PR {pr['id']}")
                 updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
                 # PRs are ordered newest to oldest
                 # if this is too old, we're done with this repo
