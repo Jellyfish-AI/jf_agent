@@ -346,9 +346,7 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.GenericException as e:
                     agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
-                        f'Got error {e} on diffs for repo {pr["id"]}, skipping...',
+                        logger, logging.INFO, f'Got error {e} on diffs for repo {pr["id"]}, skipping...'
                     )
                     additions, deletions, changed_files = None, None, None
                 else:
