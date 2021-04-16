@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from functools import wraps
 import logging
 import os
+from enum import Enum
 import traceback
 
 '''
@@ -63,7 +64,25 @@ def log_loop_iters(
         yield
 
 
-def log_and_print(logger, level, msg, exc_info=False):
+
+# 1XX : SUCCESS
+# 1XX : ENGINEERING
+# 1XX : CLIENT
+# XX1 : CONFIG Related
+# XX2 : JIRA Related
+# XX3 : GIT Related
+# XX2 : INFRA Related
+class ErrorCodes(Enum):
+    NOT_DEFINED = 0
+    SUCCESS = 100
+    SUCCESS_CONFIG = 101 #
+    CLIENT = 200 #
+    CLIENT_CONFIG = 201 #
+    ENGINEERING = 300
+    ENGINEERING_CONFIG = 301 #
+    ENGINEERING_INFRA = 302 #
+
+def log_and_print(logger, level, msg, status: ErrorCodes = ErrorCodes.NOT_DEFINED, exc_info=False):
     '''
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)

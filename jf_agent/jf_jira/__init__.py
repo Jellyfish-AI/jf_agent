@@ -56,6 +56,7 @@ def get_basic_jira_connection(config, creds):
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', exc_info=True
         )
+        # Client Perms / Config
 
 
 @diagnostics.capture_timing()
@@ -74,6 +75,7 @@ def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
     print(
         f'\nScanning the "Development" field on the Jira issues revealed {len(missing_repos)} Git repos apparently missing from Jellyfish'
     )
+    # Engineering
     for missing_repo in missing_repos:
         print(f"* {missing_repo['name']:30}\t{missing_repo['url']}")
     print('\n')
@@ -279,4 +281,5 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         agent_logging.log_and_print(
             logger, logging.ERROR, f'Failed to download jira data:\n{e}', exc_info=True
         )
+        # Engineering
         return {'type': 'Jira', 'status': 'failed'}

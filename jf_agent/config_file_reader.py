@@ -96,7 +96,14 @@ def obtain_config(args) -> ValidatedConfig:
 
     run_mode = args.mode
     if run_mode not in VALID_RUN_MODES:
-        print(f'''ERROR: Mode should be one of "{', '.join(VALID_RUN_MODES)}"''')
+        agent_logging.log_and_print(
+                logger,
+                logging.WARNING,
+                (
+                    f'''ERROR: Mode should be one of "{', '.join(VALID_RUN_MODES)}"'''
+                ),
+                agent_logging.ErrorCodes.CLIENT,
+        )
         raise BadConfigException()
 
     run_mode_includes_download = run_mode in ('download_and_send', 'download_only')

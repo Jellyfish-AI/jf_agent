@@ -53,6 +53,7 @@ class GithubClient:
                     logging.WARNING,
                     f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
                 )
+                # Engineering
 
     def get_branches(self, full_repo):
         url = f'{self.base_url}/repos/{full_repo}/branches'
@@ -92,6 +93,7 @@ class GithubClient:
                 logger.warning(
                     f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref'
                 )
+                # Engineering
                 return None
 
     # Raw web service operations with optional rate limiting
@@ -128,6 +130,7 @@ class GithubClient:
                         logging.ERROR,
                         f'Request to {url} has failed {i} times -- giving up!',
                     )
+                    # Engineering
                     raise
 
                 # rate-limited!  Sleep until it's ok, then try again
@@ -152,6 +155,7 @@ class GithubClient:
                     logging.WARNING,
                     f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
                 )
+                # Engineering infra
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
 
@@ -169,6 +173,7 @@ class GithubClient:
                 page = result.json()
                 if type(page) != list:
                     raise ValueError(f'Expected an array of json results, but got: {page}')
+                    # Engineering
 
                 if len(page) == 0:
                     return  # no new values returned

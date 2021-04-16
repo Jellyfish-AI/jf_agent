@@ -64,6 +64,7 @@ class GitLabAdapter(GitAdapter):
             raise ValueError(
                 'No projects found.  Make sure your token has appropriate access to GitLab.'
             )
+            # Client perms
         return projects
 
     @diagnostics.capture_timing()
@@ -107,6 +108,7 @@ class GitLabAdapter(GitAdapter):
                         logging.INFO,
                         f'skipping repo {api_repo.id} because not in include_repos...',
                     )
+                    # Client Config
                     continue  # skip this repo
                 if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
                     agent_logging.log_and_print(
@@ -114,6 +116,7 @@ class GitLabAdapter(GitAdapter):
                         logging.INFO,
                         f'skipping repo {api_repo.id} because in exclude_repos...',
                     )
+                    # Client Config
                     continue  # skip this repo
 
                 try:
@@ -155,12 +158,14 @@ class GitLabAdapter(GitAdapter):
                         f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
                     ),
                 )
+                # Client perms
 
         print('✓')
         if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
             )
+            # Client perms
         return nrm_repos
 
     @diagnostics.capture_timing()
@@ -178,6 +183,7 @@ class GitLabAdapter(GitAdapter):
                 f'pulling branches from repo {api_repo.id}'
                 'This is most likely because no repo was in the GitlabProject -- will treat like there are no branches',
             )
+            # Engineering
             return []
 
     @diagnostics.capture_timing()
@@ -214,6 +220,7 @@ class GitLabAdapter(GitAdapter):
                     print(
                         f':WARN: Got exception for branch {nrm_repo.default_branch_name}: {e}. Skipping...'
                     )
+                    # Engineering
         print('✓')
 
     @diagnostics.capture_timing()
@@ -267,6 +274,7 @@ class GitLabAdapter(GitAdapter):
                                     f'fetching source project {api_pr.source_project_id} '
                                     f'for merge_request {api_pr.id}. Skipping...',
                                 )
+                                # Engineering
                                 continue
 
                             nrm_commits: List[NormalizedCommit] = [
@@ -306,12 +314,14 @@ class GitLabAdapter(GitAdapter):
                                 f'normalizing PR {pr_id} from repo {nrm_repo.id}. Skipping...',
                                 log_as_exception=True,
                             )
+                            # Engineering
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
                         e, f'getting PRs for repo {nrm_repo.id}. Skipping...', log_as_exception=True
                     )
+                    # Engineering
 
     print('✓')
 
@@ -441,6 +451,7 @@ def _get_normalized_pr_comments(
             f'standardizing PR comments for merge_request {merge_request.id} -- '
             f'handling it as if it has no comments',
         )
+        # Engineering
         return []
 
 
@@ -460,6 +471,7 @@ def _get_normalized_approvals(merge_request):
             f'standardizing PR approvals for merge_request {merge_request.id} -- '
             f'handling it as if it has no approvals',
         )
+        # Engineering
         return []
 
 

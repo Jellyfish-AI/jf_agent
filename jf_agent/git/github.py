@@ -151,6 +151,7 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
         raise ValueError(
             'No projects found.  Make sure your token has appropriate access to GitHub.'
         )
+        # Client config
     return projects
 
 
@@ -210,6 +211,7 @@ def get_repos(
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
         )
+        # Client config
     return repos
 
 
@@ -271,6 +273,7 @@ def get_default_branch_commits(
 
             except Exception as e:
                 print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
+                # Engineering
 
 
 def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
@@ -380,4 +383,5 @@ def get_pull_requests(
 
             except Exception as e:
                 print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
+                # Engineering
     print()

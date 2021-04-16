@@ -123,6 +123,7 @@ class BitbucketCloudAdapter(GitAdapter):
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
             )
+            # Client config
 
         return repos
 
@@ -199,6 +200,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                     logging.WARN,
                                     f"PR {api_pr['id']} doesn't reference a source and/or destination repository; skipping it...",
                                 )
+                                # Engineering
                                 continue
 
                             yield _normalize_pr(
@@ -225,6 +227,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...',
                                 exc_info=True,
                             )
+                            # Engineering
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
@@ -234,6 +237,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         f'Error getting PRs for repo {repo.id}. Skipping...',
                         exc_info=True,
                     )
+                    # Engineering
 
         print('✓')
 

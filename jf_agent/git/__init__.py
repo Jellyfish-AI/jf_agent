@@ -260,9 +260,11 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             exc_info=True,
         )
         return
+        # Client Config
 
     # if the git provider is none of the above, throw an error
     raise ValueError(f'unsupported git provider {config.git_provider}')
+    # Client Config
 
 
 @diagnostics.capture_timing()

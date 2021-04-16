@@ -80,6 +80,7 @@ class GitLabClient:
                 f'fetching notes for merge_request {merge_request.id} -- '
                 f'handling it as if it has no notes',
             )
+            # Engineering
             merge_request.note_list = []
 
         try:
@@ -90,6 +91,7 @@ class GitLabClient:
                 f'fetching changes for merge_request {merge_request.id} -- '
                 f'handling it as if it has no diffs',
             )
+            # Engineering
             merge_request.diff = ''
 
         try:
@@ -105,6 +107,7 @@ class GitLabClient:
                 f'fetching approvals for merge_request {merge_request.id} -- '
                 f'handling it as if it has no approvals',
             )
+            # Engineering
             merge_request.approved_by = []
 
         # convert the 'commit_list' generator into a list of objects
