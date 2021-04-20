@@ -52,8 +52,8 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
+                    agent_logging.ErrorClassification.ENGINEERING,
                 )
-                # Engineering
 
     def get_branches(self, full_repo):
         url = f'{self.base_url}/repos/{full_repo}/branches'
@@ -90,10 +90,12 @@ class GithubClient:
             return raw.json()
         except HTTPError as e:
             if e.response.status_code in (422,):
-                logger.warning(
-                    f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref'
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref',
+                    agent_logging.ErrorClassification.ENGINEERING,
                 )
-                # Engineering
                 return None
 
     # Raw web service operations with optional rate limiting
@@ -129,8 +131,8 @@ class GithubClient:
                         logger,
                         logging.ERROR,
                         f'Request to {url} has failed {i} times -- giving up!',
+                        agent_logging.ErrorClassification.ENGINEERING,
                     )
-                    # Engineering
                     raise
 
                 # rate-limited!  Sleep until it's ok, then try again
@@ -154,8 +156,8 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
+                    agent_logging.ErrorClassification.ENGINEERING,
                 )
-                # Engineering infra
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
 
@@ -172,8 +174,13 @@ class GithubClient:
                 result = self.get_raw_result(url)
                 page = result.json()
                 if type(page) != list:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.WARNING,
+                        f'Expected an array of json results, but got: {page}',
+                        agent_logging.ErrorClassification.ENGINEERING,
+                    )
                     raise ValueError(f'Expected an array of json results, but got: {page}')
-                    # Engineering
 
                 if len(page) == 0:
                     return  # no new values returned

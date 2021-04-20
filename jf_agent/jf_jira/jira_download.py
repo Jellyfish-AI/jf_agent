@@ -41,8 +41,7 @@ def download_users(jira_connection, gdpr_active, quiet=False):
     if len(jira_users) == 0:
         raise RuntimeError(
             'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
-        )
-        # Client Jira Perm
+        ) # Client Permissions Error
 
     if not quiet:
         print('✓')
@@ -156,8 +155,8 @@ def download_projects_and_versions(
                     logger,
                     logging.ERROR,
                     f'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...',
+                    agent_logging.ErrorClassification.CLIENT_CONFIG
                 )
-                # # Client Jira Perm
                 return False
             else:
                 raise
@@ -172,8 +171,7 @@ def download_projects_and_versions(
     if not projects:
         raise Exception(
             'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
-        )
-        # Client Jira Config
+        ) # Client Config Error
 
     print('✓')
 
@@ -222,8 +220,8 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         logging.ERROR,
                         f"You do not have the required permissions in jira required to "
                         f"fetch boards for the project {project_id}",
+                        agent_logging.ErrorClassification.CLIENT_PERMISSIONS
                     )
-                    # Client Jira Perm
                     break
                 raise
 
@@ -255,7 +253,6 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                     # skip and move on
                     if e.status_code == 500 or e.status_code == 404:
                         print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
-                        # Client Jira Perm
                     else:
                         raise
 
@@ -322,16 +319,16 @@ def download_all_issue_metadata(
                             logger,
                             logging.WARNING,
                             f'Caught KeyError from search_issues(), reducing batch size to {batch_size}',
+                            agent_logging.ErrorClassification.ENGINEERING,
                         )
-                        # Engineering server-side
                         continue
                     else:
                         agent_logging.log_and_print(
                             logger,
                             logging.ERROR,
                             'Caught KeyError from search_issues(), batch size is already 0, bailing out',
+                            agent_logging.ErrorClassification.ENGINEERING,
                         )
-                        # Engineering server-side
                         raise
 
                 issue_metadata = {
@@ -347,8 +344,8 @@ def download_all_issue_metadata(
                 logger,
                 logging.ERROR,
                 f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}',
+                agent_logging.ErrorClassification.ENGINEERING,
             )
-            # Engineering
 
     threads = [
         threading.Thread(
@@ -521,8 +518,8 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
                     logger=logger,
                     level=logging.WARNING,
                     msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
+                    error_code=agent_logging.ErrorClassification.ENGINEERING,
                 )
-                # Engineering
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
             if i.get(field_id_field) in exclude_fields:
@@ -582,9 +579,9 @@ def _download_jira_issues_segment(
             logger,
             logging.ERROR,
             f'[Thread {thread_num}] Jira issue downloader FAILED',
+            agent_logging.ErrorClassification.ENGINEERING,
             exc_info=True,
         )
-        # Engineering
         q.put(e)
 
 
@@ -618,7 +615,6 @@ def _download_jira_issues_page(
         except (json.decoder.JSONDecodeError, JIRAError) as e:
             if hasattr(e, 'status_code') and e.status_code == 429:
                 # This is rate limiting ("Too many requests")
-                # Engineering
                 raise
 
             batch_size = int(batch_size / 2)
@@ -636,9 +632,9 @@ def _download_jira_issues_page(
                         logger,
                         logging.WARNING,
                         f'Apparently unable to fetch issue based on search_params {search_params}',
+                        agent_logging.ErrorClassification.ENGINEERING,
                     )
                     return [], 0
-                    # Engineering
                 else:
                     get_changelog = False
                     batch_size = 1
@@ -685,7 +681,6 @@ def download_worklogs(jira_connection, issue_ids):
             worklog_list_json = json_loads(resp)
         except ValueError:
             print("Couldn't parse JIRA response as JSON: %s", resp.text)
-            # Engineering
             raise
 
         updated.extend([wl for wl in worklog_list_json if int(wl['issueId']) in issue_ids])
@@ -711,9 +706,8 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print(
-                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', exc_info=True
+                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', agent_logging.ErrorClassification.ENGINEERING, exc_info=True
             )
-            # Engineering
             return []
 
         # Custom values are buried deep in the createmeta response:
@@ -910,9 +904,9 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                         logger,
                         logging.ERROR,
                         "you do not have the required 'development field' permissions in jira required to scan for missing repos",
+                        agent_logging.ErrorClassification.CLIENT_CONFIG
                     )
                     return []
-                # Client Jira Perm
 
             for repo in repositories:
                 repo_name = repo['name']
@@ -963,7 +957,6 @@ def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
                 f"likely because it doesn't exist anymore -- skipping"
             )
             return []
-            # Engineering
         raise
     except Exception as e:
         print(
@@ -971,13 +964,11 @@ def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
             f'{issue_id} -- skipping'
         )
         return []
-        # Engineering
 
     if response.get('errors'):
         print(
             f"WARNING: received an error when requesting development details for {issue_id}: {response['errors']}"
         )
-        # Engineering
 
     detail = response.get('detail', [])
     if not detail:

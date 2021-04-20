@@ -120,13 +120,13 @@ class BitbucketCloudClient:
                     # been too long
                     if (datetime.utcnow() - start) < timedelta(hours=1):
                         agent_logging.log_and_print(
-                            logger, logging.INFO, 'Retrying in 30 seconds...'
+                            logger, logging.INFO, 'Retrying in 30 seconds...', agent_logging.ErrorClassification.ENGINEERING,
                         )
                         time.sleep(30)
                         continue
                     else:
                         agent_logging.log_and_print(
-                            logger, logging.ERROR, 'Getting HTTP 429s for over an hour; giving up!'
+                            logger, logging.ERROR, 'Getting HTTP 429s for over an hour; giving up!', agent_logging.ErrorClassification.ENGINEERING,
                         )
                 raise
 
@@ -143,7 +143,7 @@ class BitbucketCloudClient:
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404 and ignore404:
                         agent_logging.log_and_print(
-                            logger, logging.INFO, f'Caught a 404 for {url} - ignoring'
+                            logger, logging.INFO, f'Caught a 404 for {url} - ignoring', agent_logging.ErrorClassification.ENGINEERING,
                         )
                         return
                     raise

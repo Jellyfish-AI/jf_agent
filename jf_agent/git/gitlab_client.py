@@ -11,7 +11,7 @@ class MissingSourceProjectException(Exception):
     pass
 
 
-def log_and_print_request_error(e, action='making request', log_as_exception=False):
+def log_and_print_request_error(e, action='making request', error_code=agent_logging.ErrorClassification.ENGINEERING, log_as_exception=False):
     try:
         response_code = e.response_code
     except AttributeError:
@@ -80,7 +80,6 @@ class GitLabClient:
                 f'fetching notes for merge_request {merge_request.id} -- '
                 f'handling it as if it has no notes',
             )
-            # Engineering
             merge_request.note_list = []
 
         try:
@@ -91,7 +90,6 @@ class GitLabClient:
                 f'fetching changes for merge_request {merge_request.id} -- '
                 f'handling it as if it has no diffs',
             )
-            # Engineering
             merge_request.diff = ''
 
         try:
@@ -107,7 +105,6 @@ class GitLabClient:
                 f'fetching approvals for merge_request {merge_request.id} -- '
                 f'handling it as if it has no approvals',
             )
-            # Engineering
             merge_request.approved_by = []
 
         # convert the 'commit_list' generator into a list of objects

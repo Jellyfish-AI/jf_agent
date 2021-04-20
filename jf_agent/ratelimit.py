@@ -58,6 +58,7 @@ class RateLimiter(object):
                             logger,
                             logging.ERROR,
                             f'Rate limiter: thought we were operating within our limit (made {calls_made}/{max_calls} calls for {realm}), but got HTTP 429 anyway!',
+                            agent_logging.ErrorClassification.ENGINEERING,
                         )
                     raise
 
@@ -71,6 +72,7 @@ class RateLimiter(object):
                     logger,
                     logging.ERROR,
                     f'Next available time to make call is after the timeout of {self.timeout_secs} seconds. Giving up.',
+                    agent_logging.ErrorClassification.ENGINEERING,
                 )
                 raise Exception('Rate limit timeout')
 
@@ -80,6 +82,7 @@ class RateLimiter(object):
                     logger,
                     logging.INFO,
                     f'Sleeping for {sleep_period_secs:.1f} secs ({sleep_period_secs / 60.0:.1f} mins)',
+                    agent_logging.ErrorClassification.ENGINEERING,
                 )
                 time.sleep(sleep_period_secs)
 

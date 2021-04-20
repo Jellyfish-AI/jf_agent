@@ -277,7 +277,6 @@ def get_default_branch_commits(
                 print(
                     f'WARN: Got NotFoundException for branch \"{repo.get("default_branch_name", "")}\": {e}. Skipping...'
                 )
-                # Engineering
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
@@ -370,8 +369,8 @@ def get_pull_requests(
                         logger,
                         logging.INFO,
                         f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                        agent_logging.ErrorClassification.ENGINEERING,
                     )
-                    # Engineering
 
                 for activity in activites:
                     if activity['action'] == 'COMMENTED':
@@ -420,7 +419,6 @@ def get_pull_requests(
                     print(
                         f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
                     )
-                    # Engineering
                     commits = []
 
                 normalized_pr = {

@@ -122,8 +122,7 @@ class BitbucketCloudAdapter(GitAdapter):
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
-            )
-            # Client config
+            ) # Client config Error
 
         return repos
 
@@ -199,8 +198,8 @@ class BitbucketCloudAdapter(GitAdapter):
                                     logger,
                                     logging.WARN,
                                     f"PR {api_pr['id']} doesn't reference a source and/or destination repository; skipping it...",
+                                    agent_logging.ErrorClassification.ENGINEERING,
                                 )
-                                # Engineering
                                 continue
 
                             yield _normalize_pr(
@@ -225,9 +224,9 @@ class BitbucketCloudAdapter(GitAdapter):
                                 logger,
                                 logging.ERROR,
                                 f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...',
+                                agent_logging.ErrorClassification.ENGINEERING,
                                 exc_info=True,
                             )
-                            # Engineering
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
@@ -235,9 +234,9 @@ class BitbucketCloudAdapter(GitAdapter):
                         logger,
                         logging.ERROR,
                         f'Error getting PRs for repo {repo.id}. Skipping...',
+                        agent_logging.ErrorClassification.ENGINEERING,
                         exc_info=True,
                     )
-                    # Engineering
 
         print('✓')
 
@@ -363,6 +362,7 @@ def _normalize_pr(
                 logger,
                 logging.WARN,
                 f'Unable to parse the diff For PR {api_pr["id"]} in repo {repo.id}; proceeding as though no files were changed.',
+                agent_logging.ErrorClassification.ENGINEERING,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -380,6 +380,7 @@ def _normalize_pr(
                 logging.WARN,
                 f'For PR {api_pr["id"]} in repo {repo.id}, caught HTTPError (HTTP 401) when attempting to retrieve changes; '
                 f'proceeding as though no files were changed',
+                agent_logging.ErrorClassification.ENGINEERING,
             )
         else:
             # Some other HTTP error happened; Re-raise

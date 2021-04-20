@@ -68,25 +68,25 @@ def log_loop_iters(
 # 1XX : SUCCESS
 # 1XX : ENGINEERING
 # 1XX : CLIENT
+# XX0 : GENERAL
 # XX1 : CONFIG Related
-# XX2 : JIRA Related
-# XX3 : GIT Related
-# XX2 : INFRA Related
-class ErrorCodes(Enum):
-    NOT_DEFINED = 0
-    SUCCESS = 100
-    SUCCESS_CONFIG = 101 #
-    CLIENT = 200 #
-    CLIENT_CONFIG = 201 #
-    ENGINEERING = 300
-    ENGINEERING_CONFIG = 301 #
-    ENGINEERING_INFRA = 302 #
+# XX2 : PERMISSIONS Related
+class ErrorClassification(Enum):
+    NOT_DEFINED = 'Null Classification'
+    SUCCESS = 'Success General'
+    SUCCESS_CONFIG = 'Success Config' #
+    CLIENT = 'Client General' #
+    CLIENT_CONFIG = 'Client Config' #
+    CLIENT_PERMISSIONS = 'Client Permissions' #
+    ENGINEERING = 'Engineering General'
+    ENGINEERING_CONFIG = 'Engineering Config' #
 
-def log_and_print(logger, level, msg, status: ErrorCodes = ErrorCodes.NOT_DEFINED, exc_info=False):
+def log_and_print(logger, level, msg, error_classification: ErrorClassification = ErrorClassification.NOT_DEFINED, exc_info=False):
     '''
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)
     '''
+    msg = f'[{error_classification}] {msg}'
     logger.log(level, msg, exc_info=exc_info)
     print(msg, flush=True)
     if exc_info:
