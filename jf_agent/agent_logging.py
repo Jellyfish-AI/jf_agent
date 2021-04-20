@@ -64,22 +64,15 @@ def log_loop_iters(
         yield
 
 
-
-# 1XX : SUCCESS
-# 1XX : ENGINEERING
-# 1XX : CLIENT
-# XX0 : GENERAL
-# XX1 : CONFIG Related
-# XX2 : PERMISSIONS Related
+# Represents the classification of the logging error/warning/info.
+# Provides a way of understanding what groups of people the errors relate to.
 class ErrorClassification(Enum):
     NOT_DEFINED = 'Null Classification'
-    SUCCESS = 'Success General'
-    SUCCESS_CONFIG = 'Success Config' #
-    CLIENT = 'Client General' #
-    CLIENT_CONFIG = 'Client Config' #
-    CLIENT_PERMISSIONS = 'Client Permissions' #
-    ENGINEERING = 'Engineering General'
-    ENGINEERING_CONFIG = 'Engineering Config' #
+    SUCCESS = 'Success General' # General Customer Success Errors
+    CLIENT = 'Client General' # General Client Errors
+    CLIENT_CONFIG = 'Client Config' # Client Errors related to their configuration
+    CLIENT_PERMISSIONS = 'Client Permissions' # Client Error related to their permissions in Jira, Git, etc. or their config.
+    ENGINEERING = 'Engineering General' # General Engineering Errors
 
 def log_and_print(logger, level, msg, error_classification: ErrorClassification = ErrorClassification.NOT_DEFINED, exc_info=False):
     '''
