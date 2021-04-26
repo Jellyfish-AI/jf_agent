@@ -65,7 +65,7 @@ def log_loop_iters(
 # Represents the classification of the logging error/warning/info.
 # Provides a way of understanding what groups of people the errors relate to.
 ERROR_MESSAGES = {
-    '000': 'Null Classification',
+    '000': 'Unclassified',
     '100': 'Success General', # General Customer Success Errors
     '200': 'Client', # General Client Errors
     '201': 'Client Config', # Client Errors related to their configuration
@@ -78,7 +78,6 @@ def log_and_print(logger, level, msg, error_code: str = '000', exc_info=False):
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)
     '''
-    msg = f'[{error_code}] {msg}'
     if level != logging.INFO:  # Don’t care to track codes for info-level logging
         error_message = ERROR_MESSAGES.get(error_code, 'Null Classfication')
         msg = f'[{error_code} - {error_message}] {msg}'
