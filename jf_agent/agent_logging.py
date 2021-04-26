@@ -2,7 +2,6 @@ from contextlib import contextmanager
 from functools import wraps
 import logging
 import os
-from enum import Enum
 import traceback
 
 '''
