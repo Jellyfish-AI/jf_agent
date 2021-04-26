@@ -67,10 +67,10 @@ def log_loop_iters(
 ERROR_MESSAGES = {
     '000': 'Null Classification',
     '100': 'Success General', # General Customer Success Errors
-    '200': 'Client General', # General Client Errors
+    '200': 'Client', # General Client Errors
     '201': 'Client Config', # Client Errors related to their configuration
     '202': 'Client Permissions', # Client Error related to their permissions in Jira, Git, etc. or their config.
-    '300': 'Engineering General', # General Engineering Errors
+    '300': 'Engineering', # General Engineering Errors
 }
 
 def log_and_print(logger, level, msg, error_code: str, exc_info=False):
