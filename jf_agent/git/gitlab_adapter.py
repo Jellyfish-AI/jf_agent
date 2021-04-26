@@ -105,7 +105,7 @@ class GitLabAdapter(GitAdapter):
                         logger,
                         logging.INFO,
                         f'skipping repo {api_repo.id} because not in include_repos...',
-                        agent_logging.ErrorClassification.CLIENT_CONFIG,
+                        '201',
                     )
                     continue  # skip this repo
                 if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
@@ -113,7 +113,7 @@ class GitLabAdapter(GitAdapter):
                         logger,
                         logging.INFO,
                         f'skipping repo {api_repo.id} because in exclude_repos...',
-                        agent_logging.ErrorClassification.CLIENT_CONFIG,
+                        '201',
                     )
                     continue  # skip this repo
 
@@ -155,7 +155,7 @@ class GitLabAdapter(GitAdapter):
                         f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
                         f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
                     ),
-                    agent_logging.ErrorClassification.CLIENT_PERMISSIONS,
+                    '202',
                 )
 
 

@@ -102,7 +102,7 @@ def obtain_config(args) -> ValidatedConfig:
                 (
                     f'''ERROR: Mode should be one of "{', '.join(VALID_RUN_MODES)}"'''
                 ),
-                agent_logging.ErrorClassification.CLIENT,
+                200,
         )
         raise BadConfigException()
 

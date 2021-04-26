@@ -155,7 +155,7 @@ def download_projects_and_versions(
                     logger,
                     logging.ERROR,
                     f'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...',
-                    agent_logging.ErrorClassification.CLIENT_CONFIG
+                    '201'
                 )
                 return False
             else:
@@ -220,7 +220,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         logging.ERROR,
                         f"You do not have the required permissions in jira required to "
                         f"fetch boards for the project {project_id}",
-                        agent_logging.ErrorClassification.CLIENT_PERMISSIONS
+                        '202'
                     )
                     break
                 raise
@@ -319,7 +319,7 @@ def download_all_issue_metadata(
                             logger,
                             logging.WARNING,
                             f'Caught KeyError from search_issues(), reducing batch size to {batch_size}',
-                            agent_logging.ErrorClassification.ENGINEERING,
+                            '300',
                         )
                         continue
                     else:
@@ -327,7 +327,7 @@ def download_all_issue_metadata(
                             logger,
                             logging.ERROR,
                             'Caught KeyError from search_issues(), batch size is already 0, bailing out',
-                            agent_logging.ErrorClassification.ENGINEERING,
+                            '300',
                         )
                         raise
 
@@ -344,7 +344,7 @@ def download_all_issue_metadata(
                 logger,
                 logging.ERROR,
                 f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}',
-                agent_logging.ErrorClassification.ENGINEERING,
+                '300',
             )
 
     threads = [
@@ -518,7 +518,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
                     logger=logger,
                     level=logging.WARNING,
                     msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
-                    error_classification=agent_logging.ErrorClassification.ENGINEERING,
+                    error_classification=agent_logging.ERROR_MESSAGES.ENGINEERING,
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -579,7 +579,7 @@ def _download_jira_issues_segment(
             logger,
             logging.ERROR,
             f'[Thread {thread_num}] Jira issue downloader FAILED',
-            agent_logging.ErrorClassification.ENGINEERING,
+            '300',
             exc_info=True,
         )
         q.put(e)
@@ -632,7 +632,7 @@ def _download_jira_issues_page(
                         logger,
                         logging.WARNING,
                         f'Apparently unable to fetch issue based on search_params {search_params}',
-                        agent_logging.ErrorClassification.ENGINEERING,
+                        '300',
                     )
                     return [], 0
                 else:
@@ -706,7 +706,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print(
-                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', agent_logging.ErrorClassification.ENGINEERING, exc_info=True
+                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', '300', exc_info=True
             )
             return []
 
@@ -904,7 +904,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                         logger,
                         logging.ERROR,
                         "you do not have the required 'development field' permissions in jira required to scan for missing repos",
-                        agent_logging.ErrorClassification.CLIENT_CONFIG
+                        '201'
                     )
                     return []
 

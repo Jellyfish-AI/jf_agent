@@ -385,7 +385,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             logger,
             logging.INFO,
             f'Obtained {git_config.git_provider} configuration, attempting download...',
-            agent_logging.ErrorClassification.CLIENT_CONFIG
+            '201'
         )
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
@@ -441,7 +441,7 @@ def send_data(config, creds):
                 logger,
                 logging.ERROR,
                 f'Failed to upload file {filename} to S3 bucket',
-                agent_logging.ErrorClassification.ENGINEERING,
+                '300',
                 exc_info=True,
             )
 
@@ -529,7 +529,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
             logger,
             logging.ERROR,
             f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.',
-            agent_logging.ErrorClassification.ENGINEERING,
+            '300',
             exc_info=True,
         )
         return None

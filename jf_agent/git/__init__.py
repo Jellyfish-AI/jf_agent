@@ -257,7 +257,7 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             logger,
             logging.ERROR,
             f'Failed to connect to {config.git_provider}:\n{e}',
-            agent_logging.ErrorClassification.CLIENT_CONFIG,
+            '201',
             exc_info=True,
         )
         return
@@ -325,7 +325,7 @@ def load_and_dump_git(
             logger,
             logging.ERROR,
             f'Failed to download {config.git_provider} data:\n{e}',
-            agent_logging.ErrorClassification.ENGINEERING,
+            '300',
             exc_info=True,
         )
 
@@ -433,7 +433,7 @@ def get_repos_from_git(git_connection, config: GitConfig):
             logger,
             logging.ERROR,
             f'ValueError: {config.git_provider} is not a supported git_provider for this run_mode',
-            agent_logging.ErrorClassification.ENGINEERING,
+            '300',
             exc_info=True,
         )
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')

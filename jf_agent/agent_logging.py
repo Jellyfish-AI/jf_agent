@@ -63,23 +63,26 @@ def log_loop_iters(
     else:
         yield
 
-
 # Represents the classification of the logging error/warning/info.
 # Provides a way of understanding what groups of people the errors relate to.
-class ErrorClassification(Enum):
-    NOT_DEFINED = 'Null Classification'
-    SUCCESS = 'Success General' # General Customer Success Errors
-    CLIENT = 'Client General' # General Client Errors
-    CLIENT_CONFIG = 'Client Config' # Client Errors related to their configuration
-    CLIENT_PERMISSIONS = 'Client Permissions' # Client Error related to their permissions in Jira, Git, etc. or their config.
-    ENGINEERING = 'Engineering General' # General Engineering Errors
+ERROR_MESSAGES = {
+    '000': 'Null Classification',
+    '100': 'Success General', # General Customer Success Errors
+    '200': 'Client General', # General Client Errors
+    '201': 'Client Config', # Client Errors related to their configuration
+    '202': 'Client Permissions', # Client Error related to their permissions in Jira, Git, etc. or their config.
+    '300': 'Engineering General', # General Engineering Errors
+}
 
-def log_and_print(logger, level, msg, error_classification: ErrorClassification = ErrorClassification.NOT_DEFINED, exc_info=False):
+def log_and_print(logger, level, msg, error_code: str, exc_info=False):
     '''
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)
     '''
-    msg = f'[{error_classification}] {msg}'
+    msg = f'[{error_code}] {msg}'
+    if level != logging.INFO:  # Don’t care to track codes for info-level logging
+        error_message = ERROR_MESSAGES.get(error_code, 'Null Classfication')
+        msg = f'[{error_code} - {error_message}] {msg}'
     logger.log(level, msg, exc_info=exc_info)
     print(msg, flush=True)
     if exc_info:

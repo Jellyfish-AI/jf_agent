@@ -198,7 +198,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                     logger,
                                     logging.WARN,
                                     f"PR {api_pr['id']} doesn't reference a source and/or destination repository; skipping it...",
-                                    agent_logging.ErrorClassification.ENGINEERING,
+                                    '300',
                                 )
                                 continue
 
@@ -224,7 +224,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 logger,
                                 logging.ERROR,
                                 f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...',
-                                agent_logging.ErrorClassification.ENGINEERING,
+                                '300',
                                 exc_info=True,
                             )
 
@@ -234,7 +234,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         logger,
                         logging.ERROR,
                         f'Error getting PRs for repo {repo.id}. Skipping...',
-                        agent_logging.ErrorClassification.ENGINEERING,
+                        '300',
                         exc_info=True,
                     )
 
@@ -362,7 +362,7 @@ def _normalize_pr(
                 logger,
                 logging.WARN,
                 f'Unable to parse the diff For PR {api_pr["id"]} in repo {repo.id}; proceeding as though no files were changed.',
-                agent_logging.ErrorClassification.ENGINEERING,
+                '300',
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -380,7 +380,7 @@ def _normalize_pr(
                 logging.WARN,
                 f'For PR {api_pr["id"]} in repo {repo.id}, caught HTTPError (HTTP 401) when attempting to retrieve changes; '
                 f'proceeding as though no files were changed',
-                agent_logging.ErrorClassification.ENGINEERING,
+                '300',
             )
         else:
             # Some other HTTP error happened; Re-raise

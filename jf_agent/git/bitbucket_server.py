@@ -369,7 +369,7 @@ def get_pull_requests(
                         logger,
                         logging.INFO,
                         f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
-                        agent_logging.ErrorClassification.ENGINEERING,
+                        '300',
                     )
 
                 for activity in activites:

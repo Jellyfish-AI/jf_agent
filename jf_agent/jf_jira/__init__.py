@@ -54,7 +54,7 @@ def get_basic_jira_connection(config, creds):
         return _get_raw_jira_connection(config, creds)
     except Exception as e:
         agent_logging.log_and_print(
-            logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', agent_logging.ErrorClassification.CLIENT_CONFIG, exc_info=True
+            logger, logging.ERROR, f'Failed to connect to Jira:\n{e}', '201', exc_info=True
         )
 
 
@@ -277,6 +277,6 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
 
     except Exception as e:
         agent_logging.log_and_print(
-            logger, logging.ERROR, f'Failed to download jira data:\n{e}', agent_logging.ErrorClassification.ENGINEERING, exc_info=True
+            logger, logging.ERROR, f'Failed to download jira data:\n{e}', '300', exc_info=True
         )
         return {'type': 'Jira', 'status': 'failed'}

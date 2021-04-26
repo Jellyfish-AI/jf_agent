@@ -11,7 +11,7 @@ class MissingSourceProjectException(Exception):
     pass
 
 
-def log_and_print_request_error(e, action='making request', error_code=agent_logging.ErrorClassification.ENGINEERING, log_as_exception=False):
+def log_and_print_request_error(e, action='making request', error_code='300', log_as_exception=False):
     try:
         response_code = e.response_code
     except AttributeError:

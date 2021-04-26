@@ -52,7 +52,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
-                    agent_logging.ErrorClassification.ENGINEERING,
+                    '300',
                 )
 
     def get_branches(self, full_repo):
@@ -94,7 +94,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref',
-                    agent_logging.ErrorClassification.ENGINEERING,
+                    '300',
                 )
                 return None
 
@@ -131,7 +131,7 @@ class GithubClient:
                         logger,
                         logging.ERROR,
                         f'Request to {url} has failed {i} times -- giving up!',
-                        agent_logging.ErrorClassification.ENGINEERING,
+                        '300',
                     )
                     raise
 
@@ -156,7 +156,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
-                    agent_logging.ErrorClassification.ENGINEERING,
+                    '300',
                 )
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
@@ -178,7 +178,7 @@ class GithubClient:
                         logger,
                         logging.WARNING,
                         f'Expected an array of json results, but got: {page}',
-                        agent_logging.ErrorClassification.ENGINEERING,
+                        '300',
                     )
                     raise ValueError(f'Expected an array of json results, but got: {page}')
 
