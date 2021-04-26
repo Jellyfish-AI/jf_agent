@@ -547,4 +547,4 @@ if __name__ == '__main__':
     try:
         main()
     except BadConfigException:
-        print('ERROR: Bad config; see earlier messages' # Client Config Error
+        print('ERROR: Bad config; see earlier messages') # Client Config Error
