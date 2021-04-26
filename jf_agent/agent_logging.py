@@ -73,7 +73,7 @@ ERROR_MESSAGES = {
     '300': 'Engineering', # General Engineering Errors
 }
 
-def log_and_print(logger, level, msg, error_code: str, exc_info=False):
+def log_and_print(logger, level, msg, error_code: str = '000', exc_info=False):
     '''
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)

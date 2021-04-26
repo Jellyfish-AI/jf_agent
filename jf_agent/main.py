@@ -372,7 +372,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
     if config.jira_url:
         agent_logging.log_and_print(
-            logger, logging.INFO, 'Obtained Jira configuration, attempting download...'
+            logger, logging.INFO, 'Obtained Jira configuration, attempting download...', error_code=''
         )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
