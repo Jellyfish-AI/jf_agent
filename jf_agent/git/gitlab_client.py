@@ -22,11 +22,11 @@ def log_and_print_request_error(e, action='making request', error_code='300', lo
 
     if log_as_exception:
         agent_logging.log_and_print(
-            logger, logging.ERROR, f'Got {error_name} {response_code} when {action} ({e})'
+            logger, logging.ERROR, f'Got {error_name} {response_code} when {action} ({e})', error_code
         )
     else:
         agent_logging.log_and_print(
-            logger, logging.WARNING, f'Got {error_name} {response_code} when {action}'
+            logger, logging.WARNING, f'Got {error_name} {response_code} when {action}', error_code
         )
 
 
