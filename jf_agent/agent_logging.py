@@ -78,10 +78,11 @@ def log_and_print(logger, level, msg, error_code: str = '000', exc_info=False):
     For a failure that should be sent to the logger, and also written
     to stdout (for user visibility)
     '''
+    log_msg = msg
     if level != logging.INFO:  # Don’t care to track codes for info-level logging
         error_message = ERROR_MESSAGES.get(error_code, 'Null Classfication')
-        msg = f'[{error_code} - {error_message}] {msg}'
-    logger.log(level, msg, exc_info=exc_info)
+        log_msg = f'[{error_code} - {error_message}] {msg}'
+    logger.log(level, log_msg, exc_info=exc_info)
     print(msg, flush=True)
     if exc_info:
         print(traceback.format_exc())
