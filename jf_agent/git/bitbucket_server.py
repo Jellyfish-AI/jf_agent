@@ -3,7 +3,7 @@ import logging
 import stashy
 import pytz
 from tqdm import tqdm
-from requests.exceptions import RetryError
+from requests.exceptions import RetryError, ChunkedEncodingError
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -309,6 +309,8 @@ def get_pull_requests(
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
             )
+            skipped_prs = 0
+
             for pr in tqdm(
                 api_repo.pull_requests.all(state='ALL', order='NEWEST'),
                 desc=f'downloading PRs for {repo["name"]}',
@@ -330,12 +332,18 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except stashy.errors.NotFoundException:
                     additions, deletions, changed_files = None, None, None
-                except RetryError as e:
+                except RetryError:
                     print(
                         f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo.get()['name']}"
                     )
                     additions, deletions, changed_files = None, None, None
-                except stashy.errors.GenericException as e:
+                except ChunkedEncodingError as e:
+                    print(
+                        f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}, error: {e}. Skipping.'
+                    )
+                    skipped_prs += 1
+                    continue
+                except stashy.errors.GenericException:
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
@@ -459,3 +467,10 @@ def get_pull_requests(
                 }
 
                 yield normalized_pr
+
+            if skipped_prs > 5:
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
+                )
