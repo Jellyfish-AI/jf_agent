@@ -150,7 +150,7 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
     if not projects:
         raise ValueError(
             'No projects found.  Make sure your token has appropriate access to GitHub.'
-        ) # Client Config Error
+        ) # Customer Config Error
     return projects
 
 
@@ -210,7 +210,7 @@ def get_repos(
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
         )
-        # Client config
+        Customer Config
     return repos
 
 

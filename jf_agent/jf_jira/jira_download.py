@@ -41,7 +41,7 @@ def download_users(jira_connection, gdpr_active, quiet=False):
     if len(jira_users) == 0:
         raise RuntimeError(
             'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
-        ) # Client Permissions Error
+        ) # Customer Permissions Error
 
     if not quiet:
         print('✓')
@@ -171,7 +171,7 @@ def download_projects_and_versions(
     if not projects:
         raise Exception(
             'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
-        ) # Client Config Error
+        ) # Customer Config Error
 
     print('✓')
 

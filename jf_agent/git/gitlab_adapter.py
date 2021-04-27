@@ -62,7 +62,7 @@ class GitLabAdapter(GitAdapter):
         if not projects:
             raise ValueError(
                 'No projects found.  Make sure your token has appropriate access to GitLab.'
-            ) # Client Permissions Error
+            ) # Customer Permissions Error
         return projects
 
     @diagnostics.capture_timing()
@@ -163,7 +163,7 @@ class GitLabAdapter(GitAdapter):
         if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
-            ) # Client Permissions Error
+            ) # Customer Permissions Error
         return nrm_repos
 
     @diagnostics.capture_timing()

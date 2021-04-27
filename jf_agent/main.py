@@ -111,11 +111,11 @@ def main():
             if 'Basic authentication with passwords is deprecated.' in str(e):
                 print(
                     f'Error connecting to Jira instance at {config.jira_url}. Please use a Jira API token, see https://confluence.atlassian.com/cloud/api-tokens-938839638.html.'
-                ) # Client Config Error
+                ) # Customer Config Error
             else:
                 print(
                     f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
-                ) # Client Config Error
+                ) # Customer Config Error
             return
 
         # test jira users permission
@@ -129,7 +129,7 @@ def main():
         except Exception as e:
             print(
                 f'Error downloading users from Jira instance at {config.jira_url}, please verify that this user has the "browse all users" permission. Error: {e}'
-            ) # Client Permissions Error
+            ) # Customer Permissions Error
             return
 
         # test jira project access
@@ -140,7 +140,7 @@ def main():
         if config.jira_include_projects:
             for proj in config.jira_include_projects:
                 if proj not in accessible_projects:
-                    print(f'Error: Unable to access explicitly-included project {proj}.') # Client Permissions Error
+                    print(f'Error: Unable to access explicitly-included project {proj}.') # Customer Permissions Error
                     return
 
         print('Success!')
@@ -242,7 +242,7 @@ def _get_git_instance_to_creds(git_config):
         if not envvar_val:
             print(
                 f'ERROR: Missing environment variable {envvar_name}. Required for instance {git_config.git_instance_slug}.'
-            ) # Client Config Error
+            ) # Customer Config Error
             raise BadConfigException()
         return envvar_val
 
@@ -267,7 +267,7 @@ def _get_git_instance_to_creds(git_config):
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
-        print('ERROR: JELLYFISH_API_TOKEN not found in the environment.') # Client Config Error
+        print('ERROR: JELLYFISH_API_TOKEN not found in the environment.') # Customer Config Error
         raise BadConfigException()
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
@@ -282,7 +282,7 @@ def obtain_creds(config):
     if config.jira_url and not (jira_username and jira_password):
         print(
             'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD.'
-        ) # Client Config Error
+        ) # Customer Config Error
         raise BadConfigException()
 
     return UserProvidedCreds(
@@ -301,7 +301,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         print(
             f"ERROR: Couldn't get agent config info from {base_url}/agent/pull-state "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
-        ) #  Client Permissions Error
+        ) #  Customer Permissions Error
         raise BadConfigException()
 
     agent_config = resp.json()
@@ -326,7 +326,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 print(
                     f'ERROR: The Jellyfish API did not return an instance with the git_instance_slug `{slug}` -- '
                     f'please check your configuration or contact Jellyfish'
-                ) # Client Config Error
+                ) # Customer Config Error
                 raise BadConfigException()
 
     # If a single Git instance is configured in the YAML, but multiple instances are configured
@@ -352,14 +352,14 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 print(
                     'ERROR: Must specify git_instance slug in multi-git mode -- '
                     'please check your configuration or contact Jellyfish'
-                ) # Client Config Error
+                ) # Customer Config Error
                 raise BadConfigException()
 
             if git_config.git_instance_slug not in git_instance_info:
                 print(
                     f'ERROR: Invalid `instance_slug` {git_config.git_instance_slug} in configuration. -- '
                     'please check your configuration or contact Jellyfish'
-                ) # Client Config Error
+                ) # Customer Config Error
                 raise BadConfigException()
 
     return JellyfishEndpointInfo(jira_info, git_instance_info)
@@ -494,7 +494,7 @@ def send_data(config, creds):
     if any(thread_exceptions):
         print(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
-        ) # Client Error
+        ) # Customer Error
         return
 
     # creating .done file
@@ -536,7 +536,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
 
     if resp.status_code == 400:
         # additionally, indicate config needs alterations
-        raise BadConfigException() # Client Config Error
+        raise BadConfigException() # Customer Config Error
     elif not resp.ok:
         return None
 
@@ -547,4 +547,4 @@ if __name__ == '__main__':
     try:
         main()
     except BadConfigException:
-        print('ERROR: Bad config; see earlier messages') # Client Config Error
+        print('ERROR: Bad config; see earlier messages') # Customer Config Error

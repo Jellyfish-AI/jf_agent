@@ -122,7 +122,7 @@ class BitbucketCloudAdapter(GitAdapter):
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
-            ) # Client config Error
+            ) # Customer Config Error
 
         return repos
 

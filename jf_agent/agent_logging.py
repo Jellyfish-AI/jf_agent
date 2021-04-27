@@ -67,9 +67,9 @@ def log_loop_iters(
 ERROR_MESSAGES = {
     '000': 'Unclassified',
     '100': 'Success General', # General Customer Success Errors
-    '200': 'Client', # General Client Errors
-    '201': 'Client Config', # Client Errors related to their configuration
-    '202': 'Client Permissions', # Client Error related to their permissions in Jira, Git, etc. or their config.
+    '200': 'Customer', # General Customer Errors
+    '201': 'Customer Config', # Customer Errors related to their configuration
+    '202': 'Customer Permissions', # Customer Error related to their permissions in Jira, Git, etc. or their config.
     '300': 'Engineering', # General Engineering Errors
 }
 
