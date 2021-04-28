@@ -63,53 +63,53 @@ def log_loop_iters(
         yield
 
 ERROR_MESSAGES = {
-    3000: 'Failed to upload file {filename} to S3 bucket',
-    3010: 'Rate limiter: thought we were operating within our limit (made {calls_made}/{max_calls} calls for {realm}), but got HTTP 429 anyway!',
-    3020: 'Next available time to make call is after the timeout of {timeout_secs} seconds. Giving up.',
-    3030: 'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.',
-    3001: 'PR {id} doesn\'t reference a source and/or destination repository; skipping it...',
-    3011: 'Error normalizing PR {id} from repo {id}. Skipping...',
-    3021: 'Error getting PRs for repo {id}. Skipping...',
-    3031: 'Unable to parse the diff For PR {id} in repo {id}; proceeding as though no files were changed.',
-    3041: 'For PR {id} in repo {id}, caught HTTPError (HTTP 401) when attempting to retrieve changes; ' 'proceeding as though no files were changed',
-    3051: 'For PR {id} in repo {id}, caught UnicodeDecodeError when attempting to decode changes; proceeding as though no files were changed',
-    3061: 'Failed to download {git_provider} data:\n{e}',
-    3071: 'ValueError: {git_provider} is not a supported git_provider for this run_mode',
-    3081: 'Got unexpected HTTP 403 for repo {url}.  Skipping...',
-    3091: 'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
-    3101: 'Request to {url} has failed {i} times -- giving up!',
-    3111: 'Expected an array of json results, but got: {page}',
-    3121: 'Got HTTP {response_status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid re',
-    3131: 'Got {error_name} {response_code} when {action} ({e})',
-    3141: 'Got {error_name} {response_code} when {action}',
+    3000: 'Failed to upload file {} to S3 bucket',
+    3010: 'Rate limiter: thought we were operating within our limit (made {}/{} calls for {}), but got HTTP 429 anyway!',
+    3020: 'Next available time to make call is after the timeout of {} seconds. Giving up.',
+    3030: 'ERROR: Could not parse response with status code {}. Contact an administrator for help.',
+    3001: 'PR {} doesn\'t reference a source and/or destination repository; skipping it...',
+    3011: 'Error normalizing PR {} from repo {}. Skipping...',
+    3021: 'Error getting PRs for repo {}. Skipping...',
+    3031: 'Unable to parse the diff For PR {} in repo {}; proceeding as though no files were changed.',
+    3041: 'For PR {} in repo {}, caught HTTPError (HTTP 401) when attempting to retrieve changes; ' 'proceeding as though no files were changed',
+    3051: 'For PR {} in repo {}, caught UnicodeDecodeError when attempting to decode changes; proceeding as though no files were changed',
+    3061: 'Failed to download {} data:\n{}',
+    3071: 'ValueError: {} is not a supported git_provider for this run_mode',
+    3081: 'Got unexpected HTTP 403 for repo {}.  Skipping...',
+    3091: 'Github rate limit exceeded.  Trying again in {}...',
+    3101: 'Request to {} has failed {} times -- giving up!',
+    3111: 'Expected an array of json results, but got: {}',
+    3121: 'Got HTTP {} when fetching commit {} for "{}", this likely means you are trying to fetch an invalid re',
+    3131: 'Got {} {} when {} ({})',
+    3141: 'Got {} {} when {}',
     3151: 'Getting HTTP 429s for over an hour; giving up!',
-    3002: 'Failed to download jira data:\n{e}',
-    3012: 'Caught KeyError from search_issues(), reducing batch size to {batch_size}',
+    3002: 'Failed to download jira data:\n{}',
+    3012: 'Caught KeyError from search_issues(), reducing batch size to {}',
     3022: 'Caught KeyError from search_issues(), batch size is already 0, bailing out',
-    3032: 'Exception encountered in thread {thread_num}\n{traceback.format_exc()}',
-    3042: '[Thread {thread_num}] Jira issue downloader FAILED',
-    3052: 'JIRAError ({e}), reducing batch size to {batch_size}',
-    3062: 'Apparently unable to fetch issue based on search_params {search_params}',
+    3032: 'Exception encountered in thread {}\n{}',
+    3042: '[Thread {}] Jira issue downloader FAILED',
+    3052: 'JIRAError ({}), reducing batch size to {}',
+    3062: 'Apparently unable to fetch issue based on search_params {}',
     3072: 'Error calling createmeta JIRA endpoint',
-    3082: 'OJ-9084: Changelog history item with no \'fieldId\' or \'field\' key: {keys}',
-    2000: ('''ERROR: Mode should be one of "{VALID_RUN_MODES}"'''),
-    2101: 'Failed to connect to {git_provider}:\n{e}', # 201
-    2102: 'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...', # 201
-    2112: 'Failed to connect to Jira:\n{e}', # 201
+    3082: 'OJ-9084: Changelog history item with no \'fieldId\' or \'field\' key: {}',
+    2000: ('''ERROR: Mode should be one of "{}"'''),
+    2101: 'Failed to connect to {}:\n{}', # 201
+    2102: 'Unable to access project {}, may be a Jira misconfiguration. Skipping...', # 201
+    2112: 'Failed to connect to Jira:\n{}', # 201
     2122: 'you do not have the required \'development field\' permissions in jira required to scan for missing repos', # 201
     2132: (
             'Missing recommended jira_fields! For the best possible experience, '
             'please add the following to `include_fields` in the '
-            'configuration file: {missing_required_fields}'
+            'configuration file: {}'
         ),
     2142: (
             'Excluding recommended jira_fields! For the best possible experience, '
             'please remove the following from `exclude_fields` in the '
-            'configuration file: {excluded_required_fields}',
+            'configuration file: {}',
         ),
-    2201: ('\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project_id}. '
-            'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'),
-    2202: "You do not have the required permissions in jira required to fetch boards for the project {project_id}",
+    2201: ('\nERROR: Failed to download ({}) repo(s) from the group {}. '
+            'Please check that the appropriate permissions are set for the following repos... ({})'),
+    2202: "You do not have the required permissions in jira required to fetch boards for the project {}",
 }
 
 def log_and_print(logger, level, msg, exc_info=False):
