@@ -151,11 +151,11 @@ def download_projects_and_versions(
                 and e.text
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.ERROR,
-                    f'Unable to access project {project_id}, may be a Jira misconfiguration. Skipping...',
-                    '201'
+                    msg_args=[project_id],
+                    error_code=2101,
                 )
                 return False
             else:
@@ -215,12 +215,11 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 ).json()['values']
             except JIRAError as e:
                 if e.status_code == 400:
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.ERROR,
-                        f"You do not have the required permissions in jira required to "
-                        f"fetch boards for the project {project_id}",
-                        '202'
+                        msg_args=[project_id],
+                        error_code=2201,
                     )
                     break
                 raise
@@ -315,19 +314,19 @@ def download_all_issue_metadata(
                     # a smaller ask will prevent the server from choking.
                     batch_size = int(batch_size / 2)
                     if batch_size > 0:
-                        agent_logging.log_and_print(
+                        agent_logging.log_and_print_error_or_warning(
                             logger,
                             logging.WARNING,
-                            f'Caught KeyError from search_issues(), reducing batch size to {batch_size}',
-                            '300',
+                            msg_args=[batch_size],
+                            error_code=3700,
                         )
                         continue
                     else:
-                        agent_logging.log_and_print(
+                        agent_logging.log_and_print_error_or_warning(
                             logger,
                             logging.ERROR,
-                            'Caught KeyError from search_issues(), batch size is already 0, bailing out',
-                            '300',
+                            msg_args=[],
+                            error_code=3701,
                         )
                         raise
 
@@ -340,11 +339,11 @@ def download_all_issue_metadata(
 
         except Exception as e:
             thread_exceptions[thread_num] = e
-            agent_logging.log_and_print(
+            agent_logging.log_and_print_error_or_warning(
                 logger,
                 logging.ERROR,
-                f'Exception encountered in thread {thread_num}\n{traceback.format_exc()}',
-                '300',
+                msg_args=[thread_num, traceback.format_exc()],
+                error_code=3702,
             )
 
     threads = [
@@ -514,11 +513,11 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         for i in items:
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger=logger,
                     level=logging.WARNING,
-                    msg=f"OJ-9084: Changelog history item with no 'fieldId' or 'field' key: {i.keys()}",
-                    error_classification=agent_logging.ERROR_MESSAGES.ENGINEERING,
+                    error_code= 3904,
+                    msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -575,11 +574,11 @@ def _download_jira_issues_segment(
         q.put(None)
 
     except BaseException as e:
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.ERROR,
-            f'[Thread {thread_num}] Jira issue downloader FAILED',
-            '300',
+            msg_args=[thread_num],
+            error_code=3900,
             exc_info=True,
         )
         q.put(e)
@@ -618,21 +617,22 @@ def _download_jira_issues_page(
                 raise
 
             batch_size = int(batch_size / 2)
-            agent_logging.log_and_print(
+            agent_logging.log_and_print_error_or_warning(
                 logger,
                 logging.WARNING,
-                f'JIRAError ({e}), reducing batch size to {batch_size}',
+                msg_args=[e, batch_size],
+                error_code=3901,
                 exc_info=True,
             )
             if batch_size == 0:
                 if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                     return [], 1
                 elif not get_changelog:
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.WARNING,
-                        f'Apparently unable to fetch issue based on search_params {search_params}',
-                        '300',
+                        msg_args=[search_params],
+                        error_code=3902,
                     )
                     return [], 0
                 else:
@@ -705,8 +705,8 @@ def download_customfieldoptions(jira_connection, project_ids):
                 projectIds=[project_id], expand='projects.issuetypes.fields'
             )
         except JIRAError:
-            agent_logging.log_and_print(
-                logger, logging.ERROR, 'Error calling createmeta JIRA endpoint', '300', exc_info=True
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.ERROR, error_code=3903, exc_info=True
             )
             return []
 
@@ -900,11 +900,10 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 )
             except JIRAError as e:
                 if e.status_code == 403:
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.ERROR,
-                        "you do not have the required 'development field' permissions in jira required to scan for missing repos",
-                        '201'
+                        error_code=2103,
                     )
                     return []
 

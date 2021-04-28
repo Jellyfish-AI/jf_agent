@@ -11,7 +11,7 @@ class MissingSourceProjectException(Exception):
     pass
 
 
-def log_and_print_request_error(e, action='making request', error_code='300', log_as_exception=False):
+def log_and_print_request_error(e, action='making request', log_as_exception=False):
     try:
         response_code = e.response_code
     except AttributeError:
@@ -21,12 +21,12 @@ def log_and_print_request_error(e, action='making request', error_code='300', lo
     error_name = type(e).__name__
 
     if log_as_exception:
-        agent_logging.log_and_print(
-            logger, logging.ERROR, f'Got {error_name} {response_code} when {action} ({e})', error_code
+        agent_logging.log_and_print_error_or_warning(
+            logger, logging.ERROR, msg_args=[error_name, response_code, action, e], error_code=3500,
         )
     else:
-        agent_logging.log_and_print(
-            logger, logging.WARNING, f'Got {error_name} {response_code} when {action}', error_code
+        agent_logging.log_and_print_error_or_warning(
+            logger, logging.WARNING, msg_args=[error_name, response_code, action], error_code=3501
         )
 
 

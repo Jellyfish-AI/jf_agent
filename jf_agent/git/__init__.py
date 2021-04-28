@@ -253,11 +253,11 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             )
 
     except Exception as e:
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.ERROR,
-            f'Failed to connect to {config.git_provider}:\n{e}',
-            '201',
+            msg_args=[config.git_provider, e],
+            error_code=2100,
             exc_info=True,
         )
         return
@@ -321,11 +321,11 @@ def load_and_dump_git(
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
     except Exception as e:
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.ERROR,
-            f'Failed to download {config.git_provider} data:\n{e}',
-            '300',
+            msg_args=[config.git_provider, e],
+            error_code=3300,
             exc_info=True,
         )
 
@@ -429,11 +429,11 @@ def get_repos_from_git(git_connection, config: GitConfig):
         projects = gl_adapter.get_projects()
         repos = gl_adapter.get_repos(projects)
     else:
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.ERROR,
-            f'ValueError: {config.git_provider} is not a supported git_provider for this run_mode',
-            '300',
+            msg_args=[config.git_provider],
+            error_code=3301,
             exc_info=True,
         )
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')

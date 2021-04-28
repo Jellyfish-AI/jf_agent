@@ -48,11 +48,11 @@ class GithubClient:
 
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.WARNING,
-                    f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
-                    '300',
+                    msg_args=[m["url"]],
+                    error_code=3400,
                 )
 
     def get_branches(self, full_repo):
@@ -90,11 +90,11 @@ class GithubClient:
             return raw.json()
         except HTTPError as e:
             if e.response.status_code in (422,):
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.WARNING,
-                    f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref',
-                    '300',
+                    msg_args=[e.response.status_code, ref, full_repo_name],
+                    error_code=3403,
                 )
                 return None
 
@@ -127,11 +127,11 @@ class GithubClient:
                     raise
 
                 if i >= max_retries:
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.ERROR,
-                        f'Request to {url} has failed {i} times -- giving up!',
-                        '300',
+                        msg_args=[url, i],
+                        error_code=3401,
                     )
                     raise
 
@@ -152,11 +152,11 @@ class GithubClient:
                 # wait longer than that
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.WARNING,
-                    f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
-                    '300',
+                    msg_args=[reset_wait_str],
+                    error_code=3401,
                 )
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
@@ -174,11 +174,11 @@ class GithubClient:
                 result = self.get_raw_result(url)
                 page = result.json()
                 if type(page) != list:
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.WARNING,
-                        f'Expected an array of json results, but got: {page}',
-                        '300',
+                        msg_args=[page],
+                        error_code=3402,
                     )
                     raise ValueError(f'Expected an array of json results, but got: {page}')
 

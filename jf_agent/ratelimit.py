@@ -54,11 +54,11 @@ class RateLimiter(object):
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 429:
                         # Got rate limited anyway!
-                        agent_logging.log_and_print(
+                        agent_logging.log_and_print_error_or_warning(
                             logger,
                             logging.ERROR,
-                            f'Rate limiter: thought we were operating within our limit (made {calls_made}/{max_calls} calls for {realm}), but got HTTP 429 anyway!',
-                            '300',
+                            msg_args=[calls_made, max_calls, realm],
+                            error_code=3100
                         )
                     raise
 
@@ -68,11 +68,11 @@ class RateLimiter(object):
                 f'Rate limiter: exceeded {max_calls} calls in {period_secs} seconds for {realm}!',
             )
             if (sleep_until - start) >= timedelta(seconds=self.timeout_secs):
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.ERROR,
-                    f'Next available time to make call is after the timeout of {self.timeout_secs} seconds. Giving up.',
-                    '300',
+                    msg_args=[self.timeout_secs],
+                    error_code=3101
                 )
                 raise Exception('Rate limit timeout')
 
@@ -82,7 +82,6 @@ class RateLimiter(object):
                     logger,
                     logging.INFO,
                     f'Sleeping for {sleep_period_secs:.1f} secs ({sleep_period_secs / 60.0:.1f} mins)',
-                    '300',
                 )
                 time.sleep(sleep_period_secs)
 

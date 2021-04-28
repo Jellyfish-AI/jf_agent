@@ -385,7 +385,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             logger,
             logging.INFO,
             f'Obtained {git_config.git_provider} configuration, attempting download...',
-            '201'
         )
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
@@ -437,11 +436,11 @@ def send_data(config, creds):
             upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
             thread_exceptions.append(e)
-            agent_logging.log_and_print(
+            agent_logging.log_and_print_error_or_warning(
                 logger,
                 logging.ERROR,
-                f'Failed to upload file {filename} to S3 bucket',
-                '300',
+                msg_args=[filename],
+                error_code=3000,
                 exc_info=True,
             )
 
@@ -525,11 +524,11 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
         data = resp.json()
         print(data.get('message', ''))
     except json.decoder.JSONDecodeError:
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.ERROR,
-            f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.',
-            '300',
+            msg_args=[resp.status_code],
+            error_code=3001,
             exc_info=True,
         )
         return None

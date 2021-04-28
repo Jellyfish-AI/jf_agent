@@ -194,11 +194,11 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or 'repository' not in api_pr['destination']
                                 or not api_pr['destination']['repository']
                             ):
-                                agent_logging.log_and_print(
+                                agent_logging.log_and_print_error_or_warning(
                                     logger,
                                     logging.WARN,
-                                    f"PR {api_pr['id']} doesn't reference a source and/or destination repository; skipping it...",
-                                    '300',
+                                    msg_args=[api_pr['id']],
+                                    error_code=3200
                                 )
                                 continue
 
@@ -220,21 +220,21 @@ class BitbucketCloudAdapter(GitAdapter):
 
                         except Exception:
                             # if something happens when normalizing a PR, just keep going with the rest
-                            agent_logging.log_and_print(
+                            agent_logging.log_and_print_error_or_warning(
                                 logger,
                                 logging.ERROR,
-                                f'Error normalizing PR {api_pr["id"]} from repo {repo.id}. Skipping...',
-                                '300',
+                                msg_args=[api_pr["id"], repo.id],
+                                error_code=3201,
                                 exc_info=True,
                             )
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
-                    agent_logging.log_and_print(
+                    agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.ERROR,
-                        f'Error getting PRs for repo {repo.id}. Skipping...',
-                        '300',
+                        msg_args=[repo.id],
+                        error_code=3203,
                         exc_info=True,
                     )
 
@@ -358,11 +358,11 @@ def _normalize_pr(
         diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
-            agent_logging.log_and_print(
+            agent_logging.log_and_print_error_or_warning(
                 logger,
                 logging.WARN,
-                f'Unable to parse the diff For PR {api_pr["id"]} in repo {repo.id}; proceeding as though no files were changed.',
-                '300',
+                msg_args=[api_pr["id"], repo.id],
+                error_code=3203,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -375,23 +375,22 @@ def _normalize_pr(
             pass
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
-            agent_logging.log_and_print(
+            agent_logging.log_and_print_error_or_warning(
                 logger,
                 logging.WARN,
-                f'For PR {api_pr["id"]} in repo {repo.id}, caught HTTPError (HTTP 401) when attempting to retrieve changes; '
-                f'proceeding as though no files were changed',
-                '300',
+                msg_args=[api_pr["id"], repo.id],
+                error_code=3204,
             )
         else:
             # Some other HTTP error happened; Re-raise
             raise
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
-        agent_logging.log_and_print(
+        agent_logging.log_and_print_error_or_warning(
             logger,
             logging.WARN,
-            f'For PR {api_pr["id"]} in repo {repo.id}, caught UnicodeDecodeError when attempting to decode changes; '
-            f'proceeding as though no files were changed',
+            msg_args=[api_pr["id"], repo.id],
+            error_code=3205,
         )
 
     # Comments
