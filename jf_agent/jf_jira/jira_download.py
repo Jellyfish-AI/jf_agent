@@ -155,7 +155,7 @@ def download_projects_and_versions(
                     logger,
                     logging.ERROR,
                     msg_args=[project_id],
-                    error_code=2101,
+                    error_code=2112,
                 )
                 return False
             else:
@@ -219,7 +219,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         logger,
                         logging.ERROR,
                         msg_args=[project_id],
-                        error_code=2201,
+                        error_code=2202,
                     )
                     break
                 raise
@@ -318,15 +318,14 @@ def download_all_issue_metadata(
                             logger,
                             logging.WARNING,
                             msg_args=[batch_size],
-                            error_code=3700,
+                            error_code=3012,
                         )
                         continue
                     else:
                         agent_logging.log_and_print_error_or_warning(
                             logger,
                             logging.ERROR,
-                            msg_args=[],
-                            error_code=3701,
+                            error_code=3022,
                         )
                         raise
 
@@ -343,7 +342,7 @@ def download_all_issue_metadata(
                 logger,
                 logging.ERROR,
                 msg_args=[thread_num, traceback.format_exc()],
-                error_code=3702,
+                error_code=3032,
             )
 
     threads = [
@@ -516,7 +515,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
                 agent_logging.log_and_print_error_or_warning(
                     logger=logger,
                     level=logging.WARNING,
-                    error_code= 3904,
+                    error_code= 3082,
                     msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
@@ -578,7 +577,7 @@ def _download_jira_issues_segment(
             logger,
             logging.ERROR,
             msg_args=[thread_num],
-            error_code=3900,
+            error_code=3042,
             exc_info=True,
         )
         q.put(e)
@@ -621,7 +620,7 @@ def _download_jira_issues_page(
                 logger,
                 logging.WARNING,
                 msg_args=[e, batch_size],
-                error_code=3901,
+                error_code=3052,
                 exc_info=True,
             )
             if batch_size == 0:
@@ -632,7 +631,7 @@ def _download_jira_issues_page(
                         logger,
                         logging.WARNING,
                         msg_args=[search_params],
-                        error_code=3902,
+                        error_code=3062,
                     )
                     return [], 0
                 else:
@@ -706,7 +705,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print_error_or_warning(
-                logger, logging.ERROR, error_code=3903, exc_info=True
+                logger, logging.ERROR, error_code=3072, exc_info=True
             )
             return []
 
@@ -903,7 +902,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                     agent_logging.log_and_print_error_or_warning(
                         logger,
                         logging.ERROR,
-                        error_code=2103,
+                        error_code=2122,
                     )
                     return []
 

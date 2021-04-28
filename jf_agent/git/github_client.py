@@ -52,7 +52,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     msg_args=[m["url"]],
-                    error_code=3400,
+                    error_code=3081,
                 )
 
     def get_branches(self, full_repo):
@@ -94,7 +94,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     msg_args=[e.response.status_code, ref, full_repo_name],
-                    error_code=3403,
+                    error_code=3121,
                 )
                 return None
 
@@ -131,7 +131,7 @@ class GithubClient:
                         logger,
                         logging.ERROR,
                         msg_args=[url, i],
-                        error_code=3401,
+                        error_code=3101,
                     )
                     raise
 
@@ -156,7 +156,7 @@ class GithubClient:
                     logger,
                     logging.WARNING,
                     msg_args=[reset_wait_str],
-                    error_code=3401,
+                    error_code=3091,
                 )
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
@@ -178,7 +178,7 @@ class GithubClient:
                         logger,
                         logging.WARNING,
                         msg_args=[page],
-                        error_code=3402,
+                        error_code=3111,
                     )
                     raise ValueError(f'Expected an array of json results, but got: {page}')
 

@@ -153,7 +153,7 @@ def obtain_config(args) -> ValidatedConfig:
                 logger,
                 logging.WARNING,
                 msg_args=[list(missing_required_fields)],
-                error_code=2104,
+                error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
@@ -162,7 +162,7 @@ def obtain_config(args) -> ValidatedConfig:
                 logger,
                 logging.WARNING,
                 msg_args=[list(excluded_required_fields)],
-                error_code=2105,
+                error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)

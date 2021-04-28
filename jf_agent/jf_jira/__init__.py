@@ -277,6 +277,6 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
 
     except Exception as e:
         agent_logging.log_and_print_error_or_warning(
-            logger, logging.ERROR, msg_args=[e], error_code=3600, exc_info=True
+            logger, logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
         )
         return {'type': 'Jira', 'status': 'failed'}

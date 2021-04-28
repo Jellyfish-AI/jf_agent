@@ -126,7 +126,7 @@ class BitbucketCloudClient:
                         continue
                     else:
                         agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, error_code=3800
+                            logger, logging.ERROR, error_code=3151
                         )
                 raise
 

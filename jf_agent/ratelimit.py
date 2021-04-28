@@ -58,7 +58,7 @@ class RateLimiter(object):
                             logger,
                             logging.ERROR,
                             msg_args=[calls_made, max_calls, realm],
-                            error_code=3100
+                            error_code=3010
                         )
                     raise
 
@@ -72,7 +72,7 @@ class RateLimiter(object):
                     logger,
                     logging.ERROR,
                     msg_args=[self.timeout_secs],
-                    error_code=3101
+                    error_code=3020
                 )
                 raise Exception('Rate limit timeout')
 

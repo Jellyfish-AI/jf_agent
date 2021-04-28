@@ -198,7 +198,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                     logger,
                                     logging.WARN,
                                     msg_args=[api_pr['id']],
-                                    error_code=3200
+                                    error_code=3030
                                 )
                                 continue
 
@@ -224,7 +224,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 logger,
                                 logging.ERROR,
                                 msg_args=[api_pr["id"], repo.id],
-                                error_code=3201,
+                                error_code=3011,
                                 exc_info=True,
                             )
 
@@ -234,7 +234,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         logger,
                         logging.ERROR,
                         msg_args=[repo.id],
-                        error_code=3203,
+                        error_code=3021,
                         exc_info=True,
                     )
 
@@ -362,7 +362,7 @@ def _normalize_pr(
                 logger,
                 logging.WARN,
                 msg_args=[api_pr["id"], repo.id],
-                error_code=3203,
+                error_code=3031,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -379,7 +379,7 @@ def _normalize_pr(
                 logger,
                 logging.WARN,
                 msg_args=[api_pr["id"], repo.id],
-                error_code=3204,
+                error_code=3041,
             )
         else:
             # Some other HTTP error happened; Re-raise
@@ -390,7 +390,7 @@ def _normalize_pr(
             logger,
             logging.WARN,
             msg_args=[api_pr["id"], repo.id],
-            error_code=3205,
+            error_code=3051,
         )
 
     # Comments

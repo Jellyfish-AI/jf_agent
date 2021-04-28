@@ -150,7 +150,7 @@ class GitLabAdapter(GitAdapter):
                     logger,
                     logging.WARNING,
                     msg_args=[total_failed, nrm_project.id, repos_failed_string],
-                    error_code=2200,
+                    error_code=2201,
                 )
 
 
