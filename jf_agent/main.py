@@ -301,7 +301,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         print(
             f"ERROR: Couldn't get agent config info from {base_url}/agent/pull-state "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
-        )  #  Customer Permissions Error
+        )
         raise BadConfigException()
 
     agent_config = resp.json()
@@ -313,7 +313,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         print(
             'ERROR: A Git instance is configured, but no Git instance '
             'info returned from the Jellyfish API -- please contact Jellyfish'
-        )  # Customer Success Config Error
+        )
         raise BadConfigException()
 
     # if there are multiple git configurations
@@ -342,7 +342,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
         print(
             'ERROR: A single Git instance has been configured, but multiple Git instances were returned '
             'from the Jellyfish API -- please contact Jellyfish'
-        )  # Customer Success Config Error
+        )
         raise BadConfigException()
 
     # if multi git instance is configured in the YAML, assert there is a valid git_instance_slug
@@ -489,7 +489,7 @@ def send_data(config, creds):
     if any(thread_exceptions):
         print(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
-        )  # Customer Error
+        )
         return
 
     # creating .done file
