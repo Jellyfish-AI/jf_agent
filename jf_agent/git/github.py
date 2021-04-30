@@ -210,7 +210,6 @@ def get_repos(
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
         )
-        # Customer Config
     return repos
 
 
