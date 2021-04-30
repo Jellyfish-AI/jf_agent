@@ -122,7 +122,7 @@ class BitbucketCloudAdapter(GitAdapter):
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
-            ) # Customer Config Error
+            )
 
         return repos
 
@@ -195,10 +195,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or not api_pr['destination']['repository']
                             ):
                                 agent_logging.log_and_print_error_or_warning(
-                                    logger,
-                                    logging.WARN,
-                                    msg_args=[api_pr['id']],
-                                    error_code=3030
+                                    logger, logging.WARN, msg_args=[api_pr['id']], error_code=3030
                                 )
                                 continue
 
@@ -231,11 +228,7 @@ class BitbucketCloudAdapter(GitAdapter):
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
                     agent_logging.log_and_print_error_or_warning(
-                        logger,
-                        logging.ERROR,
-                        msg_args=[repo.id],
-                        error_code=3021,
-                        exc_info=True,
+                        logger, logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
         print('✓')
@@ -359,10 +352,7 @@ def _normalize_pr(
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             agent_logging.log_and_print_error_or_warning(
-                logger,
-                logging.WARN,
-                msg_args=[api_pr["id"], repo.id],
-                error_code=3031,
+                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3031,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -376,10 +366,7 @@ def _normalize_pr(
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
             agent_logging.log_and_print_error_or_warning(
-                logger,
-                logging.WARN,
-                msg_args=[api_pr["id"], repo.id],
-                error_code=3041,
+                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3041,
             )
         else:
             # Some other HTTP error happened; Re-raise
@@ -387,10 +374,7 @@ def _normalize_pr(
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
         agent_logging.log_and_print_error_or_warning(
-            logger,
-            logging.WARN,
-            msg_args=[api_pr["id"], repo.id],
-            error_code=3051,
+            logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3051,
         )
 
     # Comments
@@ -455,12 +439,11 @@ def _normalize_pr(
         and api_pr['merge_commit'].get('hash')
     ):
         api_merge_commit = client.get_commit(
-            repo.project.id,
-            api_pr['source']['repository']['uuid'],
-            api_pr['merge_commit']['hash']
+            repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
         )
-        merge_commit = _normalize_commit(api_merge_commit, repo, strip_text_content, redact_names_and_urls)
-
+        merge_commit = _normalize_commit(
+            api_merge_commit, repo, strip_text_content, redact_names_and_urls
+        )
 
     # Repo links
     base_repo = _normalize_short_form_repo(

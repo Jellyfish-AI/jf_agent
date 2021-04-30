@@ -58,7 +58,7 @@ class RateLimiter(object):
                             logger,
                             logging.ERROR,
                             msg_args=[calls_made, max_calls, realm],
-                            error_code=3010
+                            error_code=3010,
                         )
                     raise
 
@@ -69,10 +69,7 @@ class RateLimiter(object):
             )
             if (sleep_until - start) >= timedelta(seconds=self.timeout_secs):
                 agent_logging.log_and_print_error_or_warning(
-                    logger,
-                    logging.ERROR,
-                    msg_args=[self.timeout_secs],
-                    error_code=3020
+                    logger, logging.ERROR, msg_args=[self.timeout_secs], error_code=3020
                 )
                 raise Exception('Rate limit timeout')
 

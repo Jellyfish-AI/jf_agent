@@ -49,10 +49,7 @@ class GithubClient:
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
                 agent_logging.log_and_print_error_or_warning(
-                    logger,
-                    logging.WARNING,
-                    msg_args=[m["url"]],
-                    error_code=3081,
+                    logger, logging.WARNING, msg_args=[m["url"]], error_code=3081,
                 )
 
     def get_branches(self, full_repo):
@@ -128,10 +125,7 @@ class GithubClient:
 
                 if i >= max_retries:
                     agent_logging.log_and_print_error_or_warning(
-                        logger,
-                        logging.ERROR,
-                        msg_args=[url, i],
-                        error_code=3101,
+                        logger, logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
 
@@ -153,10 +147,7 @@ class GithubClient:
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
                 agent_logging.log_and_print_error_or_warning(
-                    logger,
-                    logging.WARNING,
-                    msg_args=[reset_wait_str],
-                    error_code=3091,
+                    logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry
@@ -174,12 +165,6 @@ class GithubClient:
                 result = self.get_raw_result(url)
                 page = result.json()
                 if type(page) != list:
-                    agent_logging.log_and_print_error_or_warning(
-                        logger,
-                        logging.WARNING,
-                        msg_args=[page],
-                        error_code=3111,
-                    )
                     raise ValueError(f'Expected an array of json results, but got: {page}')
 
                 if len(page) == 0:

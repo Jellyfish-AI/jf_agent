@@ -263,7 +263,7 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
         return
 
     # if the git provider is none of the above, throw an error
-    raise ValueError(f'unsupported git provider {config.git_provider}') # Customer Config Error
+    raise ValueError(f'unsupported git provider {config.git_provider}')
 
 
 @diagnostics.capture_timing()
@@ -429,12 +429,5 @@ def get_repos_from_git(git_connection, config: GitConfig):
         projects = gl_adapter.get_projects()
         repos = gl_adapter.get_repos(projects)
     else:
-        agent_logging.log_and_print_error_or_warning(
-            logger,
-            logging.ERROR,
-            msg_args=[config.git_provider],
-            error_code=3071,
-            exc_info=True,
-        )
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
     return repos
