@@ -115,23 +115,23 @@ ERROR_MESSAGES = {
 }
 
 
-def log_and_print(logger, level, msg, exc_info=False):
+def log_and_print(logger, level, msg):
     '''
     For an info-level message that should be sent to the logger, and also written
     to stdout (for user visibility)
     '''
-    logger.log(level, msg, exc_info=exc_info)
+    logger.log(level, msg)
     print(msg, flush=True)
-    if exc_info:
-        print(traceback.format_exc())
 
 
-def log_and_print_error_or_warning(logger, level, error_code, msg_args=[]):
+def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_info=False):
     '''
     For a failure that should be sent to the logger with an error_code, and also written
     to stdout (for user visibility)
     '''
     assert level >= logger.WARNING
     msg = f'[{error_code}] {ERROR_MESSAGES.get(error_code).format(*msg_args)}'
-    logger.log(level, msg)
+    logger.log(level, msg, exc_info=exc_info)
     print(msg, flush=True)
+    if exc_info:
+        print(traceback.format_exc())
