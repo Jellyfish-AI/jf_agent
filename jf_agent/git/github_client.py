@@ -48,10 +48,8 @@ class GithubClient:
 
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    f'Got unexpected HTTP 403 for repo {m["url"]}.  Skipping...',
+                agent_logging.log_and_print_error_or_warning(
+                    logger, logging.WARNING, msg_args=[m["url"]], error_code=3081,
                 )
 
     def get_branches(self, full_repo):
@@ -89,8 +87,11 @@ class GithubClient:
             return raw.json()
         except HTTPError as e:
             if e.response.status_code in (422,):
-                logger.warning(
-                    f'Got HTTP {e.response.status_code} when fetching commit {ref} for "{full_repo_name}", this likely means you are trying to fetch an invalid ref'
+                agent_logging.log_and_print_error_or_warning(
+                    logger,
+                    logging.WARNING,
+                    msg_args=[e.response.status_code, ref, full_repo_name],
+                    error_code=3121,
                 )
                 return None
 
@@ -123,10 +124,8 @@ class GithubClient:
                     raise
 
                 if i >= max_retries:
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.ERROR,
-                        f'Request to {url} has failed {i} times -- giving up!',
+                    agent_logging.log_and_print_error_or_warning(
+                        logger, logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
 
@@ -147,10 +146,8 @@ class GithubClient:
                 # wait longer than that
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    f'Github rate limit exceeded.  Trying again in {reset_wait_str}...',
+                agent_logging.log_and_print_error_or_warning(
+                    logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
                 time.sleep(reset_wait_in_seconds)
                 continue  # retry

@@ -4,7 +4,6 @@ import requests
 from dateutil import parser
 from typing import List
 import logging
-
 from jf_agent.git import (
     GitAdapter,
     NormalizedUser,
@@ -133,6 +132,7 @@ class GitLabAdapter(GitAdapter):
 
             # if there were any repositories we had issues with... print them out now.
             if repos_that_failed_to_download:
+
                 def __repo_log_string(api_repo):
                     # build log string
                     name = (
@@ -147,13 +147,11 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                agent_logging.log_and_print(
+                agent_logging.log_and_print_error_or_warning(
                     logger,
                     logging.WARNING,
-                    (
-                        f'\nERROR: Failed to download ({total_failed}) repo(s) from the group {nrm_project.id}. '
-                        f'Please check that the appropriate permissions are set for the following repos... ({repos_failed_string})'
-                    ),
+                    msg_args=[total_failed, nrm_project.id, repos_failed_string],
+                    error_code=2201,
                 )
 
         print('✓')
@@ -280,7 +278,11 @@ class GitLabAdapter(GitAdapter):
                             ]
                             merge_request = self.client.expand_merge_request_data(api_pr)
                             merge_commit = None
-                            if merge_request.state == 'merged' and nrm_commits is not None and merge_request.merge_commit_sha:
+                            if (
+                                merge_request.state == 'merged'
+                                and nrm_commits is not None
+                                and merge_request.merge_commit_sha
+                            ):
                                 merge_commit = _normalize_commit(
                                     self.client.get_project_commit(
                                         merge_request.project_id, merge_request.merge_commit_sha
@@ -295,7 +297,7 @@ class GitLabAdapter(GitAdapter):
                                 nrm_commits,
                                 self.config.git_strip_text_content,
                                 self.config.git_redact_names_and_urls,
-                                merge_commit
+                                merge_commit,
                             )
                         except Exception as e:
                             # if something goes wrong with normalizing one of the prs - don't stop pulling. try
@@ -366,10 +368,10 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_repo(
-        api_repo,
-        normalized_branches: List[NormalizedBranch],
-        normalized_project: NormalizedProject,
-        redact_names_and_urls: bool,
+    api_repo,
+    normalized_branches: List[NormalizedBranch],
+    normalized_project: NormalizedProject,
+    redact_names_and_urls: bool,
 ) -> NormalizedRepository:
     repo_name = (
         api_repo.name if not redact_names_and_urls else _repo_redactor.redact_name(api_repo.name)
@@ -399,7 +401,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
 
 
 def _normalize_commit(
-        api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = NormalizedUser(
         id=f'{api_commit.author_name}<{api_commit.author_email}>',
@@ -423,7 +425,7 @@ def _normalize_commit(
 
 
 def _get_normalized_pr_comments(
-        merge_request, strip_text_content
+    merge_request, strip_text_content
 ) -> List[NormalizedPullRequestComment]:
     try:
         return [
@@ -464,11 +466,11 @@ def _get_normalized_approvals(merge_request):
 
 
 def _normalize_pr(
-        merge_request,
-        normalized_commits: List[NormalizedCommit],
-        strip_text_content: bool,
-        redact_names_and_urls: bool,
-        merge_commit
+    merge_request,
+    normalized_commits: List[NormalizedCommit],
+    strip_text_content: bool,
+    redact_names_and_urls: bool,
+    merge_commit,
 ):
     base_branch_name = merge_request.target_branch
     head_branch_name = merge_request.source_branch

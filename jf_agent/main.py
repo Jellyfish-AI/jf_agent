@@ -372,7 +372,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
     if config.jira_url:
         agent_logging.log_and_print(
-            logger, logging.INFO, 'Obtained Jira configuration, attempting download...'
+            logger, logging.INFO, 'Obtained Jira configuration, attempting download...',
         )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
@@ -436,11 +436,8 @@ def send_data(config, creds):
             upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
             thread_exceptions.append(e)
-            agent_logging.log_and_print(
-                logger,
-                logging.ERROR,
-                f'Failed to upload file {filename} to S3 bucket',
-                exc_info=True,
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
     def upload_file(filename, path_to_obj, signed_url):
