@@ -129,7 +129,7 @@ def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_i
     For a failure that should be sent to the logger with an error_code, and also written
     to stdout (for user visibility)
     '''
-    assert level >= logger.WARNING
+    assert level >= logging.WARNING
     msg = f'[{error_code}] {ERROR_MESSAGES.get(error_code).format(*msg_args)}'
     logger.log(level, msg, exc_info=exc_info)
     print(msg, flush=True)
