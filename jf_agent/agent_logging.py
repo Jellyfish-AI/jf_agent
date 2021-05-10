@@ -95,7 +95,7 @@ ERROR_MESSAGES = {
     3082: 'OJ-9084: Changelog history item with no \'fieldId\' or \'field\' key: {}',
     2101: 'Failed to connect to {}:\n{}',
     2102: 'Unable to access project {}, may be a Jira misconfiguration. Skipping...',
-    2112: 'Failed to connect to Jira:\n{}',
+    2112: 'Failed to connect to Jira for project ID \n{}',
     2122: 'you do not have the required \'development field\' permissions in jira required to scan for missing repos',
     2132: (
         'Missing recommended jira_fields! For the best possible experience, '
