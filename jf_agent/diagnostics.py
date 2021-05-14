@@ -84,6 +84,19 @@ def capture_outdir_size(outdir):
     )
 
 
+def capture_download_data_summary(filenames_to_summarize):
+    for filename in filenames_to_summarize:
+        with open(filename) as data_file:
+            data = json.loads(data_file)
+            _write_diagnostic(
+                {
+                    'type': 'data_download_summary',
+                    'data_type': {filename},
+                    'num_items_downloaded': len(data),
+                }
+            )
+
+
 def continually_gather_system_diagnostics(kill_event, outdir):
     def _flush_cached_readings(cached_readings):
         if not cached_readings:
