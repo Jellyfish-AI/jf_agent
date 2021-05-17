@@ -199,6 +199,7 @@ def main():
             sys_diag_collector.join()
 
         finally:
+            diagnostics.capture_download_data_summary(config.outdir)
             diagnostics.close_file()
 
     if config.run_mode_includes_send:

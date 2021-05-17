@@ -84,14 +84,39 @@ def capture_outdir_size(outdir):
     )
 
 
-def capture_download_data_summary(filenames_to_summarize):
-    for filename in filenames_to_summarize:
-        with open(filename) as data_file:
+def capture_download_data_summary(outdir):
+    # obtain file names from the directory
+    _, directories, filenames = next(os.walk(outdir))
+
+    # get the full file paths for each of the immediate
+    # subdirectories (we're assuming only a single level)
+    for directory in directories:
+        path = os.path.join(outdir, directory)
+        for file_name in os.listdir(path):
+            filenames.append(f'{directory}/{file_name}')
+
+    for filename in filenames:
+        if filename not in [
+            'jira_projects_and_versions.json',
+            'jira_issues.json',
+            'jira_fields.json',
+            'bb_commits.json',
+            'bb_projects.json',
+            'bb_prs.json',
+            'bb_repos.json',
+        ]:
+            filenames.remove(filename)
+
+    # check what components necessary on top of filenames for opening file
+    breakpoint()
+
+    for fn in filenames:
+        with open(os.path.join(outdir, fn), 'w') as data_file:
             data = json.loads(data_file)
             _write_diagnostic(
                 {
                     'type': 'data_download_summary',
-                    'data_type': {filename},
+                    'data_type': {fn},
                     'num_items_downloaded': len(data),
                 }
             )
