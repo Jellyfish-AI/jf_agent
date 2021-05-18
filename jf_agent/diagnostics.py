@@ -95,8 +95,9 @@ def capture_download_data_summary(outdir):
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
 
+    new_list = []
     for filename in filenames:
-        if filename not in [
+        if filename in [
             'jira_projects_and_versions.json',
             'jira_issues.json',
             'jira_fields.json',
@@ -105,21 +106,31 @@ def capture_download_data_summary(outdir):
             'bb_prs.json',
             'bb_repos.json',
         ]:
-            filenames.remove(filename)
+            new_list.append(filename)
 
     # check what components necessary on top of filenames for opening file
-    breakpoint()
+    print(f'FILES {new_list}')
+    print(f'Directories {directories}')
+    print(f'Outdir {outdir}')
 
-    for fn in filenames:
-        with open(os.path.join(outdir, fn), 'w') as data_file:
-            data = json.loads(data_file)
-            _write_diagnostic(
-                {
-                    'type': 'data_download_summary',
-                    'data_type': {fn},
-                    'num_items_downloaded': len(data),
-                }
-            )
+    for fn in new_list:
+        print(f'insiide new list forloop {new_list}')
+
+        with open(os.path.join(outdir, fn), 'r') as read_file:
+            print(f'opened file {fn}')
+            try:
+                data = json.loads(read_file.read())
+                print(f'data {data}')
+                # # this all goes to end of file, spike what it takes to prepend
+                # _write_diagnostic(
+                #     {
+                #         'type': 'data_download_summary',
+                #         'data_type': {fn},
+                #         'num_items_downloaded': len(data),
+                #     }
+                # )
+            except Exception:
+                print(f'filename: {fn}')
 
 
 def continually_gather_system_diagnostics(kill_event, outdir):
