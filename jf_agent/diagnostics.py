@@ -1,7 +1,8 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
 from functools import wraps
-from io import FileIO
+from jf_agent.agent_logging import log_and_print
+import logging
 import json
 import os
 import pytz
@@ -9,9 +10,10 @@ import shutil
 import subprocess
 import threading
 import time
-
 import psutil
 
+
+logger = logging.getLogger(__name__)
 
 DIAGNOSTICS_FILE = None
 
@@ -98,15 +100,16 @@ def capture_download_data_summary(outdir):
 
     print(f'FILENAMES: {filenames}')
     for filename in filenames:
-        if filename in [
-            'jira_projects_and_versions.json',
-            'jira_issues.json',
-            'jira_fields.json',
-            'bb_commits.json',
-            'bb_projects.json',
-            'bb_prs.json',
-            'bb_repos.json',
-        ]:
+        if (
+            (
+                filename
+                in ['jira_projects_and_versions.json', 'jira_issues.json', 'jira_fields.json',]
+            )
+            or 'bb_commits.json' in filename
+            or 'bb_projects.json' in filename
+            or 'bb_prs.json' in filename
+            or 'bb_repos.json' in filename
+        ):
             with open(os.path.join(outdir, filename), 'r') as read_file:
                 try:
                     data = json.loads(read_file.read())
@@ -120,7 +123,11 @@ def capture_download_data_summary(outdir):
                         }
                     )
                 except Exception:
-                    print(f'failed to read and load: {filename}')
+                    log_and_print(
+                        logger,
+                        logging.WARNING,
+                        f'Failed to read and load: {filename} for Diagnostic data summary',
+                    )
 
 
 def continually_gather_system_diagnostics(kill_event, outdir):
