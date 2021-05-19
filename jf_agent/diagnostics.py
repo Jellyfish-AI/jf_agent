@@ -1,6 +1,7 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
 from functools import wraps
+from io import FileIO
 import json
 import os
 import pytz
@@ -95,7 +96,7 @@ def capture_download_data_summary(outdir):
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
 
-    new_list = []
+    print(f'FILENAMES: {filenames}')
     for filename in filenames:
         if filename in [
             'jira_projects_and_versions.json',
@@ -106,31 +107,20 @@ def capture_download_data_summary(outdir):
             'bb_prs.json',
             'bb_repos.json',
         ]:
-            new_list.append(filename)
-
-    # check what components necessary on top of filenames for opening file
-    print(f'FILES {new_list}')
-    print(f'Directories {directories}')
-    print(f'Outdir {outdir}')
-
-    for fn in new_list:
-        print(f'insiide new list forloop {new_list}')
-
-        with open(os.path.join(outdir, fn), 'r') as read_file:
-            print(f'opened file {fn}')
-            try:
-                data = json.loads(read_file.read())
-                print(f'data {data}')
-                # # this all goes to end of file, spike what it takes to prepend
-                # _write_diagnostic(
-                #     {
-                #         'type': 'data_download_summary',
-                #         'data_type': {fn},
-                #         'num_items_downloaded': len(data),
-                #     }
-                # )
-            except Exception:
-                print(f'filename: {fn}')
+            with open(os.path.join(outdir, filename), 'r') as read_file:
+                try:
+                    data = json.loads(read_file.read())
+                    # this all goes to end of file, spike what it takes to prepend
+                    data_type = str(filename.split(".json")[0])
+                    _write_diagnostic(
+                        {
+                            'type': 'data_download_summary',
+                            'data_type': data_type,
+                            f'num_{data_type}_downloaded': len(data),
+                        }
+                    )
+                except Exception:
+                    print(f'failed to read and load: {filename}')
 
 
 def continually_gather_system_diagnostics(kill_event, outdir):
