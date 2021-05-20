@@ -2,7 +2,13 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent.git import GithubClient, NormalizedProject, NormalizedRepository, NormalizedUser
+from jf_agent.git import (
+    GithubClient,
+    NormalizedCommit,
+    NormalizedProject,
+    NormalizedRepository,
+    NormalizedUser,
+)
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -218,16 +224,16 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         {'name': commit['commit']['author']['name'], 'email': commit['commit']['author']['email']}
     )
 
-    return {
-        'hash': commit['sha'],
-        'commit_date': commit['commit']['committer']['date'],
-        'author': _normalize_user(author),
-        'author_date': commit['commit']['author']['date'],
-        'url': commit['html_url'] if not redact_names_and_urls else None,
-        'message': sanitize_text(commit['commit']['message'], strip_text_content),
-        'is_merge': len(commit['parents']) > 1,
-        'repo': _normalize_pr_repo(repo, redact_names_and_urls),
-    }
+    return NormalizedCommit(
+        hash=commit['sha'],
+        url=commit['html_url'] if not redact_names_and_urls else None,
+        message=sanitize_text(commit['commit']['message'], strip_text_content),
+        commit_date=commit['commit']['committer']['date'],
+        author_date=commit['commit']['author']['date'],
+        author=_normalize_user(author),
+        is_merged=len(commit['parents']) > 1,
+        repo=_normalize_pr_repo(repo, redact_names_and_urls),
+    )
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
