@@ -2,7 +2,7 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent.git import GithubClient, NormalizedProject, NormalizedUser
+from jf_agent.git import GithubClient, NormalizedProject, NormalizedRepository, NormalizedUser
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -154,21 +154,25 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
 
 
 def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls):
-    return {
-        'id': repo['id'],
-        'name': (
+    return NormalizedRepository(
+        id=repo['id'],
+        name=(
             repo['name']
             if not redact_names_and_urls
             else _project_redactor.redact_name(repo['name'])
         ),
-        'full_name': (
+        full_name=(
             repo['full_name']
             if not redact_names_and_urls
             else _project_redactor.redact_name(repo['full_name'])
         ),
-        'url': repo['html_url'] if not redact_names_and_urls else None,
-        'default_branch_name': repo['default_branch'],
-        'branches': [
+        url=repo['html_url'] if not redact_names_and_urls else None,
+        is_forked=repo['fork'],
+        default_branch_name=repo['default_branch'],
+        project=_normalize_project(
+            client.get_json(repo['organization']['url']), redact_names_and_urls
+        ),
+        branches=[
             {
                 'name': (
                     b['name']
@@ -179,11 +183,7 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
             }
             for b in client.get_branches(repo['full_name'])
         ],
-        'is_fork': repo['fork'],
-        'project': _normalize_project(
-            client.get_json(repo['organization']['url']), redact_names_and_urls
-        ),
-    }
+    )
 
 
 @agent_logging.log_entry_exit(logger)
