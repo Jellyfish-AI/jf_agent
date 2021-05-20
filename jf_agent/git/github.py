@@ -2,7 +2,7 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent.git import GithubClient, NormalizedUser
+from jf_agent.git import GithubClient, NormalizedProject, NormalizedUser
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -124,16 +124,16 @@ def get_users(client: GithubClient, include_orgs):
 
 
 def _normalize_project(api_org, redact_names_and_urls):
-    return {
-        'id': api_org['id'],
-        'login': api_org['login'],
-        'name': (
+    return NormalizedProject(
+        id=api_org['id'],
+        login=api_org['login'],
+        name=(
             api_org.get('name')
             if not redact_names_and_urls
             else _project_redactor.redact_name(api_org.get('name'))
         ),
-        'url': api_org.get('html_url') if not redact_names_and_urls else None,
-    }
+        url=api_org.get('html_url') if not redact_names_and_urls else None,
+    )
 
 
 @diagnostics.capture_timing()
