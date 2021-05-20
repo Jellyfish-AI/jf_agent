@@ -2,7 +2,7 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent.git import GithubClient
+from jf_agent.git import GithubClient, NormalizedUser
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -103,15 +103,14 @@ def _normalize_user(user):
 
     # raw user, just have email (e.g. from a commit)
     if 'id' not in user:
-        return {
-            'id': user['email'],
-            'login': user['email'],
-            'name': user['name'],
-            'email': user['email'],
-        }
+        return NormalizedUser(
+            id=user['email'], login=user['email'], name=user['name'], email=user['email']
+        )
 
     # API user, where github matched to a known account
-    return {'id': user['id'], 'login': user['login'], 'name': user['name'], 'email': user['email']}
+    return NormalizedUser(
+        id=user['id'], login=user['login'], name=user['name'], email=user['email']
+    )
 
 
 @diagnostics.capture_timing()
