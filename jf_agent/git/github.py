@@ -6,6 +6,7 @@ from jf_agent.git import (
     GithubClient,
     NormalizedCommit,
     NormalizedProject,
+    NormalizedPullRequestRepository,
     NormalizedRepository,
     NormalizedUser,
 )
@@ -237,13 +238,13 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
-    return {
-        'id': repo['id'],
-        'name': (
+    return NormalizedPullRequestRepository(
+        id=repo['id'],
+        name=(
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])
         ),
-        'url': repo['html_url'] if not redact_names_and_urls else None,
-    }
+        url=repo['html_url'] if not redact_names_and_urls else None,
+    )
 
 
 def get_default_branch_commits(
