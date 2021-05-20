@@ -6,6 +6,7 @@ from jf_agent.git import (
     GithubClient,
     NormalizedCommit,
     NormalizedProject,
+    NormalizedPullRequest,
     NormalizedPullRequestRepository,
     NormalizedRepository,
     NormalizedUser,
@@ -295,53 +296,35 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
 
 
 def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
-    return {
-        'id': pr['number'],
-        'author': _normalize_user(client.get_json(pr['user']['url'])),
-        'title': sanitize_text(pr['title'], strip_text_content),
-        'body': sanitize_text(pr['body'], strip_text_content),
-        'is_closed': pr['state'] == 'closed',
-        'is_merged': pr['merged'],
-        'created_at': pr['created_at'],
-        'updated_at': pr['updated_at'],
-        'closed_date': pr['closed_at'] if pr['closed_at'] else None,
-        'url': (pr['html_url'] if not redact_names_and_urls else None),
-        'base_repo': _normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
-        'base_branch': (
+    return NormalizedPullRequest(
+        id=pr['number'],
+        additions=pr['additions'],
+        deletions=pr['deletions'],
+        changed_files=pr['changed_files'],
+        is_closed=pr['state'] == 'closed',
+        is_merged=pr['merged'],
+        created_at=pr['created_at'],
+        updated_at=pr['updated_at'],
+        merge_date=pr['merged_at'] if pr['merged_at'] else None,
+        closed_date=pr['closed_at'] if pr['closed_at'] else None,
+        title=sanitize_text(pr['title'], strip_text_content),
+        body=sanitize_text(pr['body'], strip_text_content),
+        url=(pr['html_url'] if not redact_names_and_urls else None),
+        base_branch=(
             pr['base']['ref']
             if not redact_names_and_urls
             else _branch_redactor.redact_name(pr['base']['ref'])
         ),
-        'head_repo': _normalize_pr_repo(pr['head']['repo'], redact_names_and_urls),
-        'head_branch': (
+        head_branch=(
             pr['head']['ref']
             if not redact_names_and_urls
             else _branch_redactor.redact_name(pr['head']['ref'])
         ),
-        'additions': pr['additions'],
-        'deletions': pr['deletions'],
-        'changed_files': pr['changed_files'],
-        'comments': [
-            {
-                'user': _normalize_user(client.get_json(c['user']['url'])),
-                'body': c['body'],
-                'created_at': c['created_at'],
-            }
-            for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
-        ],
-        'approvals': [
-            {
-                'foreign_id': r['id'],
-                'user': _normalize_user(client.get_json(r['user']['url'])),
-                'review_state': r['state'],
-            }
-            for r in client.get_pr_reviews(pr['base']['repo']['full_name'], pr['number'])
-        ],
-        'merge_date': pr['merged_at'] if pr['merged_at'] else None,
-        'merged_by': (
+        author=_normalize_user(client.get_json(pr['user']['url'])),
+        merged_by=(
             _normalize_user(client.get_json(pr['merged_by']['url'])) if pr['merged'] else None
         ),
-        'commits': [
+        commits=[
             _normalize_commit(c, pr['base']['repo'], strip_text_content, redact_names_and_urls)
             for c in tqdm(
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
@@ -350,8 +333,26 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
                 unit='commits',
             )
         ],
-        'merge_commit': _get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
-    }
+        merge_commit=_get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
+        comments=[
+            {
+                'user': _normalize_user(client.get_json(c['user']['url'])),
+                'body': c['body'],
+                'created_at': c['created_at'],
+            }
+            for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
+        ],
+        approvals=[
+            {
+                'foreign_id': r['id'],
+                'user': _normalize_user(client.get_json(r['user']['url'])),
+                'review_state': r['state'],
+            }
+            for r in client.get_pr_reviews(pr['base']['repo']['full_name'], pr['number'])
+        ],
+        baase_repo=_normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
+        head_repo=_normalize_pr_repo(pr['head']['repo'], redact_names_and_urls),
+    )
 
 
 def get_pull_requests(
