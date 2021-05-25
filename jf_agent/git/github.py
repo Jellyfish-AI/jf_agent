@@ -7,8 +7,8 @@ from jf_agent.git import (
     NormalizedCommit,
     NormalizedProject,
     NormalizedPullRequest,
-    NormalizedPullRequestRepository,
     NormalizedRepository,
+    NormalizedShortRepository,
     NormalizedUser,
 )
 from jf_agent.git import pull_since_date_for_repo
@@ -239,7 +239,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
-    return NormalizedPullRequestRepository(
+    return NormalizedShortRepository(
         id=repo['id'],
         name=(
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])

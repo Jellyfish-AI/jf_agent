@@ -104,13 +104,6 @@ class NormalizedPullRequestComment:
 
 
 @dataclass
-class NormalizedPullRequestRepository:
-    id: any
-    name: str
-    url: str
-
-
-@dataclass
 class NormalizedPullRequestReview:
     user: NormalizedUser
     foreign_id: int
