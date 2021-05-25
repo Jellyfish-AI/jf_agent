@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from jf_agent.git import (
     GithubClient,
+    NormalizedBranch,
     NormalizedCommit,
     NormalizedProject,
     NormalizedPullRequest,
@@ -183,14 +184,14 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
             client.get_json(repo['organization']['url']), redact_names_and_urls
         ),
         branches=[
-            {
-                'name': (
+            NormalizedBranch(
+                name=(
                     b['name']
                     if not redact_names_and_urls
                     else _branch_redactor.redact_name(b['name'])
                 ),
-                'sha': b['commit']['sha'],
-            }
+                sha=b['commit']['sha'],
+            )
             for b in client.get_branches(repo['full_name'])
         ],
     )
