@@ -7,6 +7,7 @@ from jf_agent.git import (
     NormalizedCommit,
     NormalizedProject,
     NormalizedPullRequest,
+    NormalizedPullRequestComment,
     NormalizedPullRequestReview,
     NormalizedRepository,
     NormalizedShortRepository,
@@ -336,11 +337,11 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
         ],
         merge_commit=_get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
         comments=[
-            {
-                'user': _normalize_user(client.get_json(c['user']['url'])),
-                'body': c['body'],
-                'created_at': c['created_at'],
-            }
+            NormalizedPullRequestComment(
+                user=_normalize_user(client.get_json(c['user']['url'])),
+                body=c['body'],
+                created_at=c['created_at'],
+            )
             for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
         ],
         approvals=[
