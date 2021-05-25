@@ -2,7 +2,18 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-from jf_agent.git import GithubClient
+from jf_agent.git import (
+    GithubClient,
+    NormalizedBranch,
+    NormalizedCommit,
+    NormalizedProject,
+    NormalizedPullRequest,
+    NormalizedPullRequestComment,
+    NormalizedPullRequestReview,
+    NormalizedRepository,
+    NormalizedShortRepository,
+    NormalizedUser,
+)
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -103,15 +114,14 @@ def _normalize_user(user):
 
     # raw user, just have email (e.g. from a commit)
     if 'id' not in user:
-        return {
-            'id': user['email'],
-            'login': user['email'],
-            'name': user['name'],
-            'email': user['email'],
-        }
+        return NormalizedUser(
+            id=user['email'], login=user['email'], name=user['name'], email=user['email']
+        )
 
     # API user, where github matched to a known account
-    return {'id': user['id'], 'login': user['login'], 'name': user['name'], 'email': user['email']}
+    return NormalizedUser(
+        id=user['id'], login=user['login'], name=user['name'], email=user['email']
+    )
 
 
 @diagnostics.capture_timing()
@@ -125,16 +135,16 @@ def get_users(client: GithubClient, include_orgs):
 
 
 def _normalize_project(api_org, redact_names_and_urls):
-    return {
-        'id': api_org['id'],
-        'login': api_org['login'],
-        'name': (
+    return NormalizedProject(
+        id=api_org['id'],
+        login=api_org['login'],
+        name=(
             api_org.get('name')
             if not redact_names_and_urls
             else _project_redactor.redact_name(api_org.get('name'))
         ),
-        'url': api_org.get('html_url') if not redact_names_and_urls else None,
-    }
+        url=api_org.get('html_url') if not redact_names_and_urls else None,
+    )
 
 
 @diagnostics.capture_timing()
@@ -155,36 +165,36 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
 
 
 def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls):
-    return {
-        'id': repo['id'],
-        'name': (
+    return NormalizedRepository(
+        id=repo['id'],
+        name=(
             repo['name']
             if not redact_names_and_urls
             else _project_redactor.redact_name(repo['name'])
         ),
-        'full_name': (
+        full_name=(
             repo['full_name']
             if not redact_names_and_urls
             else _project_redactor.redact_name(repo['full_name'])
         ),
-        'url': repo['html_url'] if not redact_names_and_urls else None,
-        'default_branch_name': repo['default_branch'],
-        'branches': [
-            {
-                'name': (
+        url=repo['html_url'] if not redact_names_and_urls else None,
+        is_forked=repo['fork'],
+        default_branch_name=repo['default_branch'],
+        project=_normalize_project(
+            client.get_json(repo['organization']['url']), redact_names_and_urls
+        ),
+        branches=[
+            NormalizedBranch(
+                name=(
                     b['name']
                     if not redact_names_and_urls
                     else _branch_redactor.redact_name(b['name'])
                 ),
-                'sha': b['commit']['sha'],
-            }
+                sha=b['commit']['sha'],
+            )
             for b in client.get_branches(repo['full_name'])
         ],
-        'is_fork': repo['fork'],
-        'project': _normalize_project(
-            client.get_json(repo['organization']['url']), redact_names_and_urls
-        ),
-    }
+    )
 
 
 @agent_logging.log_entry_exit(logger)
@@ -219,26 +229,26 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         {'name': commit['commit']['author']['name'], 'email': commit['commit']['author']['email']}
     )
 
-    return {
-        'hash': commit['sha'],
-        'commit_date': commit['commit']['committer']['date'],
-        'author': _normalize_user(author),
-        'author_date': commit['commit']['author']['date'],
-        'url': commit['html_url'] if not redact_names_and_urls else None,
-        'message': sanitize_text(commit['commit']['message'], strip_text_content),
-        'is_merge': len(commit['parents']) > 1,
-        'repo': _normalize_pr_repo(repo, redact_names_and_urls),
-    }
+    return NormalizedCommit(
+        hash=commit['sha'],
+        url=commit['html_url'] if not redact_names_and_urls else None,
+        message=sanitize_text(commit['commit']['message'], strip_text_content),
+        commit_date=commit['commit']['committer']['date'],
+        author_date=commit['commit']['author']['date'],
+        author=_normalize_user(author),
+        is_merged=len(commit['parents']) > 1,
+        repo=_normalize_pr_repo(repo, redact_names_and_urls),
+    )
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
-    return {
-        'id': repo['id'],
-        'name': (
+    return NormalizedShortRepository(
+        id=repo['id'],
+        name=(
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])
         ),
-        'url': repo['html_url'] if not redact_names_and_urls else None,
-    }
+        url=repo['html_url'] if not redact_names_and_urls else None,
+    )
 
 
 def get_default_branch_commits(
@@ -289,53 +299,35 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
 
 
 def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
-    return {
-        'id': pr['number'],
-        'author': _normalize_user(client.get_json(pr['user']['url'])),
-        'title': sanitize_text(pr['title'], strip_text_content),
-        'body': sanitize_text(pr['body'], strip_text_content),
-        'is_closed': pr['state'] == 'closed',
-        'is_merged': pr['merged'],
-        'created_at': pr['created_at'],
-        'updated_at': pr['updated_at'],
-        'closed_date': pr['closed_at'] if pr['closed_at'] else None,
-        'url': (pr['html_url'] if not redact_names_and_urls else None),
-        'base_repo': _normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
-        'base_branch': (
+    return NormalizedPullRequest(
+        id=pr['number'],
+        additions=pr['additions'],
+        deletions=pr['deletions'],
+        changed_files=pr['changed_files'],
+        is_closed=pr['state'] == 'closed',
+        is_merged=pr['merged'],
+        created_at=pr['created_at'],
+        updated_at=pr['updated_at'],
+        merge_date=pr['merged_at'] if pr['merged_at'] else None,
+        closed_date=pr['closed_at'] if pr['closed_at'] else None,
+        title=sanitize_text(pr['title'], strip_text_content),
+        body=sanitize_text(pr['body'], strip_text_content),
+        url=(pr['html_url'] if not redact_names_and_urls else None),
+        base_branch=(
             pr['base']['ref']
             if not redact_names_and_urls
             else _branch_redactor.redact_name(pr['base']['ref'])
         ),
-        'head_repo': _normalize_pr_repo(pr['head']['repo'], redact_names_and_urls),
-        'head_branch': (
+        head_branch=(
             pr['head']['ref']
             if not redact_names_and_urls
             else _branch_redactor.redact_name(pr['head']['ref'])
         ),
-        'additions': pr['additions'],
-        'deletions': pr['deletions'],
-        'changed_files': pr['changed_files'],
-        'comments': [
-            {
-                'user': _normalize_user(client.get_json(c['user']['url'])),
-                'body': c['body'],
-                'created_at': c['created_at'],
-            }
-            for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
-        ],
-        'approvals': [
-            {
-                'foreign_id': r['id'],
-                'user': _normalize_user(client.get_json(r['user']['url'])),
-                'review_state': r['state'],
-            }
-            for r in client.get_pr_reviews(pr['base']['repo']['full_name'], pr['number'])
-        ],
-        'merge_date': pr['merged_at'] if pr['merged_at'] else None,
-        'merged_by': (
+        author=_normalize_user(client.get_json(pr['user']['url'])),
+        merged_by=(
             _normalize_user(client.get_json(pr['merged_by']['url'])) if pr['merged'] else None
         ),
-        'commits': [
+        commits=[
             _normalize_commit(c, pr['base']['repo'], strip_text_content, redact_names_and_urls)
             for c in tqdm(
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
@@ -344,8 +336,26 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
                 unit='commits',
             )
         ],
-        'merge_commit': _get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
-    }
+        merge_commit=_get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
+        comments=[
+            NormalizedPullRequestComment(
+                user=_normalize_user(client.get_json(c['user']['url'])),
+                body=c['body'],
+                created_at=c['created_at'],
+            )
+            for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
+        ],
+        approvals=[
+            NormalizedPullRequestReview(
+                user=_normalize_user(client.get_json(r['user']['url'])),
+                foreign_id=r['id'],
+                review_state=r['state'],
+            )
+            for r in client.get_pr_reviews(pr['base']['repo']['full_name'], pr['number'])
+        ],
+        baase_repo=_normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
+        head_repo=_normalize_pr_repo(pr['head']['repo'], redact_names_and_urls),
+    )
 
 
 def get_pull_requests(
