@@ -178,7 +178,7 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
             else _project_redactor.redact_name(repo['full_name'])
         ),
         url=repo['html_url'] if not redact_names_and_urls else None,
-        is_forked=repo['fork'],
+        is_fork=repo['fork'],
         default_branch_name=repo['default_branch'],
         project=_normalize_project(
             client.get_json(repo['organization']['url']), redact_names_and_urls
@@ -236,7 +236,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         commit_date=commit['commit']['committer']['date'],
         author_date=commit['commit']['author']['date'],
         author=_normalize_user(author),
-        is_merged=len(commit['parents']) > 1,
+        is_merge=len(commit['parents']) > 1,
         repo=_normalize_pr_repo(repo, redact_names_and_urls),
     )
 
@@ -353,7 +353,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
             )
             for r in client.get_pr_reviews(pr['base']['repo']['full_name'], pr['number'])
         ],
-        baase_repo=_normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
+        base_repo=_normalize_pr_repo(pr['base']['repo'], redact_names_and_urls),
         head_repo=_normalize_pr_repo(pr['head']['repo'], redact_names_and_urls),
     )
 
