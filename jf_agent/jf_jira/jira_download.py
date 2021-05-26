@@ -33,9 +33,15 @@ def download_users(jira_connection, gdpr_active, quiet=False):
     jira_users = _search_all_users(jira_connection, gdpr_active)
 
     # Some jira instances won't return more than one page of
-    # results.  If we have seen exactly 1000 results, try
+    # results.  If we have seen approximately 1000 results, try
     # searching a different way
-    if len(jira_users) == 1000:
+    if 950 <= len(jira_users) <= 1000:
+        agent_logging.log_and_print(
+            logger=logger,
+            level=logging.INFO,
+            msg=f'Page limit reached with {len(jira_users)} users, '
+            'falling back to search by letter method.',
+        )
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
     if len(jira_users) == 0:
