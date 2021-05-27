@@ -372,7 +372,7 @@ def get_pull_requests(
                     activites = sorted(
                         [a for a in api_pr.activities()], key=lambda x: x['createdDate']
                     )
-                except stashy.errors.GenericException as e:
+                except (stashy.errors.GenericException, RetryError) as e:
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,
