@@ -6,7 +6,9 @@ global:
   # Set this to True to skip verification of server SSL certificates.  This might
   # be useful if your Jira / Bitbucket server doesn't have a valid SSL certificate.
   no_verify_ssl: False
-
+  # Set this to False if you would not like to send your config.yml file to Jellyfish.
+  # We use this as a diagnostic tool for customer assistance.
+  send_agent_config_in_payload: True
 
 #############################
 # 2. Jira configuration

@@ -492,6 +492,11 @@ def send_data(config, creds):
         )
         return
 
+    # If sending agent config flag is on, upload to s3 bucket
+    if config.send_agent_config_in_payload:
+        config_file_dict = get_signed_url(['config.yml'])['config.yml']
+        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'])
+
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
     Path(done_file_path).touch()
