@@ -440,8 +440,10 @@ def send_data(config, creds):
                 logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
-    def upload_file(filename, path_to_obj, signed_url):
-        with open(f'{config.outdir}/{filename}', 'rb') as f:
+    def upload_file(filename, path_to_obj, signed_url, local=False):
+        filepath = filename if local else f'{config.outdir}/{filename}'
+
+        with open(filepath, 'rb') as f:
             # If successful, returns HTTP status code 204
             session = retry_session()
             upload_resp = session.post(
@@ -492,10 +494,10 @@ def send_data(config, creds):
         )
         return
 
-    # If sending agent config flag is on, upload to s3 bucket
+    # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config_in_payload:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
-        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'])
+        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
