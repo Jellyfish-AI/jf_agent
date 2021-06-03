@@ -495,7 +495,7 @@ def send_data(config, creds):
         return
 
     # If sending agent config flag is on, upload config.yml to s3 bucket
-    if config.send_agent_config_in_payload:
+    if config.send_agent_config:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 

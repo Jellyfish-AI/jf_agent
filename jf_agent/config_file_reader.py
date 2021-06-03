@@ -60,7 +60,7 @@ ValidatedConfig = namedtuple(
         'compress_output_files',
         'jellyfish_api_base',
         'skip_ssl_verification',
-        'send_agent_config_in_payload'
+        'send_agent_config'
     ],
 )
 
@@ -116,7 +116,7 @@ def obtain_config(args) -> ValidatedConfig:
 
     yaml_conf_global = yaml_config.get('global', {})
     skip_ssl_verification = yaml_conf_global.get('no_verify_ssl', False)
-    send_agent_config_in_payload = yaml_conf_global.get('send_agent_config_in_payload', False)
+    send_agent_config = yaml_conf_global.get('send_agent_config', False)
 
     # jira configuration
     jira_config = yaml_config.get('jira', {})
@@ -247,7 +247,7 @@ def obtain_config(args) -> ValidatedConfig:
         compress_output_files,
         jellyfish_api_base,
         skip_ssl_verification,
-        send_agent_config_in_payload,
+        send_agent_config,
     )
 
 
