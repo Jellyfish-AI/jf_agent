@@ -440,8 +440,10 @@ def send_data(config, creds):
                 logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
-    def upload_file(filename, path_to_obj, signed_url):
-        with open(f'{config.outdir}/{filename}', 'rb') as f:
+    def upload_file(filename, path_to_obj, signed_url, local=False):
+        filepath = filename if local else f'{config.outdir}/{filename}'
+
+        with open(filepath, 'rb') as f:
             # If successful, returns HTTP status code 204
             session = retry_session()
             upload_resp = session.post(
@@ -491,6 +493,11 @@ def send_data(config, creds):
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         return
+
+    # If sending agent config flag is on, upload config.yml to s3 bucket
+    if config.send_agent_config:
+        config_file_dict = get_signed_url(['config.yml'])['config.yml']
+        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
