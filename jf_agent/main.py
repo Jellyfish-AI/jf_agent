@@ -146,17 +146,39 @@ def main():
         # Git diagnostics
         import jf_agent.git as git
 
-        print("Git details:")
         git_configs = config.git_configs
         for i, git_config in enumerate(git_configs, start=1):
-            print(f"Git provider: {git_config.git_provider} ({i}/{len(git_configs)})")
-            print(f"Included Projects: {git_config.git_include_projects}")
+            print(f"Git details for instance {i}/{len(git_configs)}:")
+            print(f"  Git provider: {git_config.git_provider}")
+            print(f"  Included Projects: {git_config.git_include_projects}")
             if len(git_config.git_exclude_projects) > 0:
-                print(f"Excluded Projects: {git_config.git_exclude_projects}")
-            print(f"Included Repos: {git_config.git_include_repos}")
+                print(f"  Excluded Projects: {git_config.git_exclude_projects}")
+            print(f"  Included Repos: {git_config.git_include_repos}")
             if len(git_config.git_exclude_repos) > 0:
-                print(f"Excluded Projects: {git_config.git_exclude_repos}")
+                print(f"  Excluded Projects: {git_config.git_exclude_repos}")
 
+            print(f'==> Testing Git permissions...')
+
+            try:
+                client = git.get_git_client(git_config, list(creds.git_instance_to_creds.values())[i - 1],
+                                        skip_ssl_verification=config.skip_ssl_verification)
+
+                # Make sure we can see all projects / repos that we're supposed to
+                for project in git_config.git_include_projects:
+                    repos = client.get_all_repos(project)
+                    all_repos = [x['name'] for x in repos]
+                    for repo in git_config.git_include_repos:
+                        if repo not in all_repos:
+                            print(f"Missing repo {repo}!")
+                            raise BadConfigException
+
+                print("Agent is configured properly for this instance.")
+
+            except BadConfigException as e:
+                print("Error obtaining proper GitHub credentials for this configuration. Make sure you have entered all"
+                      "information correctly.")
+
+        # Memory & Disk Usage diagnostics
         import os
         import shutil
 
