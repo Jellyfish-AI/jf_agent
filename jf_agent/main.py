@@ -143,6 +143,42 @@ def main():
                     print(f'Error: Unable to access explicitly-included project {proj}.')
                     return
 
+        # Git diagnostics
+        import jf_agent.git as git
+
+        print("Git details:")
+        git_configs = config.git_configs
+        for i, git_config in enumerate(git_configs, start=1):
+            print(f"Git provider: {git_config.git_provider} ({i}/{len(git_configs)})")
+            print(f"Included Projects: {git_config.git_include_projects}")
+            if len(git_config.git_exclude_projects) > 0:
+                print(f"Excluded Projects: {git_config.git_exclude_projects}")
+            print(f"Included Repos: {git_config.git_include_repos}")
+            if len(git_config.git_exclude_repos) > 0:
+                print(f"Excluded Projects: {git_config.git_exclude_repos}")
+
+        import os
+        import shutil
+
+        print("Memory & Disk Usage:")
+        # From here:
+        # https://stackoverflow.com/questions/51248144/getting-cpu-and-memory-usage-of-a-docker-container-from-within-the-dockerized-ap
+        used = int(
+            os.popen('cat /sys/fs/cgroup/memory/memory.usage_in_bytes').readlines()[0].strip()
+        )  # memory usage
+        maximum = int(
+            os.popen('cat /sys/fs/cgroup/memory/memory.limit_in_bytes').readlines()[0].strip()
+        )  # memory limit
+
+        print(
+            f"% memory available: {(1.0 - (used * 100 / maximum)) * 100.0}% (used: {round(used / (1024 * 1024), 2)}MB)"
+        )
+
+        output_dir_size = os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
+        usage = shutil.disk_usage('/home/jf_agent/output/')
+
+        print(f'Disk space used: {round(usage.used / (1024 ** 3), 5)}GB / {round(usage.total / 1024 ** 3, 5)}GB')
+        print(f"Size of output dir: {output_dir_size}")
         print('Success!')
 
         return
