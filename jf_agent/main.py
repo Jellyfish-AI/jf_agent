@@ -161,11 +161,16 @@ def main():
             print(f'==> Testing Git connection...')
 
             try:
-                client = git.get_git_client(git_config, list(creds.git_instance_to_creds.values())[i - 1],
-                                            skip_ssl_verification=config.skip_ssl_verification)
+                client = git.get_git_client(
+                    git_config,
+                    list(creds.git_instance_to_creds.values())[i - 1],
+                    skip_ssl_verification=config.skip_ssl_verification,
+                )
 
                 all_repos = git.get_repos_from_git(client, git_config)
-                print(f"  Agent can view the following repos for this instance: {[repo.name for repo in all_repos]}")
+                print(
+                    f"  Agent can view the following repos for this instance: {[repo.name for repo in all_repos]}"
+                )
             except Exception as e:
                 print("Git connection unsuccessful!")
 
