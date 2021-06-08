@@ -143,6 +143,32 @@ def main():
                     print(f'Error: Unable to access explicitly-included project {proj}.')
                     return
 
+        # Git diagnostics
+        import jf_agent.git as git
+
+        git_configs = config.git_configs
+
+        for i, git_config in enumerate(git_configs, start=1):
+            print(f"Git details for instance {i}/{len(git_configs)}:")
+            print(f"  Git provider: {git_config.git_provider}")
+            print(f"  Included Projects: {git_config.git_include_projects}")
+            if len(git_config.git_exclude_projects) > 0:
+                print(f"  Excluded Projects: {git_config.git_exclude_projects}")
+            print(f"  Included Repos: {git_config.git_include_repos}")
+            if len(git_config.git_exclude_repos) > 0:
+                print(f"  Excluded Projects: {git_config.git_exclude_repos}")
+
+            print(f'==> Testing Git connection...')
+
+            try:
+                client = git.get_git_client(git_config, list(creds.git_instance_to_creds.values())[i - 1],
+                                            skip_ssl_verification=config.skip_ssl_verification)
+
+                all_repos = git.get_repos_from_git(client, git_config)
+                print(f"  Agent can view the following repos for this instance: {[repo.name for repo in all_repos]}")
+            except Exception as e:
+                print("Git connection unsuccessful!")
+
         print('Success!')
 
         return
