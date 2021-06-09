@@ -156,9 +156,9 @@ def main():
                 print(f"  Excluded Projects: {git_config.git_exclude_projects}")
             print(f"  Included Repos: {git_config.git_include_repos}")
             if len(git_config.git_exclude_repos) > 0:
-                print(f"  Excluded Projects: {git_config.git_exclude_repos}")
+                print(f"  Excluded Repos: {git_config.git_exclude_repos}")
 
-            print(f'==> Testing Git connection...')
+            print('==> Testing Git connection...')
 
             try:
                 client = git.get_git_client(
@@ -167,12 +167,22 @@ def main():
                     skip_ssl_verification=config.skip_ssl_verification,
                 )
 
-                all_repos = git.get_repos_from_git(client, git_config)
+                all_repos, projects = git.get_repos_from_git(client, git_config)
+
+                print(
+                    f"  Agent can view the following projects for this instance: {[proj.login for proj in projects]}"
+                )
                 print(
                     f"  Agent can view the following repos for this instance: {[repo.name for repo in all_repos]}"
                 )
+
+                for repo in git_config.git_include_repos:
+                    if repo not in all_repos:
+                        print(f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
+                              f" proper permissions to view this repository.")
+
             except Exception as e:
-                print("Git connection unsuccessful!")
+                print(f"Git connection unsuccessful! Exception: {e}")
 
         print('Success!')
 
@@ -184,6 +194,7 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+        print(jellyfish_endpoint_info)
 
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)

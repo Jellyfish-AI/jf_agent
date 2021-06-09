@@ -903,9 +903,10 @@ def _remove_repos_present_in_git_instance(git_connection, git_config, missing_re
 
     try:
         # Cross reference any apparently missing repos found by Jira with actual Git repo sources since
-        # Jira may return inexact repo names/urls. Remove any mismatches found.
+        # Jira may return inexact repo names/urls. Remove any mismatches found.'
+        repos, _ = get_repos_from_git(git_connection, git_config)
         _remove_mismatched_repos(
-            missing_repositories, get_repos_from_git(git_connection, git_config), git_config
+            missing_repositories, repos, git_config
         )
     except Exception as e:
         print(
