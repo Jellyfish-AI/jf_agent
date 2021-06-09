@@ -194,7 +194,6 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-        print(jellyfish_endpoint_info)
 
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
