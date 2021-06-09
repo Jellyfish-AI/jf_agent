@@ -432,3 +432,83 @@ def get_repos_from_git(git_connection, config: GitConfig):
     else:
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
     return repos, projects
+
+
+def get_nested_repos_from_git(git_connection, config: GitConfig):
+    """
+    Gets repositories from git, nested in their respective projects.
+    Does a lot of code borrowing from "get_projects" / "get_repos" in order to
+    get the repos that belong to a project.
+
+    @return: Dict: str -> List[str]
+    """
+    output_dict = {}
+
+    if config.git_provider == 'bitbucket_server':
+
+        from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
+        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs, _normalize_repo
+
+        projects = get_projects_bbs(
+            git_connection, config.git_include_projects, config.git_exclude_projects, False
+        )
+
+        filters = []
+        if config.git_include_repos:
+            filters.append(lambda r: r['name'] in config.git_include_repos)
+        if config.git_exclude_repos:
+            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+
+        for api_project in projects:
+            project_repos = []
+            project = git_connection.projects[api_project['key']]
+            for repo in project.repos.list():
+                if all(filt(repo) for filt in filters):
+                    project_repos.append(repo['name'])
+            output_dict[api_project.get('name')] = project_repos
+
+    elif config.git_provider == 'bitbucket_cloud':
+
+        from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
+
+        bbc_adapter = BitbucketCloudAdapter(git_connection)
+
+        projects = bbc_adapter.get_projects()
+        for project in projects:
+            project_repos = [x.name for x in bbc_adapter.get_repos([project])]
+            output_dict[project.name] = project_repos
+
+    elif config.git_provider == 'github':
+
+        from jf_agent.git.github import get_repos as get_repos_gh, get_projects, _normalize_repo
+
+        filters = []
+        if config.git_include_repos:
+            filters.append(lambda r: r['name'] in config.git_include_repos)
+        if config.git_exclude_repos:
+            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+
+        for org in config.git_include_projects:
+            org_repos = [
+                _normalize_repo(git_connection, org, r, config.git_redact_names_and_urls)
+                for r in git_connection.get_all_repos(org)
+                if all(filt(r) for filt in filters)
+            ]
+            output_dict[org] = [x.name for x in org_repos]
+
+    elif config.git_provider == 'gitlab':
+
+        from jf_agent.git.gitlab_adapter import GitLabAdapter
+
+        gl_adapter = GitLabAdapter(
+            config=config, outdir='', compress_output_files=False, client=git_connection
+        )
+
+        projects = gl_adapter.get_projects()
+        for project in projects:
+            project_repos = [x.name for x in gl_adapter.get_repos([project])]
+            output_dict[project.name] = project_repos
+
+    else:
+        raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
+    return output_dict

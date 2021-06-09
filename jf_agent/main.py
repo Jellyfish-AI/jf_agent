@@ -167,17 +167,17 @@ def main():
                     skip_ssl_verification=config.skip_ssl_verification,
                 )
 
-                all_repos, projects = git.get_repos_from_git(client, git_config)
+                project_repo_dict = git.get_nested_repos_from_git(client, git_config)
+                all_repos = sum(project_repo_dict.values(), [])
 
-                print(
-                    f"  Agent can view the following projects for this instance: {[proj.login for proj in projects]}"
-                )
-                print(
-                    f"  Agent can view the following repos for this instance: {[repo.name for repo in all_repos]}"
-                )
+                print("  All projects and repositories available to agent:")
+                for project_name, repo_list in project_repo_dict.items():
+                    print(f"  -- {project_name}")
+                    for repo in repo_list:
+                        print(f"    -- {repo}")
 
                 for repo in git_config.git_include_repos:
-                    if repo not in [x.name for x in all_repos]:
+                    if repo not in all_repos:
                         print(f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
                               f" proper permissions to view this repository.")
 
