@@ -177,7 +177,7 @@ def main():
                 )
 
                 for repo in git_config.git_include_repos:
-                    if repo not in all_repos:
+                    if repo not in [x.name for x in all_repos]:
                         print(f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
                               f" proper permissions to view this repository.")
 
