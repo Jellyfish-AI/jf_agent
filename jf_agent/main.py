@@ -148,25 +148,28 @@ def main():
         import shutil
 
         print("Memory & Disk Usage:")
-        # From here:
-        # https://stackoverflow.com/questions/51248144/getting-cpu-and-memory-usage-of-a-docker-container-from-within-the-dockerized-ap
-        used = int(
-            os.popen('cat /sys/fs/cgroup/memory/memory.usage_in_bytes').readlines()[0].strip()
-        )  # memory usage
-        maximum = int(
-            os.popen('cat /sys/fs/cgroup/memory/memory.limit_in_bytes').readlines()[0].strip()
-        )  # memory limit
+        try:
+            # From here:
+            # https://stackoverflow.com/questions/51248144/getting-cpu-and-memory-usage-of-a-docker-container-from-within-the-dockerized-ap
+            used = int(
+                os.popen('cat /sys/fs/cgroup/memory/memory.usage_in_bytes').readlines()[0].strip()
+            )  # memory usage
+            maximum = int(
+                os.popen('cat /sys/fs/cgroup/memory/memory.limit_in_bytes').readlines()[0].strip()
+            )  # memory limit
 
-        print(
-            f"  % memory available: {(1.0 - (used * 100 / maximum)) * 100.0}% (used: {round(used / (1024 * 1024), 2)}MB)"
-        )
+            print(
+                f"  % memory available: {(1.0 - (used * 100 / maximum)) * 100.0}% (used: {round(used / (1024 * 1024), 2)}MB)"
+            )
 
-        output_dir_size = os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
-        usage = shutil.disk_usage('/home/jf_agent/output/')
+            output_dir_size = os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
+            usage = shutil.disk_usage('/home/jf_agent/output/')
 
-        print(f'  Disk space used: {round(usage.used / (1024 ** 3), 5)}GB / {round(usage.total / 1024 ** 3, 5)}GB')
-        print(f"  Size of output dir: {output_dir_size}")
-        print('Success!')
+            print(f'  Disk space used: {round(usage.used / (1024 ** 3), 5)}GB / {round(usage.total / 1024 ** 3, 5)}GB')
+            print(f"  Size of output dir: {output_dir_size}")
+            print('Success!')
+        except Exception as e:
+            print("  ERROR: Could not obtain memory and/or disk usage information.")
 
         return
 
