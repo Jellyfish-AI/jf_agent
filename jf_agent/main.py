@@ -7,6 +7,7 @@ import threading
 from collections import namedtuple
 from glob import glob
 from pathlib import Path
+import sys
 
 import requests
 import json
@@ -93,6 +94,8 @@ def main():
     creds = obtain_creds(config)
     agent_logging.configure(config.outdir)
 
+    success = True
+
     if config.run_mode == 'validate':
         print('Validating configuration...')
         from jf_jira import _get_raw_jira_connection
@@ -116,7 +119,7 @@ def main():
                 print(
                     f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
                 )
-            return
+            return False
 
         # test jira users permission
         try:
@@ -130,7 +133,7 @@ def main():
             print(
                 f'Error downloading users from Jira instance at {config.jira_url}, please verify that this user has the "browse all users" permission. Error: {e}'
             )
-            return
+            return False
 
         # test jira project access
         print('==> Testing jira project permissions...')
@@ -141,7 +144,7 @@ def main():
             for proj in config.jira_include_projects:
                 if proj not in accessible_projects:
                     print(f'Error: Unable to access explicitly-included project {proj}.')
-                    return
+                    return False
 
         # Git diagnostics
         import jf_agent.git as git
@@ -178,11 +181,14 @@ def main():
 
                 for repo in git_config.git_include_repos:
                     if repo not in all_repos:
-                        print(f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
-                              f" proper permissions to view this repository.")
+                        print(
+                            f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
+                            f" proper permissions to view this repository."
+                        )
 
             except Exception as e:
                 print(f"Git connection unsuccessful! Exception: {e}")
+                return False
 
         print('Success!')
 
@@ -210,8 +216,9 @@ def main():
             print('Success!')
         except Exception as e:
             print(f"  ERROR: Could not obtain memory and/or disk usage information. {e}")
+            return False
 
-        return
+        return True
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
@@ -244,7 +251,7 @@ def main():
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(config, creds, issues_to_scan)
-                return
+                return True
 
             if config.run_mode_includes_download:
                 download_data_status = download_data(
@@ -253,6 +260,8 @@ def main():
                     jellyfish_endpoint_info.jira_info,
                     jellyfish_endpoint_info.git_instance_info,
                 )
+
+                success = all(s['status'] == 'success' for s in download_data_status)
 
                 write_file(
                     config.outdir, 'status', config.compress_output_files, download_data_status
@@ -268,13 +277,15 @@ def main():
             diagnostics.close_file()
 
     if config.run_mode_includes_send:
-        send_data(config, creds)
+        success &= send_data(config, creds)
     else:
         print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
         print(f'You can now inspect the downloaded data in {config.outdir}')
         print(f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"')
 
     print('Done!')
+
+    return success
 
 
 UserProvidedCreds = namedtuple(
@@ -558,7 +569,7 @@ def send_data(config, creds):
         print(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
-        return
+        return False
 
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
@@ -570,6 +581,8 @@ def send_data(config, creds):
     Path(done_file_path).touch()
     done_file_dict = get_signed_url(['.done'])['.done']
     upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+
+    return True
 
 
 def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):
@@ -609,6 +622,9 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
 
 if __name__ == '__main__':
     try:
-        main()
+        success = main()
+        if not success:
+            sys.exit(1)
     except BadConfigException:
         print('ERROR: Bad config; see earlier messages')
+        sys.exit(1)

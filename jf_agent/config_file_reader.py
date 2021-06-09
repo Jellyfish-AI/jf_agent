@@ -60,7 +60,7 @@ ValidatedConfig = namedtuple(
         'compress_output_files',
         'jellyfish_api_base',
         'skip_ssl_verification',
-        'send_agent_config'
+        'send_agent_config',
     ],
 )
 
