@@ -406,9 +406,8 @@ def get_repos_from_git(git_connection, config: GitConfig):
 
     elif config.git_provider == 'github':
 
-        from jf_agent.git.github import get_repos as get_repos_gh, get_projects
+        from jf_agent.git.github import get_repos as get_repos_gh
 
-        projects = get_projects(git_connection, config.git_include_projects, config.git_redact_names_and_urls)
         _, repos = zip(
             *get_repos_gh(
                 git_connection,
@@ -431,7 +430,7 @@ def get_repos_from_git(git_connection, config: GitConfig):
         repos = gl_adapter.get_repos(projects)
     else:
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
-    return repos, projects
+    return repos
 
 
 def get_nested_repos_from_git(git_connection, config: GitConfig):
