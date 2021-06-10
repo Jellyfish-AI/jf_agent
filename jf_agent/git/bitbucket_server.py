@@ -4,6 +4,7 @@ import stashy
 import pytz
 from tqdm import tqdm
 from requests.exceptions import RetryError, ChunkedEncodingError
+from urllib3.exceptions import MaxRetryError
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -372,7 +373,7 @@ def get_pull_requests(
                     activites = sorted(
                         [a for a in api_pr.activities()], key=lambda x: x['createdDate']
                     )
-                except (stashy.errors.GenericException, RetryError) as e:
+                except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
                     agent_logging.log_and_print(
                         logger,
                         logging.INFO,

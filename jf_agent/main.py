@@ -186,6 +186,31 @@ def main():
 
         print('Success!')
 
+        # Memory & Disk Usage diagnostics
+        import os
+        import shutil
+        import psutil
+
+        print("Memory & Disk Usage:")
+
+        try:
+            print(
+                f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)}MB"
+            )
+
+            output_dir_size = (
+                os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
+            )
+            usage = shutil.disk_usage('/home/jf_agent/output/')
+
+            print(
+                f'  Disk space used: {round(usage.used / (1024 ** 3), 5)}GB / {round(usage.total / 1024 ** 3, 5)}GB'
+            )
+            print(f"  Size of output dir: {output_dir_size}")
+            print('Success!')
+        except Exception as e:
+            print(f"  ERROR: Could not obtain memory and/or disk usage information. {e}")
+
         return
 
     elif config.run_mode == 'send_only':
@@ -481,8 +506,10 @@ def send_data(config, creds):
                 logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
-    def upload_file(filename, path_to_obj, signed_url):
-        with open(f'{config.outdir}/{filename}', 'rb') as f:
+    def upload_file(filename, path_to_obj, signed_url, local=False):
+        filepath = filename if local else f'{config.outdir}/{filename}'
+
+        with open(filepath, 'rb') as f:
             # If successful, returns HTTP status code 204
             session = retry_session()
             upload_resp = session.post(
@@ -532,6 +559,11 @@ def send_data(config, creds):
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         return
+
+    # If sending agent config flag is on, upload config.yml to s3 bucket
+    if config.send_agent_config:
+        config_file_dict = get_signed_url(['config.yml'])['config.yml']
+        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # creating .done file
     done_file_path = f'{os.path.join(config.outdir, ".done")}'
