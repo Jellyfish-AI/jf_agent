@@ -143,6 +143,49 @@ def main():
                     print(f'Error: Unable to access explicitly-included project {proj}.')
                     return
 
+        # Git diagnostics
+        import jf_agent.git as git
+
+        git_configs = config.git_configs
+
+        for i, git_config in enumerate(git_configs, start=1):
+            print(f"Git details for instance {i}/{len(git_configs)}:")
+            print(f"  Git provider: {git_config.git_provider}")
+            print(f"  Included Projects: {git_config.git_include_projects}")
+            if len(git_config.git_exclude_projects) > 0:
+                print(f"  Excluded Projects: {git_config.git_exclude_projects}")
+            print(f"  Included Repos: {git_config.git_include_repos}")
+            if len(git_config.git_exclude_repos) > 0:
+                print(f"  Excluded Repos: {git_config.git_exclude_repos}")
+
+            print('==> Testing Git connection...')
+
+            try:
+                client = git.get_git_client(
+                    git_config,
+                    list(creds.git_instance_to_creds.values())[i - 1],
+                    skip_ssl_verification=config.skip_ssl_verification,
+                )
+
+                project_repo_dict = git.get_nested_repos_from_git(client, git_config)
+                all_repos = sum(project_repo_dict.values(), [])
+
+                print("  All projects and repositories available to agent:")
+                for project_name, repo_list in project_repo_dict.items():
+                    print(f"  -- {project_name}")
+                    for repo in repo_list:
+                        print(f"    -- {repo}")
+
+                for repo in git_config.git_include_repos:
+                    if repo not in all_repos:
+                        print(f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
+                              f" proper permissions to view this repository.")
+
+            except Exception as e:
+                print(f"Git connection unsuccessful! Exception: {e}")
+
+        print('Success!')
+
         # Memory & Disk Usage diagnostics
         import os
         import shutil
