@@ -143,7 +143,30 @@ def main():
                     print(f'Error: Unable to access explicitly-included project {proj}.')
                     return
 
-        print('Success!')
+        # Memory & Disk Usage diagnostics
+        import os
+        import shutil
+        import psutil
+
+        print("Memory & Disk Usage:")
+
+        try:
+            print(
+                f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)}MB"
+            )
+
+            output_dir_size = (
+                os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
+            )
+            usage = shutil.disk_usage('/home/jf_agent/output/')
+
+            print(
+                f'  Disk space used: {round(usage.used / (1024 ** 3), 5)}GB / {round(usage.total / 1024 ** 3, 5)}GB'
+            )
+            print(f"  Size of output dir: {output_dir_size}")
+            print('Success!')
+        except Exception as e:
+            print(f"  ERROR: Could not obtain memory and/or disk usage information. {e}")
 
         return
 
