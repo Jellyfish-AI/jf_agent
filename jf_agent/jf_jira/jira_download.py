@@ -684,7 +684,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             meta = jira_connection.createmeta(
                 projectIds=[project_id], expand='projects.issuetypes.fields'
             )
-        except JIRAError as e:
+        except JIRAError:
             agent_logging.log_and_print_error_or_warning(
                 logger, logging.WARNING, error_code=3072, exc_info=False
             )
