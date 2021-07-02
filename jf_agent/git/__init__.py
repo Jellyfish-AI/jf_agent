@@ -470,7 +470,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-        bbc_adapter = BitbucketCloudAdapter(git_connection)
+        bbc_adapter = BitbucketCloudAdapter(config=config, outdir='', compress_output_files=False, client=git_connection)
 
         projects = bbc_adapter.get_projects()
         for project in projects:
