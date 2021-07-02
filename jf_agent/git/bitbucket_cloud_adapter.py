@@ -86,6 +86,8 @@ class BitbucketCloudAdapter(GitAdapter):
                     and api_repo['name'] not in self.config.git_include_repos
                     and api_repo['uuid'] not in self.config.git_include_repos
                 ):
+                    if self.config.git_verbose:
+                        print(f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's not in git_include_repos''')
                     continue
 
                 # If we have an explicit repo deny list and this is in it, skip
@@ -93,6 +95,8 @@ class BitbucketCloudAdapter(GitAdapter):
                     api_repo['name'] in self.config.git_exclude_repos
                     or api_repo['uuid'] in self.config.git_exclude_repos
                 ):
+                    if self.config.git_verbose:
+                        print(f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's in git_exclude_repos''')
                     continue
 
                 # If this repo is in a project, apply project filters:
@@ -104,6 +108,11 @@ class BitbucketCloudAdapter(GitAdapter):
                         and repo_project['key'] not in self.config.git_include_bbcloud_projects
                         and repo_project['uuid'] not in self.config.git_include_bbcloud_projects
                     ):
+                        if self.config.git_verbose:
+                            print(
+                                f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
+                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is not in git_include_bbcloud_projects'''
+                            )
                         continue
 
                     # if we have a project deny list and this repo is in a project that's in it, skip
@@ -111,6 +120,11 @@ class BitbucketCloudAdapter(GitAdapter):
                         repo_project['key'] in self.config.git_exclude_bbcloud_projects
                         or repo_project['uuid'] in self.config.git_exclude_bbcloud_projects
                     ):
+                        if self.config.git_verbose:
+                            print(
+                                f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
+                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is in git_exclude_bbcloud_projects'''
+                            )
                         continue
 
                 branches = self.get_branches(p, api_repo)
@@ -167,7 +181,7 @@ class BitbucketCloudAdapter(GitAdapter):
     ) -> List[NormalizedPullRequest]:
         print('downloading bitbucket prs... ', end='', flush=True)
         for i, repo in enumerate(
-            tqdm(normalized_repos, desc=f'downloading prs for repos', unit='repos'), start=1
+            tqdm(normalized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
