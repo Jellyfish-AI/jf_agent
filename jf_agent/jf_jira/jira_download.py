@@ -684,10 +684,8 @@ def download_customfieldoptions(jira_connection, project_ids):
             meta = jira_connection.createmeta(
                 projectIds=[project_id], expand='projects.issuetypes.fields'
             )
-        except JIRAError:
-            agent_logging.log_and_print_error_or_warning(
-                logger, logging.ERROR, error_code=3072, exc_info=True
-            )
+        except JIRAError as e:
+            logger.warning(f"{e}. Error calling createmeta JIRA endpoint. Skipping...")
             return []
 
         # Custom values are buried deep in the createmeta response:
