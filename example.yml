@@ -182,7 +182,8 @@ git:
   # Redact names and URLs for projects, repos, branches.
   redact_names_and_urls: False
 
-  # More verbose local logging (currently only available on Bitbucket Server).
+  # More verbose local logging (currently only available for Bitbucket Server and Bitbucket
+  # Cloud).
   verbose: False
 
 ######################################
