@@ -686,7 +686,7 @@ def download_customfieldoptions(jira_connection, project_ids):
             )
         except JIRAError:
             agent_logging.log_and_print_error_or_warning(
-                logger, logging.ERROR, error_code=3072, exc_info=True
+                logger, logging.WARNING, error_code=3072, exc_info=False
             )
             return []
 
