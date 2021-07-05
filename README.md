@@ -22,51 +22,55 @@ If you are looking for details on how to set up your agent, look [here](#setup-g
 ## Setup Guide :hammer_and_wrench:
 
 1. **Create a YAML configuration file**
-   - This will help our agent work with your applications!
-   - You can use this [example config file](https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml) to get started. Using this example file, fill out fields such as your Jira url, and Git url. Uncomment configuration options as desired.
-   - Save the YAML file on the host that will execute the agent.  
+   - This will help the agent work with your systems!
+   - You can use this [example config file](https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml) to get started. Using this example file, fill out fields such as your Jira URL and Git URL. Uncomment configuration options as desired.
+   - Save the YAML file on the host that will execute the agent.
 
 2. **Create an environment variable file**
-    - This is where you'll store authentication information, such as your API tokens, and login information
-    - The way your file looks will vary based on your organization's tool set. The base file should look something like the code snippet below, with the corresponding values filled in in place of the ellipses:
+    - This is where you'll store authentication information, such as your API tokens and login credentials.
+    - The way your file looks will vary based on your organization's toolset. You'll start with this code snippet, replacing the ellipses with the value for `JELLYFISH_API_TOKEN` that you got from Jellyfish:
       ```
-      JELLYFISH_API_TOKEN=...      
-      JIRA_USERNAME=...
-      JIRA_PASSWORD=...
+      JELLYFISH_API_TOKEN=...
       ```
-      - You can obtain the value for `JELLYFISH_API_TOKEN` from Jellyfish
-      - To get a value for `JIRA_USERNAME`, choose a Jira username that has read access to all of the projects you would like to use in Jellyfish
+
+    - Then add a section to configure the agent to access your Jira system:
+         ```
+         JIRA_USERNAME=...
+         JIRA_PASSWORD=...
+         ```
+      - To get a value for `JIRA_USERNAME`, choose a Jira username that has read access to all of the projects you would like to use in Jellyfish.
       - The value for `JIRA_PASSWORD` will vary. If you are using Jira server, enter the password for the user specified with `JIRA_USERNAME`. If you are using Jira Cloud, create a personal API token, following the instructions [here](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) to obtain one.
-   - To accomodate for additional tooling, add the following lines specified below in addition to the base values above:
-      - ### **For GitHub users**:  
-         Add the following to your environment variable file:  
+
+    - Next add section(s) to configure the agent to access your Git system(s):
+      - ### **For GitHub users**:
+         Add the following to your environment variable file:
          ```
          GITHUB_TOKEN=...
          ```
-         - Create a personal access token in Github, following the instructions [here](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token). Use this token as the value for `GITHUB_TOKEN`
-      - ### **For GitLab users**:  
-         Add the following to your environment variable file:  
+         - Create a personal access token in GitHub, following the instructions [here](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token). Use this token as the value for `GITHUB_TOKEN`.
+      - ### **For GitLab users**:
+         Add the following to your environment variable file:
          ```
          GITLAB_TOKEN=...
          ```
-         - Create a personal access token in GitLab, following the instructions [here](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token). Use this token as the value for `GITLAB_TOKEN`
-      - ### **For Bitbucket Server users**:  
-         Add the following to your environment variable file:  
+         - Create a personal access token in GitLab, following the instructions [here](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token). Use this token as the value for `GITLAB_TOKEN`.
+      - ### **For Bitbucket Server users**:
+         Add the following to your environment variable file:
          ```
          BITBUCKET_USERNAME=...
          BITBUCKET_PASSWORD=...
          ```
          - `BITBUCKET_USERNAME` should be your Bitbucket server's username
          - `BITBUCKET_PASSWORD` should be your Bitbucket server's password
-      - ### **For Bitbucket Cloud users**:  
-         Add the following to your environment variable file:  
+      - ### **For Bitbucket Cloud users**:
+         Add the following to your environment variable file:
          ```
          BITBUCKET_CLOUD_USERNAME=...
          BITBUCKET_CLOUD_APP_PASSWORD=...
          ```
          - `BITBUCKET_CLOUD_USERNAME` should be your Bitbucket cloud username
          - Create an app password in Bitbucket, following the instructions [here](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Apppasswords-Createanapppassword). Use this app password as the value for `BITBUCKET_CLOUD_APP_PASSWORD`
-      - ### **For users with multiple Git instances**:  
+      - ### **For users with multiple Git instances**:
          If using multiple git instances, all git credentials must be prefixed with the corresponding `creds_envvar_prefix` provided in the `config.yml`.
 
          For example, if the `creds_envvar_prefix` is set to `ORG1` for a bitbucket instance, the configuration would include the following variables:
@@ -74,7 +78,7 @@ If you are looking for details on how to set up your agent, look [here](#setup-g
          ORG1_BITBUCKET_USERNAME=...
          ORG1_BITBUCKET_PASSWORD=...
          ```
-         When in multi-git mode, creds_envvar_prefix is required for all git instances. See the `example.yml` from Step 1 of this [Setup guide](#setup-guide) for more details.  
+         When in multi-git mode, creds_envvar_prefix is required for all git instances. See the `example.yml` from Step 1 of this [Setup guide](#setup-guide) for more details.
 
 3. **Ensure proper network configuration**
    - The agent will need to make various requests to function. Thus, we ask that you please ensure that your network firewall/proxies are configured such that the agent is able to:
@@ -89,7 +93,7 @@ The agent is distributed as a Docker image. The image bundles the agent's source
 
 Execute the agent with a `docker run` command that references the image on Docker Hub. You'll use bind mounts and environment variables to configure it with your YAML file and credentials.
 
-- The YAML configuration file you've created should be provided to the container via a bind mount. The syntax for providing a bind mount is: 
+- The YAML configuration file you've created should be provided to the container via a bind mount. The syntax for providing a bind mount is:
    ```
    --mount type=bind,source=<host_path>,target=<container_path>
    ```
@@ -103,7 +107,7 @@ Execute the agent with a `docker run` command that references the image on Docke
 
 ### Specify a usage mode :computer:
 
-The usage mode is provided to the agent via the `-m` argument. The value should be one of: `download_and_send`, `download_only`, `send_only`, `print_all_jira_fields`, `print_apparently_missing_git_repos`. If you don't provide a `-m` argument, the `download_and_send` mode is used.  
+The usage mode is provided to the agent via the `-m` argument. The value should be one of: `download_and_send`, `download_only`, `send_only`, `print_all_jira_fields`, `print_apparently_missing_git_repos`, or `validate`. If you don't provide a `-m` argument, the `download_and_send` mode is used.
 
 You can see more details about the various usage modes [here](#usage-modes).
 
