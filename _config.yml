@@ -1,0 +1,4 @@
+title: JF Agent
+theme: jekyll-theme-cayman
+plugins:
+  - jemoji
