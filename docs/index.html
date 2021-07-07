@@ -24,7 +24,7 @@
                     <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
                         <div>
                             <a href="https://jellyfish.co">
-                                <img class="nav-logo" src="jf-logo-blue.png">
+                                <img class="nav-logo" src="assets/img/jf-logo-blue.png">
                             </a>
                         </div>
                         <div class="nav-title">Agent Documentation</div>
@@ -94,7 +94,7 @@
                                         <p class="page-header-text mb-5">Welcome to the JF Agent Documentation! The agent is a tool used to connect to your systems to give you back metrics and other data to help your organization. If you are looking to set up your agent for the first time, see <a href="setup-guide.html">here</a>.</p>
                                         <a class="btn btn-lg btn-primary font-weight-500 mr-3" href="setup-guide.html">Setup Guide</a><a class="btn btn-lg btn-primary-soft text-primary font-weight-500" href="https://github.com/Jellyfish-AI/jf_agent">Source Code</a>
                                     </div>
-                                    <div class="col-lg-6 d-none d-lg-block" data-aos="fade-up" data-aos-delay="100"><img class="img-fluid jf-logo" src="logo.png" width="30%" /></div>
+                                    <div class="col-lg-6 d-none d-lg-block" data-aos="fade-up" data-aos-delay="100"><img class="img-fluid jf-logo" src="assets/img/logo.png" width="30%" /></div>
                                 </div>
                             </div>
                         </div>
@@ -106,7 +106,7 @@
                         <div class="container">
                             <div class="row align-items-center justify-content-center">
                                 <div class="col-md-9 col-lg-6 order-1 order-lg-0" data-aos="fade-right">
-                                    <div class="content-skewed content-skewed-right"><img class="content-skewed-item img-fluid shadow-lg rounded-lg" src="laptop.jpeg" alt="..." /></div>
+                                    <div class="content-skewed content-skewed-right"><img class="content-skewed-item img-fluid shadow-lg rounded-lg" src="assets/img/laptop.jpeg" alt="..." /></div>
                                 </div>
                                 <div class="col-lg-6 order-0 order-lg-1 mb-5 mb-lg-0" data-aos="fade-left">
                                     <div class="mb-5">
@@ -148,6 +148,7 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
         <script type="text/javascript">
             $( document ).ready(function() {
+                // Get nav bar template and put it on the page
                 var temp = document.getElementsByTagName("template")[0];
                 var clon = temp.content.cloneNode(true);
                 document.getElementById("layoutSidenav").appendChild(clon);

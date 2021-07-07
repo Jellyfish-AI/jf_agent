@@ -6,7 +6,8 @@
         <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
         <link rel="icon" type="image/x-icon" href="assets/img/hack_favicon.png" />
         <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>
+    </head>
     <body class="sb-nav-fixed">
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
@@ -55,13 +56,14 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
     <script type="text/javascript">
         $(document).ready(async function() {
+            // Get index.html content
             var templates = document.createElement('template');
             const response = await fetch('index.html');
             const result = await response.text();
             templates.innerHTML = result;
 
+            // Get nav bar template from index.html and put it on the page
             var template = templates.content.querySelector('#navTemplate'); 
-            console.log(template);
             var clone = template.content.cloneNode(true);
             document.getElementById("layoutSidenav").appendChild(clone);
         });

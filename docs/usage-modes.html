@@ -90,11 +90,13 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
     <script type="text/javascript">
         $(document).ready(async function() {
+            // Get content from index.html
             var templates = document.createElement('template');
             const response = await fetch('index.html');
             const result = await response.text();
             templates.innerHTML = result;
 
+            // Get nav bar template from index.html and put it on the page
             var template = templates.content.querySelector('#navTemplate'); 
             console.log(template);
             var clone = template.content.cloneNode(true);
