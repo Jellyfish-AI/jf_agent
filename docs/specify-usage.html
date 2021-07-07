@@ -11,21 +11,21 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Specify Usage Mode</h1>
+                    <div class="page-blurb">Describes how to specify a usage mode to the agent.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
-                        
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        <p>
+                            The usage mode is provided to the agent via the <code>`-m`</code> argument. The value 
+                            should be one of: <code>`download_and_send`</code>, <code>`download_only`</code>, 
+                            <code>`send_only`</code>, <code>`print_all_jira_fields`</code>, 
+                            <code>`print_apparently_missing_git_repos`</code>, or <code>`validate`</code>. 
+                        </p>
+                        <p>
+                            If you don't provide a <code>`-m`</code> argument, the <code>`download_and_send`</code> mode is used.
+                        </p>
+
+                        <p>You can see more details about the various usage modes <a href="usage-modes.html">here</a>.</p>
                     </div>
                 </main>
 

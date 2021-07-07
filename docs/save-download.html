@@ -11,21 +11,34 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Save downloaded output</h1>
+                    <div class="page-blurb">Describes how to save the output that the agent has downloaded.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
-                        
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        <p>
+                            By default, the agent will download and send the data it collects. Upon completion the 
+                            data downloaded will be stored inside the container. If you use the <code>`--rm`</code> 
+                            argument to <code>`docker run`</code> then the container and the data will be cleaned 
+                            up when the agent completes.
+                        </p>
+                        <p>
+                            If you instead want to save the downloaded output (perhaps so that you can inspect it), 
+                            you can provide a bind mount that maps a host directory to the container's agent output directory.
+                        </p>
+                        <p>
+                            Just like for providing the YAML configuration file, the syntax for providing a bind 
+                            mount for the agent output directory is:
+                            <p class="code-block">
+                                <code>
+                                    --mount type=bind,source=&lt;host_path&gt;,target=&lt;container_path&gt;
+                                </code>
+                            </p>
+                        </p>
+                        <p>
+                            In this case, the <code>`host_path`</code> should be the full path to a directory on the 
+                            host and the <code>`container_path`</code> must be <code>`/home/jf_agent/output`</code>.
+                        </p>
+
                     </div>
                 </main>
 

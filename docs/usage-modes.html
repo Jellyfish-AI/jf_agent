@@ -11,21 +11,54 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Usage Modes</h1>
+                    <div class="page-blurb">See the different usage modes that the agent offers.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
-                        
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        The agent has several different usage modes:
+                        <ol>
+                            <li>
+                                <p><code>`download_and_send`</code></p>
+                                Download Jira and/or Git data from your systems; send the 
+                                resulting data to Jellyfish. 
+                            </li>
+                            <br/>
+
+                            <li>
+                                <p><code>`download_only`</code></p>
+                                Download Jira and/or Git data from your systems. Allow the 
+                                downloaded data to be inspected before it's sent to Jellyfish.
+                            </li>
+                            <br/>
+
+                            <li>
+                                <p><code>`send_only`</code></p>
+                                Send a previously downloaded dataset to Jellyfish.
+                            </li>
+                            <br/>
+
+                            <li>
+                                <p><code>`print_all_jira_fields`</code></p>
+                                Show the keys and field names for all of your Jira custom fields
+                                 (to aid in agent configuration).
+                            </li>
+                            <br/>
+
+                            <li>
+                                <p><code>`print_apparently_missing_git_repos`</code></p>
+                                Show the names and urls of Git repositories that may be missing 
+                                from Jellyfish by looking at the Development Jira custom 
+                                field (to aid in agent configuration).
+                            </li>
+                            <br/>
+
+                            <li>
+                                <p><code>`validate`</code></p>
+                                Validate the configuration file using APIs.
+                            </li>
+                            <br/>
+                        </ol>
+                        Data that you download from Jira and/or Git may be scrubbed to remove sensitive fields and values before you send it to Jellyfish.
                     </div>
                 </main>
 

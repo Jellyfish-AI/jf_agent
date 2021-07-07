@@ -21824,10 +21824,10 @@ section {
 }
 
 .nav-title {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-family: 'Source Sans Pro', 'Segoe UI', 'Droid Sans', Tahoma, Arial, sans-serif;
   padding-left: 16px;
-  padding-top: 5px;
+  padding-top: 40px;
   padding-bottom: 15px;
   color: #8D9DA6;
 }
@@ -21843,11 +21843,11 @@ section {
 }
 
 .page-detail-wrapper {
-  margin: 20px 50px;
+  margin: 20px 70px;
 }
 
 .page-title {
-  font-size: 4rem;
+  font-size: 3rem;
   color: #126EB4;
 }
 

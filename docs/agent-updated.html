@@ -11,21 +11,19 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Keeping the agent updated</h1>
+                    <div class="page-blurb">Describes how to keep the JF agent updated.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
+                        You can pull down the latest Docker image from Docker Hub with:
                         
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        <p class="code-block">
+                            <code>
+                            docker pull jellyfishco/jf_agent:stable
+                            </code>
+                        </p>
+
+                        You may also want to periodically perform that <code>`docker pull`</code> command, or prepend it to the command you use for <code>`docker run`</code>, to ensure you're using the latest version of the agent.
                     </div>
                 </main>
 

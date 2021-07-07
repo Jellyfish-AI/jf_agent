@@ -11,21 +11,43 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Run the Agent</h1>
+                    <div class="page-blurb">Describes how to run the agent.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
-                        
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        <p>         
+                            The agent is distributed as a Docker image. The image bundles the agent's source code, 
+                            a Python 3 environment, and the AWS command line tools.
+                        </p>
+                        <p>
+                            Execute the agent with a <code>`docker run`</code> command that references the image on Docker Hub. 
+                            You'll use bind mounts and environment variables to configure it with your YAML file 
+                            and credentials.
+
+                            <ul>
+                            <li>
+                                The YAML configuration file you've created should be provided to the container via a bind mount. 
+                                The syntax for providing a bind mount is:
+                                <p class="code-block">
+                                    <code>
+                                        --mount type=bind,source=&lt;host_path&gt;,target=&lt;container_path&gt;
+                                    </code>
+                                </p>
+                                The <code>`host_path`</code> should be the full path to where you've stored the YAML configuration file. 
+                                The <code>`container_path`</code> must be <code>`/home/jf_agent/config.yml`</code>.
+                            </li>
+                            <li>
+                                Your credentials should be provided to the container via environment variables. The syntax for 
+                                providing environment variables from a file is:
+                                <p class="code-block">
+                                    <code>
+                                        --env-file &lt;full_path_to_env_file&gt;
+                                    </code>
+                                </p>
+                            </li>
+                            </ul>
+                        </p>
+
                     </div>
                 </main>
 

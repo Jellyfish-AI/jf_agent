@@ -11,21 +11,39 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Setting up the Agent</h1>
-                    <div class="page-blurb">On this page, you can choose the appropriate step-by-step guide on how to setup the JF agent 
-                    based upon your systems.</div>
+                    <h1 class="page-title">Send a Downloaded Dataset</h1>
+                    <div class="page-blurb">Describes how to specify a previously downloaded dataset to be sent to Jellyfish.</div>
 
                     <div class="page-body-text">
-                        <p>The agent requires slightly varied setup, based upon the system your organization uses. Choose the appropriate
-                        setup guide below based upon your Git instance.</p>
-                        
-                        <ul>
-                            <li><a href="github-setup-guide.html">GitHub Setup Guide</a></li>
-                            <li><a href="gitlab-setup-guide.html">GitLab Setup Guide</a></li>
-                            <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Setup Guide</a></li>
-                            <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Setup Guide</a></li>
-                            <li><a href="multi-git-setup-guide.html">Multiple Git Instances Setup Guide</a></li>
-                        </ul>
+                        <p>
+                            If you've run the agent in <code>`download_only`</code> mode so that 
+                            you can inspect its output, when you're ready to send the data to 
+                            Jellyfish you'll use the <code>`send_only`</code> mode. You'll provide 
+                            a bind mount for the output directory, and you'll also provide the 
+                            <code>`-od`</code> argument to specify a path relative to the container's 
+                            output directory that contains the data previously downloaded.
+                        </p>
+                        <p>
+                            When the agent runs, it saves its downloaded data in a timestamped directory 
+                            inside of <code>`/home/jf_agent/output`</code>. It shows the directory its 
+                            downloaded data is being written to with a line like this:
+                            <p class="code-block"><code>
+                                Will write output files into ./output/20190822_133513
+                            </code></p>
+                        </p>
+                        <p>
+                            So, e.g., if an earlier run with <code>`download_only`</code> may has 
+                            written its output file into <code>`./output/20190822_133513`</code> and the 
+                            host directory <code>`/tmp/jf_agent/output`</code> had been mounted at 
+                            <code>`/home/jf_agent/output`</code>, you'd use these arguments to send that 
+                            data to Jellyfish:
+                            <p class="code-block"><code>
+                                --mount type=bind,source=/tmp/jf_agent_output,target=/home/jf_agent/output
+                                -m send_only
+                                -od ./output/20190822_133513
+                            </code></p>
+
+                        </p>
                     </div>
                 </main>
 
