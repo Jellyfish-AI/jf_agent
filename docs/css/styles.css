@@ -21874,3 +21874,15 @@ section {
 .footer-container {
   margin: 20px;
 }
+
+.next-page {
+  float: right;
+}
+
+.previous-page {
+  float: left;
+}
+
+.nav-arrows {
+  margin-top: 60px;
+}

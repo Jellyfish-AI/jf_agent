@@ -4,86 +4,46 @@
         <link href="css/styles.css" rel="stylesheet" />
         <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
         <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
-        <link rel="icon" type="image/x-icon" href="assets/img/hack_favicon.png" />
+        <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
         <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
     <body class="sb-nav-fixed">
         <div id="layoutSidenav">
             <div id="layoutSidenav_content">
                 <main class="page-detail-wrapper">
-                    <h1 class="page-title">Bitbucket Server Setup Guide</h1>
-                    <div class="page-blurb">On this page, you will find a step-by-step guide on how to setup the JF agent 
-                    to work with Bitbucket Server.</div>
+                    <h1 class="page-title">Bitbucket Server Environment Variable Setup Guide</h1>
+                    <div class="page-blurb">On this page, you will learn how to add the correct environment variables to your file.</div>
 
                     <div class="page-body-text">
-                        <h2>1. Create a YAML configuration file</h2>
-                        <ul>
-                            <li>This will help the agent work with your systems!</li>
-                            <li>You can use this 
-                            <a href="https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml">example config file</a>
-                             to get started. Using this example file, fill out fields such as your Jira URL and Git URL. Uncomment configuration options as desired.</li>
-                            <li>Save the YAML file on the host that will execute the agent.</li>
-                        </ul>
+                            <h2>Details</h2>
+                            <p>This is where you'll add and populate your environmental variables file for Bitbucket Server.</p>
 
-                        <h2>2. Create an environment variable file</h2>
-                        <ul>
-                            <li>This is where you'll store authentication information, such as your API tokens and login credentials.</li>
-                            <li>
-                                The way your file looks will vary based on your organization's toolset. You'll start with the following 
-                                code snippet, replacing the ellipses with the value for <code>`JELLYFISH_API_TOKEN`</code> that you got from Jellyfish:
-                                <p class="code-block"><code>
-                                    JELLYFISH_API_TOKEN=...
-                                </code></p>
-                            </li>
-                            <li>
-                                Then add a section to configure the agent to access your Jira system:
-                                <p class="code-block"><code>
-                                    JIRA_USERNAME=...<br/>
-                                    JIRA_PASSWORD=...
-                                </code></p>
-                                <ul>
-                                    <li>To get a value for <code>`JIRA_USERNAME`</code>, choose a Jira username that has 
-                                    read access to all of the projects you would like to use in Jellyfish.</li>
-                                    <li>
-                                        The value for <code>`JIRA_PASSWORD`</code> will vary. If you are using Jira server, 
-                                        enter the password for the user specified with <code>`JIRA_USERNAME`</code>. If you are 
-                                        using Jira Cloud, create a personal API token, following the instructions 
-                                        <a href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/">here</a>
-                                        to obtain one.
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                Next add the following section to configure to your environment variable file. This allows the agent to access your Bitbucket Server data:
-                                
-                                <br/>
-                                <p class="code-block"><code>
-                                    BITBUCKET_USERNAME=...<br/>
-                                    BITBUCKET_PASSWORD=...
-                                </code></p>
-                                <ul>
-                                    <li>
-                                        <code>`BITBUCKET_USERNAME`</code> should be your Bitbucket server's username
-                                    </li>
-                                    <li>
-                                        <code>`BITBUCKET_PASSWORD`</code> should be your Bitbucket server's password
-                                    </li>
-                                </ul>
-
-                                
-                            </li>
-                        </ul>
-
-                        <h2>3. Ensure proper network configuration</h2>
-                        <ul>
-                            <li>The agent will need to make various requests to function. Thus, we ask that you please ensure 
-                            that your network firewall/proxies are configured such that the agent is able to:</li>
-                            <ul>
-                                <li>Make GET requests to the Jellyfish API at https://app.jellyfish.co:443/</li>
-                                <li>Make GET requests to your Jira and Git host(s) on port 443</li>
-                                <li>Make POST requests to URLs under s3.amazonaws.com on port 443</li>
-                            </ul>
-                        </ul>
+                            <h2>Instructions</h2>
+                            <ol>
+                                <li>
+                                    Add the following section to configure to your environment variable file. This is the same file 
+                                    mentioned <a href="env-var-setup-guide.html">in step 2</a>. Adding the following variables allows 
+                                    the agent to access your Bitbucket Server data:                                
+                                    <br/>
+                                    <p class="code-block"><code>
+                                        BITBUCKET_USERNAME=...<br/>
+                                        BITBUCKET_PASSWORD=...
+                                    </code></p>
+                                <li>
+                                    <code>`BITBUCKET_USERNAME`</code> should be your Bitbucket server's username
+                                </li>
+                                <li>
+                                    <code>`BITBUCKET_PASSWORD`</code> should be your Bitbucket server's password
+                                </li>
+                            </ol>
+                    </div>
+                    <div class="nav-arrows">
+                        <span class="previous-page">
+                            <a href="env-var-setup-guide.html"><i class="fas fa-angle-left"></i>&nbsp;&nbsp;Step 2: Create environment variable file </a>
+                        </span>
+                        <span class="next-page">
+                            <a href="network-config-setup-guide.html">Step 3: Ensure proper network configuration &nbsp;&nbsp;<i class="fas fa-angle-right"></i></a>
+                        </span>
                     </div>
                 </main>
 
