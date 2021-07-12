@@ -4,6 +4,7 @@
         <link href="css/styles.css" rel="stylesheet" />
         <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
         <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+        <title>JF Agent Documentation</title>
         <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
         <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
@@ -47,6 +48,79 @@
                             </li>
                             </ul>
                         </p>
+                        <br/>
+                        <h2>Sample Run Commands</h2>
+                        <p>Below are some common use cases for running the agent, and their corresponding <code>`docker run`</code> commands.</p>
+                        <p><b>Please be sure to update the commands with the proper paths when copying them!</b></p>
+                        <ul>
+                        <li>
+                            Normal mode: download and send
+                            <p class="code-block"><code>
+                            docker pull jellyfishco/jf_agent:stable && \
+                            docker run --rm \
+                            --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \
+                            --env-file /full/path/creds.env \
+                            jellyfishco/jf_agent:stable
+                            </code></p>
+                        </li>
+                        <li>
+                            Download data without sending
+                            <p class="code-block"><code>
+                                docker pull jellyfishco/jf_agent:stable && docker run --rm \<br/>
+                                --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \<br/>
+                                --mount type=bind,source=/full/path/jf_agent_output,target=/home/jf_agent/output \<br/>
+                                --env-file ./creds.env \<br/>
+                                jellyfishco/jf_agent:stable -m download_only<br/>
+                            </code></p>
+                        </li>
+                        <li>
+                            Send previously downloaded data
+                            <p class="code-block"><code>
+                                docker pull jellyfishco/jf_agent:stable && docker run --rm \<br/>
+                                --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \<br/>
+                                --mount type=bind,source=/full/path/jf_agent_output,target=/home/jf_agent/output \<br/>
+                                --env-file ./creds.env \<br/>
+                                jellyfishco/jf_agent:stable -m send_only -od ./output/20190822_133513<br/>
+                            </code></p>
+                        </li>
+                        <li>
+                            Print info on Jira fields
+                            <p class="code-block"><code>
+                                docker pull jellyfishco/jf_agent:stable && docker run --rm \<br/>
+                                --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \<br/>
+                                --env-file ./creds.env \<br/>
+                                jellyfishco/jf_agent:stable -m print_all_jira_fields<br/>
+                            </code></p>
+                        </li>
+                        <li>
+                            Print Git repos apparently missing from Jellyfish
+                            <p class="code-block"><code>
+                                docker pull jellyfishco/jf_agent:stable && docker run --rm \<br/>
+                                --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \<br/>
+                                --env-file ./creds.env \<br/>
+                                jellyfishco/jf_agent:stable -m print_apparently_missing_git_repos<br/>
+                            </code></p>
+                        </li>
+                        <li>
+                            Validate configuration
+                            <p class="code-block"><code>
+                                docker pull jellyfishco/jf_agent:stable && docker run --rm \<br/>
+                                --mount type=bind,source=/full/path/ourconfig.yml,target=/home/jf_agent/config.yml \<br/>
+                                --env-file ./creds.env \<br/>
+                                jellyfishco/jf_agent:stable -m validate<br/>
+                            </code></p>
+                        </li>
+                        </ul>
+
+                        <br/>
+                        <h2>Additional execution guides</h2>
+                        <p>For details on more ways to run your agent, refer to the links below.</p>
+                        <ul>
+                            <li><a href="agent-updated.html">Keep the agent updated</a></li>
+                            <li><a href="specify-usage.html">Specify a usage mode</a></li>
+                            <li><a href="save-download.html">Save downloaded output</a></li>
+                            <li><a href="send-dataset.html">Send a downloaded dataset</a></li>
+                        </ul>
 
                     </div>
                 </main>
