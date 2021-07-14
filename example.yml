@@ -176,6 +176,14 @@ git:
   # exclude_repos:
   #    - repo_to_skip
 
+  # Uncomment this to pull commit data from each of the specified branches for each repository.
+  # By default, we will pull commit data from only the default branch of a repository.
+  # include_branches: 
+  #    - my_repository: 
+  #      - master
+  #      - develop
+
+
   # Strip out long-form text content (commit messages, PR text, etc).
   strip_text_content: False
 
