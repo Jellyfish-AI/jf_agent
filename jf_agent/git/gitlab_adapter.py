@@ -180,10 +180,10 @@ class GitLabAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_commits_for_included_branches(
-        self, normalized_repos: List[NormalizedRepository], included_branches: dict, server_git_instance_info,
+    def get_default_branch_commits(
+        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
     ) -> List[NormalizedCommit]:
-        print('downloading gitlab commits on included branches... ', end='', flush=True)
+        print('downloading gitlab default branch commits... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(

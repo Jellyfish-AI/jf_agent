@@ -2,8 +2,6 @@ from dateutil import parser
 import logging
 from tqdm import tqdm
 
-import pdb
-
 from jf_agent.git import (
     GithubClient,
     NormalizedBranch,
