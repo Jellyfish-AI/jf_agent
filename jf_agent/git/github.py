@@ -276,8 +276,6 @@ def get_commits_for_included_branches(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
             )
 
-            # Find branches for which we should pull commits, specified by customer in config.
-            # If specific branches are not specified, just pull from default branch.
             branches = repo_name_to_branch_names[repo['name']]
             for branch in branches:
                 try:
