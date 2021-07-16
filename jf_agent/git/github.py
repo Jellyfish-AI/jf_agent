@@ -305,7 +305,7 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
         )
         if api_merge_commit:
             return _normalize_commit(
-                api_merge_commit, pr['base']['repo'], pr['head']['ref'], strip_text_content, redact_names_and_urls
+                api_merge_commit, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls
             )
         else:
             return None
@@ -343,7 +343,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
             _normalize_user(client.get_json(pr['merged_by']['url'])) if pr['merged'] else None
         ),
         commits=[
-            _normalize_commit(c, pr['base']['repo'], pr['head']['ref'], strip_text_content, redact_names_and_urls)
+            _normalize_commit(c, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls)
             for c in tqdm(
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
                 f'downloading commits for PR {pr["number"]}',
