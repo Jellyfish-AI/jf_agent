@@ -184,9 +184,9 @@ git:
   # Note: This is currently only supported for Github users. BitBucket and Gitlab commits
   # will only be pulled for the default branch of a repository.
   # include_branches: 
-  #    - my_repository: 
-  #      - master
-  #      - develop
+  #   my_repository: 
+  #     - master
+  #     - develop
 
   # Strip out long-form text content (commit messages, PR text, etc).
   strip_text_content: False
