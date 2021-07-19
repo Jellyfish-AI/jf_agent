@@ -160,6 +160,8 @@ def main():
             print(f"  Included Repos: {git_config.git_include_repos}")
             if len(git_config.git_exclude_repos) > 0:
                 print(f"  Excluded Repos: {git_config.git_exclude_repos}")
+            if len(git_config.git_include_branches) > 0:
+                print(f"  Included Branches: {git_config.git_include_branches}")
 
             print('==> Testing Git connection...')
 
@@ -184,6 +186,12 @@ def main():
                         print(
                             f"  WARNING: {repo} is explicitly defined as an included repo, but Agent doesn't have"
                             f" proper permissions to view this repository."
+                        )
+                for repo in git_config.git_include_branches.keys():
+                    if repo not in all_repos:
+                        print(
+                            f"  WARNING: {repo} is explicitly defined as a repo for which specific branches should be" 
+                            f" processed, but Agent doesn't have proper permissions to view this repository."
                         )
 
             except Exception as e:
