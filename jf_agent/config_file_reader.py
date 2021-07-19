@@ -21,7 +21,6 @@ class GitConfig:
     git_exclude_projects: List
     git_include_repos: List
     git_exclude_repos: List
-    git_include_branches: dict
     git_strip_text_content: bool
     git_redact_names_and_urls: bool
     gitlab_per_page_override: bool
@@ -286,7 +285,6 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_exclude_bbcloud_projects = set(git_config.get('exclude_bitbucket_cloud_projects', []))
     git_include_repos = set(git_config.get('include_repos', []))
     git_exclude_repos = set(git_config.get('exclude_repos', []))
-    git_include_branches = dict(git_config.get('include_branches', {}))
 
     if multiple and not git_instance_slug:
         print('ERROR: Git `instance_slug` is required for multiple Git instance mode.')
@@ -344,7 +342,6 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_exclude_projects=list(git_exclude_projects),
         git_include_repos=list(git_include_repos),
         git_exclude_repos=list(git_exclude_repos),
-        git_include_branches=dict(git_include_branches),
         git_strip_text_content=git_config.get('strip_text_content', False),
         git_redact_names_and_urls=git_config.get('redact_names_and_urls', False),
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
