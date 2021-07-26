@@ -83,10 +83,80 @@ class TestGithub(TestCase):
 
     def test_get_branch_commits(self):
         # Arrange
-        return None
+        test_repos = _get_test_data('test_repos.json')
+        test_commits = _get_test_data('test_commits.json')
+        
+        mock_client = MagicMock()
+        mock_client.get_commits.return_value = test_commits
+
+        # Set pull_from to very far in the past to ensure fake timestamps in test commits are after this date. 
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+        
+        # Act
+        result_commits = list(github.get_default_branch_commits(mock_client, test_repos, False, test_git_instance_info, False))
+
+        # Assert
+        self.assertEqual(len(result_commits), 1, "commit size should be 1")
+        for idx, test_commit in enumerate(test_commits):
+            result_commit = result_commits[idx]
+            self.assertEqual(result_commit.hash, test_commit['sha'], "resulting commit hash does not match input")
+            self.assertEqual(result_commit.author.id, test_commit['author']['id'], "resulting author does not match input")
+            self.assertEqual(result_commit.url, test_commit['html_url'], "resulting url does not match input")
+            self.assertEqual(result_commit.message, test_commit['commit']['message'], "resulting message does not match input")
+            self.assertFalse(result_commit.is_merge)
+
+            expected_repo = test_repos[0]
+            self.assertEqual(result_commit.repo.id, expected_repo['id'], "resulting repo id does not match input")
+            self.assertEqual(result_commit.repo.name, expected_repo['name'], "resulting repo name does not match input")
+            self.assertEqual(result_commit.repo.url, expected_repo['html_url'], "resulting repo links do not match input")
+
+
     def test_get_pull_requests(self):
         # Arrange
-        return None
+        test_users = _get_test_data('test_users.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_prs = _get_test_data('test_prs.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_client.get_pullrequests.return_value = test_prs
+        mock_client.get_pr_commits.return_value = test_commits
+        mock_client.get_json.return_value = test_users[0]
+
+        # Set pull_from to very far in the past to ensure fake timestamps in test commits are after this date. 
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+        
+        # Act
+        result_prs = list(github.get_pull_requests(mock_client, test_repos, False, test_git_instance_info, False))
+
+        # Assert
+        self.assertEqual(len(result_prs), 1, "Pr size should be 1")
+        result_pr = result_prs[0]
+        test_pr = test_prs[0]
+        self.assertEqual(result_pr.id, test_pr['number'], "resulting pr id does not match input")
+        self.assertEqual(result_pr.additions, test_pr['additions'], "resulting pr additions does not match input")
+        self.assertEqual(result_pr.deletions, test_pr['deletions'], "resulting pr deletions does not match input")
+        self.assertEqual(result_pr.changed_files, test_pr['changed_files'], "resulting pr changed_files does not match input")
+        self.assertEqual(result_pr.created_at, test_pr['created_at'], "resulting pr created_at does not match input")
+        self.assertEqual(result_pr.updated_at, test_pr['updated_at'], "resulting pr updated_at does not match input")
+        self.assertEqual(result_pr.merge_date, test_pr['merged_at'], "resulting pr merge_date does not match input")
+        self.assertEqual(result_pr.closed_date, test_pr['closed_at'], "resulting pr closed_date does not match input")
+        self.assertEqual(result_pr.title, test_pr['title'], "resulting pr title does not match input")
+        self.assertEqual(result_pr.body, test_pr['body'], "resulting pr body does not match input")
+        self.assertEqual(result_pr.url, test_pr['html_url'], "resulting pr url does not match input")
+        self.assertEqual(result_pr.base_branch, test_pr['base']['ref'], "resulting pr base_branch does not match input")
+        self.assertEqual(result_pr.head_branch, test_pr['head']['ref'], "resulting pr head_branch does not match input")
+        self.assertEqual(result_pr.author.id, test_users[0]['id'], "resulting pr author id does not match input")
+        self.assertEqual(len(result_pr.commits), len(test_commits), "resulting pr commits length does not match input")
+        self.assertEqual(result_pr.commits[0].hash, test_commits[0]['sha'], "resulting pr commit hash does not match input")
+        self.assertEqual(result_pr.base_repo.id, test_pr['base']['repo']['id'], "resulting pr base repo id does not match input")
+        self.assertEqual(result_pr.head_repo.id, test_pr['head']['repo']['id'], "resulting pr head repo id does not match input")
+
+        self.assertFalse(result_pr.is_closed)
+        self.assertFalse(result_pr.is_merged)
+
+        self.assertIsNone(result_pr.merge_commit)
+
 
 def _get_test_data(file_name):
     with open(f'tests/test_data/github/{file_name}', 'r') as f:

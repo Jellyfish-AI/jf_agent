@@ -96,9 +96,9 @@ class TestBitbucketServer(TestCase):
         test_branches = _get_test_data('test_branches.json')
         test_commits = _get_test_data('test_commits.json')
         
-        mock_client = MagicMock(name="mock_client")
-        mock_project = MagicMock(name="mock_project")
-        mock_api_repo = MagicMock(name="mock_api_repo")
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_api_repo = MagicMock()
         mock_api_repos = [mock_api_repo]
 
         mock_api_repo.get.return_value = test_repos[0]
@@ -136,9 +136,9 @@ class TestBitbucketServer(TestCase):
         test_repos = _get_test_data('test_repos.json')
         test_commits = _get_test_data('test_commits.json')
 
-        mock_client = MagicMock(name="mock_client")
-        mock_project = MagicMock(name="mock_project")
-        mock_api_repo = MagicMock(name="mock_api_repo")
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_api_repo = MagicMock()
         mock_api_repos = [mock_api_repo]
 
         mock_api_repo.get.return_value = test_repos[0]

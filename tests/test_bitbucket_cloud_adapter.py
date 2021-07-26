@@ -1,3 +1,4 @@
+from jf_agent.git import NormalizedShortRepository
 import json
 import unittest
 from dateutil import parser
@@ -82,8 +83,10 @@ class TestBitbucketCloudAdapter(TestCase):
         # Arrange
         test_commits = _get_test_data('test_commits.json')
 
-        mock_normalized_project = MagicMock()
-        mock_normalized_projects = [mock_normalized_project]
+        mock_normalized_repo = MagicMock(name='hi lukas')
+        test_short_repo = NormalizedShortRepository(id='test_id', name='test_name', url='test_url')
+        mock_normalized_repo.short.return_value = test_short_repo
+        mock_normalized_repos = [mock_normalized_repo]
 
         self.mock_client.get_commits.return_value = test_commits
 
@@ -91,7 +94,7 @@ class TestBitbucketCloudAdapter(TestCase):
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
         # Act
-        resulting_commits = list(self.adapter.get_default_branch_commits(mock_normalized_projects, test_git_instance_info))
+        resulting_commits = list(self.adapter.get_default_branch_commits(mock_normalized_repos, test_git_instance_info))
 
         # Assert
         self.assertEqual(len(resulting_commits), 1, "Resulting commits should be a list of size 1")
@@ -102,7 +105,9 @@ class TestBitbucketCloudAdapter(TestCase):
         self.assertEqual(resulting_commit.url, input_commit['links']['html']['href'], "Resulting commit url does not match input")
         self.assertEqual(resulting_commit.commit_date, parser.parse(input_commit['date']), "Resulting commit date does not match input")
         self.assertEqual(resulting_commit.message, input_commit['message'], "Resulting commit message does not match input")
-        self.assertEqual(resulting_commit.repo.id, input_commit['repository']['uuid'], "Resulting commit's repo does not match input")
+        self.assertEqual(resulting_commit.repo.id, test_short_repo.id, "Resulting commit's repo id does not match input")
+        self.assertEqual(resulting_commit.repo.name, test_short_repo.name, "Resulting commit's repo name does not match input")
+        self.assertEqual(resulting_commit.repo.url, test_short_repo.url, "Resulting commit's repo url does not match input")
         self.assertFalse(resulting_commit.is_merge)
         self.assertIsNone(resulting_commit.author_date)
 
