@@ -198,7 +198,7 @@ def _normalize_repo(api_project, api_repo, redact_names_and_urls):
         'project': _normalize_project(api_project, redact_names_and_urls),
     }
 
-
+@agent_logging.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     print('downloading bitbucket repositories... ', end='', flush=True)
 

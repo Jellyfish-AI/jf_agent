@@ -456,7 +456,7 @@ def _normalize_pr(
             repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
         )
         merge_commit = _normalize_commit(
-            api_merge_commit, repo, api_pr['destination']['branch']['name'], strip_text_content, redact_names_and_urls
+            api_merge_commit, repo, strip_text_content, redact_names_and_urls
         )
 
     # Repo links
