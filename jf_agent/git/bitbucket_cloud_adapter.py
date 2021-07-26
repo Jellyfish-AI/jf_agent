@@ -313,7 +313,7 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_commit(
-    api_commit, normalized_repo, branch_name, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = _normalize_user(api_commit['author'])
     commit_url = api_commit['links']['html']['href'] if not redact_names_and_urls else None
@@ -441,9 +441,8 @@ def _normalize_pr(
             raise
 
     # Commits
-    banch_name = api_pr['destination']['branch']['name']
     commits = [
-        _normalize_commit(c, repo, banch_name, strip_text_content, redact_names_and_urls)
+        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
     merge_commit = None

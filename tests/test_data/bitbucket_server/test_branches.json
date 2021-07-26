@@ -1,0 +1,18 @@
+[
+    {
+      "id": "test_id1",
+      "displayId": "test_display_id1",
+      "type": "BRANCH",
+      "latestCommit": "21575f4cc76d2d98f3dd7413d893589ceeceb575",
+      "latestChangeset": "21575f4cc76d2d98f3dd7413d893589ceeceb575",
+      "isDefault": true
+    },
+    {
+      "id": "test_id2",
+      "displayId": "test_display_id2",
+      "type": "BRANCH",
+      "latestCommit": "bcb22a100d8a684576b4f42ed0c36147e6ed902d",
+      "latestChangeset": "bcb22a100d8a684576b4f42ed0c36147e6ed902d",
+      "isDefault": false
+    }
+  ]

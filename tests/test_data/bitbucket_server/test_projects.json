@@ -1,0 +1,14 @@
+[{
+    "key": "test_project_key",
+    "id": 1,
+    "name": "test_project_name",
+    "public": false,
+    "type": "NORMAL",
+    "links": {
+      "self": [
+        {
+          "href": "https://bitbucket.test.com/projects/test_project"
+        }
+      ]
+    }
+}]
