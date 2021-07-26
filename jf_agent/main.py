@@ -12,7 +12,6 @@ import sys
 import requests
 import json
 
-
 from jf_agent import (
     agent_logging,
     diagnostics,
