@@ -192,9 +192,6 @@ def _validate_jira(config, creds):
     """
     from jf_jira import _get_raw_jira_connection
 
-    if not config.jira_url or (not creds.jira_username and creds.jira_password):
-        print('Jira URL or Jira credentials missing. Skipping over jira validation...')
-
     print('Jira details:')
     print(f'  Jira URL:      {config.jira_url}')
     print(f'  Jira Username: {creds.jira_username}')
