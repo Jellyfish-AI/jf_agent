@@ -1,9 +1,12 @@
 import json
 import unittest
+
 from unittest import TestCase
 from unittest.mock import MagicMock
 
 from jf_agent.git import bitbucket_server
+
+TEST_INPUT_FILE_PATH = f'tests/test_data/bitbucket_server/'
 
 class TestBitbucketServer(TestCase):
 
@@ -17,7 +20,7 @@ class TestBitbucketServer(TestCase):
         result_users = bitbucket_server.get_users(mock_client)
 
         # Assert
-        self.assertEqual(len(result_users), 2, "Should be user list of size 2")
+        self.assertEqual(len(result_users), len(test_users), f"Should be user list of size {test_users}")
         for idx, resulting_user in enumerate(result_users):
             input_user = test_users[idx]
             self.assertEqual(resulting_user.get('id'), input_user.get('id'), "user ids should match")
@@ -35,7 +38,7 @@ class TestBitbucketServer(TestCase):
         result_projects = bitbucket_server.get_projects(mock_client, {}, {}, False)
         
         # Assert
-        self.assertEqual(len(result_projects), 1, "project size should be 1")
+        self.assertEqual(len(result_projects), len(test_projects), f"project size should be {len(test_projects)}")
 
         # get_projects returns a list of (api_object, normalized_project). Use the normalized version for verification.
         result_project = result_projects[0][1]
@@ -70,7 +73,7 @@ class TestBitbucketServer(TestCase):
         result_repos = list(bitbucket_server.get_repos(mock_client, test_projects, {}, {}, False))
 
         # Assert
-        self.assertEqual(len(result_repos), 1, "repo size should be 1")
+        self.assertEqual(len(result_repos), len(test_repos), f"repo size should be {len(test_repos)}")
         self.assertEqual(result_repos[0][0], mock_repo, "resulting tuple should have input mock as first element")
 
         # get_repos returns a list of (api_object, normalized_project). Use the normalized version for verification.
@@ -115,7 +118,7 @@ class TestBitbucketServer(TestCase):
         result_commits = list(bitbucket_server.get_default_branch_commits(mock_client, mock_api_repos, False, test_git_instance_info, False, False))
 
         # Assert
-        self.assertEqual(len(result_commits), 2, "commit size should be 2")
+        self.assertEqual(len(result_commits), len(test_commits), f"commit size should be {len(test_commits)}")
         for idx, test_commit in enumerate(test_commits):
             result_commit = result_commits[idx]
             self.assertEqual(result_commit['hash'], test_commit['id'], "resulting commit hash does not match input")
@@ -156,7 +159,7 @@ class TestBitbucketServer(TestCase):
         result_prs = list(bitbucket_server.get_pull_requests(mock_client, mock_api_repos, False, test_git_instance_info, False, False))
 
         # Assert
-        self.assertEqual(len(result_prs), 1, "PR size should be 1")
+        self.assertEqual(len(result_prs), len(test_prs), f"PR size should be {len(test_prs)}")
         result_pr = result_prs[0]
         input_pr = test_prs[0]
         self.assertEqual(result_pr['id'], input_pr['id'], "resulting PR id does not match input")
@@ -172,7 +175,7 @@ class TestBitbucketServer(TestCase):
         self.assertEqual(result_pr['head_branch'], input_pr['fromRef']['displayId'], "resulting PR body does not match input")
 
 def _get_test_data(file_name):
-    with open(f'tests/test_data/bitbucket_server/{file_name}', 'r') as f:
+    with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
 
 if __name__ == "__main__":

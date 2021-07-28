@@ -1,11 +1,14 @@
-from jf_agent.git import NormalizedShortRepository
 import json
 import unittest
+
 from dateutil import parser
 from unittest import TestCase
 from unittest.mock import MagicMock
 
+from jf_agent.git import NormalizedShortRepository
 from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
+
+TEST_INPUT_FILE_PATH = f'tests/test_data/bitbucket_cloud/'
 
 class TestBitbucketCloudAdapter(TestCase):
 
@@ -39,7 +42,7 @@ class TestBitbucketCloudAdapter(TestCase):
         resulting_projects = self.adapter.get_projects()
     
         # Assert
-        self.assertEqual(len(resulting_projects), 2, "Should be project list of size 2")
+        self.assertEqual(len(resulting_projects), len(input_projects), f"Should be project list of size {len(input_projects)}")
 
         for idx, resulting_project in enumerate(resulting_projects):
             self.assertEqual(resulting_project.id, input_projects[idx], "Project id should be the same as the input project name")
@@ -62,7 +65,7 @@ class TestBitbucketCloudAdapter(TestCase):
         resulting_repos = self.adapter.get_repos(mock_normalized_projects)
 
         # Assert
-        self.assertEqual(len(resulting_repos), 1, "Resulting repos should be a list of size 1")
+        self.assertEqual(len(resulting_repos), len(test_repos), f"Resulting repos should be a list of size {len(test_repos)}")
         resulting_repo = resulting_repos[0]
         input_repo = test_repos[0]
         self.assertEqual(resulting_repo.id, input_repo['uuid'], "Resulting repo id does not match input")
@@ -73,7 +76,7 @@ class TestBitbucketCloudAdapter(TestCase):
         self.assertEqual(resulting_repo.default_branch_name, input_repo['mainbranch']['name'], "Resulting repo default_branch_name does not match input")
         self.assertEqual(resulting_repo.project, mock_normalized_project, "Resulting repo project does not match input")
 
-        self.assertEqual(len(resulting_repo.branches), 1, "Resulting repo should have 1 branch")
+        self.assertEqual(len(resulting_repo.branches), len(test_branches), f"Resulting repo should have {len(test_branches)} branch")
         resulting_branch = resulting_repo.branches[0]
         input_branch = test_branches[0]
         self.assertEqual(resulting_branch.name, input_branch['name'], "Resulting branch name does not match input")
@@ -83,7 +86,7 @@ class TestBitbucketCloudAdapter(TestCase):
         # Arrange
         test_commits = _get_test_data('test_commits.json')
 
-        mock_normalized_repo = MagicMock(name='hi lukas')
+        mock_normalized_repo = MagicMock()
         test_short_repo = NormalizedShortRepository(id='test_id', name='test_name', url='test_url')
         mock_normalized_repo.short.return_value = test_short_repo
         mock_normalized_repos = [mock_normalized_repo]
@@ -97,7 +100,7 @@ class TestBitbucketCloudAdapter(TestCase):
         resulting_commits = list(self.adapter.get_default_branch_commits(mock_normalized_repos, test_git_instance_info))
 
         # Assert
-        self.assertEqual(len(resulting_commits), 1, "Resulting commits should be a list of size 1")
+        self.assertEqual(len(resulting_commits), len(test_commits), f"Resulting commits should be a list of size {len(test_commits)}")
         resulting_commit = resulting_commits[0]
         input_commit = test_commits[0]
         self.assertEqual(resulting_commit.hash, input_commit['hash'], "Resulting commit hash does not match input")
@@ -133,7 +136,7 @@ class TestBitbucketCloudAdapter(TestCase):
         resulting_prs = list(self.adapter.get_pull_requests(mock_normalized_repos, test_git_instance_info))
 
         # Assert
-        self.assertEqual(len(resulting_prs), 1, "Resulting prs should be a list of size 1")
+        self.assertEqual(len(resulting_prs), len(test_prs), f"Resulting prs should be a list of size {len(test_prs)}")
         resulting_pr = resulting_prs[0]
         input_pr = test_prs[0]
         self.assertEqual(resulting_pr.id, input_pr['id'], "Resulting pr id does not match input")
@@ -143,15 +146,15 @@ class TestBitbucketCloudAdapter(TestCase):
         self.assertEqual(resulting_pr.base_branch, input_pr['destination']['branch']['name'], "Resulting pr base branch does not match input")
         self.assertEqual(resulting_pr.head_branch, input_pr['source']['branch']['name'], "Resulting pr head branch does not match input")
         self.assertEqual(resulting_pr.author.name, input_pr['author']['display_name'], "Resulting pr author name does not match input")
-        self.assertEqual(len(resulting_pr.commits), 1, "Resulting pr should have 1 commit")
+
+        self.assertEqual(len(resulting_pr.commits), len(test_commits), f"Resulting pr should have {len(test_commits)} commit")
         self.assertEqual(resulting_pr.commits[0].hash, test_commits[0]['hash'], "Resulting pr should have hash matching input commit")
         self.assertFalse(resulting_pr.is_closed)
         self.assertFalse(resulting_pr.is_merged)
         
 
-
 def _get_test_data(file_name):
-    with open(f'tests/test_data/bitbucket_cloud/{file_name}', 'r') as f:
+    with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
 
 if __name__ == "__main__":

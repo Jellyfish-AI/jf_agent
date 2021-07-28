@@ -1,9 +1,12 @@
 import json
 import unittest
+
 from unittest import TestCase
 from unittest.mock import MagicMock
 
 from jf_agent.git import github
+
+TEST_INPUT_FILE_PATH = f'tests/test_data/github/'
 
 class TestGithub(TestCase):
 
@@ -159,7 +162,7 @@ class TestGithub(TestCase):
 
 
 def _get_test_data(file_name):
-    with open(f'tests/test_data/github/{file_name}', 'r') as f:
+    with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
 
 if __name__ == "__main__":

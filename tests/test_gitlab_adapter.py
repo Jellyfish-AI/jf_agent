@@ -1,13 +1,14 @@
-import collections
-from jf_agent.git import NormalizedShortRepository
 import json
-from typing import NamedTuple
 import unittest
+
+from collections import namedtuple
 from unittest import TestCase
-from unittest import result
 from unittest.mock import MagicMock
 
+from jf_agent.git import NormalizedShortRepository
 from jf_agent.git.gitlab_adapter import GitLabAdapter
+
+TEST_INPUT_FILE_PATH = f'tests/test_data/gitlab/'
 
 class TestGitLabAdapter(TestCase):
 
@@ -35,7 +36,7 @@ class TestGitLabAdapter(TestCase):
         resulting_users = self.adapter.get_users()
     
         # Assert
-        self.assertEqual(len(resulting_users), 2, "Users should be a list of size 2")
+        self.assertEqual(len(resulting_users), len(test_users), f"Users should be a list of size {len(test_users)}")
 
         for idx, test_user in enumerate(test_users):
             result_user = resulting_users[idx]
@@ -49,14 +50,14 @@ class TestGitLabAdapter(TestCase):
         # Arrange
         test_groups = _get_test_data('test_groups.json')
         # Convert to named tuple to make fields accessible with dot notation 
-        api_group = collections.namedtuple('api_group', test_groups[0].keys())(*test_groups[0].values())
+        api_group = namedtuple('api_group', test_groups[0].keys())(*test_groups[0].values())
         self.mock_client.get_group.return_value = api_group
 
         # Act
         resulting_projects = self.adapter.get_projects()
     
         # Assert
-        self.assertEqual(len(resulting_projects), 1, "Projects should be a list of size 1")
+        self.assertEqual(len(resulting_projects), len(test_groups), f"Projects should be a list of size {len(test_groups)}")
 
         resulting_project = resulting_projects[0]
         test_group = test_groups[0]
@@ -78,7 +79,7 @@ class TestGitLabAdapter(TestCase):
         resulting_branches = self.adapter.get_branches(mock_api_repo)
     
         # Assert
-        self.assertEqual(len(resulting_branches), 1, "Branches should be a list of size 1")
+        self.assertEqual(len(resulting_branches), len(test_branches), f"Branches should be a list of size {len(test_branches)}")
 
         resulting_branch = resulting_branches[0]
         test_branch = test_branches[0]
@@ -106,7 +107,7 @@ class TestGitLabAdapter(TestCase):
         resulting_repos = self.adapter.get_repos(resulting_projects)
     
         # Assert
-        self.assertEqual(len(resulting_repos), 1, "Repos should be a list of size 1")
+        self.assertEqual(len(resulting_repos), len(test_repos), f"Repos should be a list of size {len(test_repos)}")
 
         resulting_repo = resulting_repos[0]
         test_repo = test_repos[0]
@@ -116,7 +117,7 @@ class TestGitLabAdapter(TestCase):
         self.assertEqual(resulting_repo.url, test_repo['web_url'], "resulting repo id does not match input")
         self.assertEqual(resulting_repo.default_branch_name, test_repo['default_branch'], "resulting repo default branch does not match input")
 
-        self.assertEqual(len(resulting_repo.branches), 1, "resulting branch list should a list of size 1")
+        self.assertEqual(len(resulting_repo.branches), len(test_branches), f"resulting branch list should a list of size {len(test_branches)}")
         result_branch = resulting_repo.branches[0]
         test_branch = test_branches[0]
         self.assertEqual(result_branch.name, test_branch['name'], "resulting branch name does not match input")
@@ -151,7 +152,7 @@ class TestGitLabAdapter(TestCase):
         resulting_commits = list(self.adapter.get_default_branch_commits(mock_repos, test_git_instance_info))
 
         # Assert
-        self.assertEqual(len(resulting_commits), 1, "Commits should be a list of size 1")
+        self.assertEqual(len(resulting_commits), len(test_commits), f"Commits should be a list of size {len(test_commits)}")
 
         result_commit = resulting_commits[0]
         test_commit = test_commits[0]
@@ -183,12 +184,12 @@ class TestGitLabAdapter(TestCase):
         # Set pull_from to very far in the past to ensure fake timestamps in test commits are after this date. 
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
-        mock_pr = MagicMock(name="magic PR")
+        mock_pr = MagicMock()
         mock_pr.commit_list = [api_commit]
         mock_pr.updated_at = "2017-04-29T08:46:00Z"
         mock_pr.state = 'closed'
 
-        mock_prs = MagicMock(name="magic PRs")
+        mock_prs = MagicMock()
         mock_prs.total = 1
         mock_prs.__iter__.return_value = [mock_pr]
         
@@ -215,7 +216,7 @@ class TestGitLabAdapter(TestCase):
         self.assertEqual(resulting_pr.title, mock_pr.title, "resulting pr title does not match input")
         self.assertEqual(resulting_pr.body, mock_pr.description, "resulting pr body does not match input")
 
-        self.assertEqual(len(resulting_pr.commits), 1, "Pr commits should be a list of size 1")
+        self.assertEqual(len(resulting_pr.commits), len(test_commits), f"Pr commits should be a list of size {len(test_commits)}")
         pr_commit = resulting_pr.commits[0]
         test_commit = test_commits[0]
         self.assertEqual(pr_commit.hash, test_commit['id'], "resulting pr commit hash does not match input")
@@ -223,7 +224,7 @@ class TestGitLabAdapter(TestCase):
         self.assertFalse(pr_commit.is_merge)
 
 def _get_test_data(file_name):
-    with open(f'tests/test_data/gitlab/{file_name}', 'r') as f:
+    with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
 
 if __name__ == "__main__":
