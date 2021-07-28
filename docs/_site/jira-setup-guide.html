@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+        <title>JF Agent Documentation</title>
+        <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
+        <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
+    <body class="sb-nav-fixed">
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_content">
+                <main class="page-detail-wrapper">
+                    <h1 class="page-title">Jira Environment Variable Setup Guide</h1>
+                    <div class="page-blurb">On this page, you will find a step-by-step guide on how to setup the JF agent to work with Jira.</div>
+
+                    <div class="page-body-text">
+                        <h2 id="details">Details</h2>
+
+<p>This is where you’ll add and populate your environmental variables file for Jira.  If you want your Git instance to work with the agent, see the setup guide corresponding to the type of Git instance you have - it will include Jira instructions as well.</p>
+
+<h2 id="instructions">Instructions</h2>
+
+<ol>
+  <li>Add the following section to your environment variable file. This is the same file mentioned <a href="env-var-setup-guide.html">in step 2</a>. Adding the following variables allows the agent to access your Jira data:
+    <p class="code-block"><code>
+     JIRA_USERNAME=...<br />
+     JIRA_PASSWORD=...
+ </code></p>
+  </li>
+  <li>
+    <p>Get a value for <code class="language-plaintext highlighter-rouge">JIRA_USERNAME</code>. Choose a Jira username that has read access to all of the projects you would like to use in Jellyfish.</p>
+  </li>
+  <li>
+    <p>The value for <code class="language-plaintext highlighter-rouge">JIRA_PASSWORD</code> will vary. If you are using Jira server, enter the password for the user specified with <code class="language-plaintext highlighter-rouge">JIRA_USERNAME</code>. If you are using Jira Cloud, create a personal API token, following the instructions <a href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/">here</a>.</p>
+  </li>
+  <li>If you have additional systems not yet configured in your environment variable file, refer back to <a href="env-var-setup-guide.html">step 2</a> to set up your other systems.</li>
+</ol>
+
+                    </div>
+
+                    <div class="nav-arrows">
+                        <span class="previous-page" style="">
+                            <a href="env-var-setup-guide.html"><i class="fas fa-angle-left"></i>&nbsp;&nbsp; Step 2&#58; Create environment variable file</a>
+                        </span>
+                        <span class="next-page" style="">
+                            <a href="network-config-setup-guide.html">Step 3&#58; Ensure proper network configuration &nbsp;&nbsp;<i class="fas fa-angle-right"></i></a>
+                        </span>
+                    </div>
+                </main>
+
+                <footer class="footer pt-5 pb-5 mt-auto bg-dark footer-dark">
+                    <div class="container footer-container">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="mb-3">Find us on:</div>
+                                <div class="icon-list-social mb-3">
+                                    <a class="icon-list-social-link" href="https://www.linkedin.com/company/jellyfish-co/mycompany/"><i class="fab fa-linkedin-in"></i></a><a class="icon-list-social-link" href="https://github.com/Jellyfish-AI"><i class="fab fa-github"></i></a><a class="icon-list-social-link" href="https://twitter.com/jellyfishhq"><i class="fab fa-twitter"></i></a>
+                                </div>
+                            </div>
+                            <div class="col-lg-9"><div class="row"></div></div>
+                        </div>
+                        <hr class="my-2 mb-3" />
+                        <div class="row align-items-center">
+                            <div class="col-md-6 small">Copyright &copy; Jellyfish 2021</div>
+                            <div class="col-md-6 text-md-right small"></div>
+                        </div>
+                    </div>
+                </footer>
+
+            </div>
+        </div>
+    </body>
+
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        $(document).ready(async function() {
+            // Get index.html content
+            var templates = document.createElement('template');
+            const response = await fetch('index.html');
+            const result = await response.text();
+            templates.innerHTML = result;
+
+            // Get nav bar template from index.html and put it on the page
+            var template = templates.content.querySelector('#navTemplate'); 
+            console.log(template);
+            var clone = template.content.cloneNode(true);
+            document.getElementById("layoutSidenav").appendChild(clone);
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+
+</html>

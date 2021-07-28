@@ -1,0 +1,6 @@
+I"•<p>The usage mode is provided to the agent via the <code class="language-plaintext highlighter-rouge">-m</code> argument. The value should be one of: <code class="language-plaintext highlighter-rouge">download_and_send</code>, <code class="language-plaintext highlighter-rouge">download_only</code>, <code class="language-plaintext highlighter-rouge">send_only</code>, <code class="language-plaintext highlighter-rouge">print_all_jira_fields</code>, <code class="language-plaintext highlighter-rouge">print_apparently_missing_git_repos</code>, or <code class="language-plaintext highlighter-rouge">validate</code>.</p>
+
+<p>If you donâ€™t provide a <code class="language-plaintext highlighter-rouge">-m</code> argument, the <code class="language-plaintext highlighter-rouge">download_and_send</code> mode is used.</p>
+
+<p>You can see more details about the various usage modes <a href="usage-modes.html">here</a>.</p>
+:ET

@@ -1,0 +1,31 @@
+I"–<h2 id="details">Details</h2>
+
+<p>This is where youâ€™ll add and populate your environmental variables file for multiple Git instances</p>
+
+<h2 id="instructions">Instructions</h2>
+
+<ol>
+  <li>
+    <p>You will want to add environment variables for each Git instance you have, to configure your environment variable file. This is the same file mentioned <a href="env-var-setup-guide.html">in step 2</a>. Adding the variables allows the agent to access your Git data.</p>
+
+    <p>With multiple git instances, all git credentials must be prefixed with the corresponding <code class="language-plaintext highlighter-rouge">creds_envvar_prefix</code> provided in the <code class="language-plaintext highlighter-rouge">config.yml</code>.</p>
+
+    <p>For example, if the <code class="language-plaintext highlighter-rouge">creds_envvar_prefix</code> is set to <code class="language-plaintext highlighter-rouge">ORG1</code> for a Bitbucket instance, the configuration would include the following variables:</p>
+    <p class="code-block"><code>
+     ORG1_BITBUCKET_USERNAME=...<br />
+     ORG1_BITBUCKET_PASSWORD=...
+ </code></p>
+
+    <p>When in multi-git mode, <code class="language-plaintext highlighter-rouge">creds_envvar_prefix</code> is required for all git instances. See the <code class="language-plaintext highlighter-rouge">example.yml</code> from <a href="yaml-config-setup-guide.html">Step 1</a> of this setup guide for more details.</p>
+  </li>
+  <li>For each of your Git instances, add the appropriate environment variables from the choices below.
+    <ul>
+      <li><a href="github-setup-guide.html">GitHub Environment Variables Setup Guide</a></li>
+      <li><a href="gitlab-setup-guide.html">GitLab Environment Variables Setup Guide</a></li>
+      <li><a href="bitbucket-server-setup-guide.html">Bitbucket Server Environment Variables Setup Guide</a></li>
+      <li><a href="bitbucket-cloud-setup-guide.html">Bitbucket Cloud Environment Variables Setup Guide</a></li>
+    </ul>
+  </li>
+  <li>If you have additional systems, such as Jira, not yet configured in your environment variable file, refer back to <a href="env-var-setup-guide.html">step 2</a> to set up your other systems.</li>
+</ol>
+:ET

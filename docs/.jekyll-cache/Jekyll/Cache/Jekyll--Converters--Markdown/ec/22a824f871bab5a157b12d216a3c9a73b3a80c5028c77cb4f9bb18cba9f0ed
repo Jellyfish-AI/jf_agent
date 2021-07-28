@@ -1,0 +1,22 @@
+I"½<h2 id="details">Details</h2>
+
+<p>This is where youâ€™ll add and populate your environmental variables file for Bitbucket Cloud.</p>
+
+<h2 id="instructions">Instructions</h2>
+
+<ol>
+  <li>Add the following section to your environment variable file. This is the same file mentioned <a href="env-var-setup-guide.html">in step 2</a>. Adding the following variables allows the agent to access your Bitbucket Cloud data:
+    <p class="code-block"><code>
+     BITBUCKET_CLOUD_USERNAME=...<br />
+     BITBUCKET_CLOUD_APP_PASSWORD=...
+ </code></p>
+  </li>
+  <li>
+    <p>Use your Bitbucket Cloud username as the value for <code class="language-plaintext highlighter-rouge">BITBUCKET_CLOUD_USERNAME</code></p>
+  </li>
+  <li>
+    <p>Get the value for <code class="language-plaintext highlighter-rouge">BITBUCKET_CLOUD_APP_PASSWORD</code>. Create an app password in Bitbucket, following the instructions <a href="https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Apppasswords-Createanapppassword">here</a>.</p>
+  </li>
+  <li>If you have additional systems not yet configured in your environment variable file, refer back to <a href="env-var-setup-guide.html">step 2</a> to set up your other systems.</li>
+</ol>
+:ET

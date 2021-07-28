@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+        <title>JF Agent Documentation</title>
+        <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
+        <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
+    <body class="sb-nav-fixed">
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_content">
+                <main class="page-detail-wrapper">
+                    <h1 class="page-title">FAQ</h1>
+                    <div class="page-blurb">On this page, you will find the answers to some common questions about the agent.</div>
+
+                    <div class="page-body-text">
+                        <h2 id="when-setting-up-an-agent-what-are-the-recommended-cpumemorystorage-specs">When setting up an Agent, what are the recommended CPU/memory/storage specs?</h2>
+
+<p>2+GB of RAM, 20+GB of storage, 2+ cores</p>
+
+<p>The standard we usually go off of is &gt;=2GB of RAM. In terms of storage, this varies a bit as it can be hard to predict how much storage you may need, but we’ve never seen &gt;20GB. Aside from those, any amount of CPU should work, but if you need a minimum, set it for 2 CPU cores.</p>
+
+<p>If you’re using kubernetes, run the agent as a kubernetes job, as explained <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">here</a>.</p>
+
+<h2 id="does-the-agent-auto-update-is-there-a-way-to-initiate-a-manual-update-of-the-agent-or-does-it-require-a-deploy-of-an-updated-docker-image">Does the Agent auto-update, is there a way to initiate a manual update of the agent, or does it require a deploy of an updated docker image?</h2>
+
+<p>Clients can auto-update the Agent before every run. In the cron job/automated run, you can run a docker pull to get the latest version of the Agent.</p>
+
+<p>You can refer to the full agent updating instructions <a href="agent-updated.html">here</a>.</p>
+
+<h2 id="is-there-a-communications-channel-that-lets-us-know-when-an-agent-update-is-available-are-release-log-details-such-as-features-additions-security-fixes-etc-included">Is there a communications channel that lets us know when an agent update is available? Are release log details such as features additions, security fixes, etc. included?</h2>
+
+<p>A member of Jellyfish’s Product Success team will reach out with notifications to update the Agent. Logs are captured by the client and can be reviewed at any time.</p>
+
+<h2 id="how-should-we-have-the-agent-run-once-set-up">How should we have the agent run once set up?</h2>
+
+<p>Usually utilizing a k8s cronjob, most clients utilize a once or twice a day cadence for their agent configuration. The agent will exit after it’s done its initial pull and we’d recommend not having it restart immediately after completion. The agent checks the most recent timestamp of commit and only pulls in items after that point. But if we don’t have a most recent timestamp yet (our whole processing pipeline needs to complete), we’ll run through all repos again like it never happened.</p>
+
+<p>See more documentation on how to run the agent <a href="run-agent.html">here</a></p>
+
+<h2 id="can-we-cherry-pick-certain-epics-go-into-jellyfish-via-the-agent">Can we cherry-pick certain Epics go into Jellyfish via the Agent?</h2>
+
+<p>Clients can select which Projects and fields to send to Jellyfish.</p>
+
+<p>You can learn more about the Jira fields that can be specified <a href="jira-fields.html">here</a>.</p>
+
+
+                    </div>
+                </main>
+
+                <footer class="footer pt-5 pb-5 mt-auto bg-dark footer-dark">
+                    <div class="container footer-container">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="mb-3">Find us on:</div>
+                                <div class="icon-list-social mb-3">
+                                    <a class="icon-list-social-link" href="https://www.linkedin.com/company/jellyfish-co/mycompany/"><i class="fab fa-linkedin-in"></i></a><a class="icon-list-social-link" href="https://github.com/Jellyfish-AI"><i class="fab fa-github"></i></a><a class="icon-list-social-link" href="https://twitter.com/jellyfishhq"><i class="fab fa-twitter"></i></a>
+                                </div>
+                            </div>
+                            <div class="col-lg-9"><div class="row"></div></div>
+                        </div>
+                        <hr class="my-2 mb-3" />
+                        <div class="row align-items-center">
+                            <div class="col-md-6 small">Copyright &copy; Jellyfish 2021</div>
+                            <div class="col-md-6 text-md-right small"></div>
+                        </div>
+                    </div>
+                </footer>
+
+            </div>
+        </div>
+    </body>
+
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        $(document).ready(async function() {
+            // Get index.html content
+            var templates = document.createElement('template');
+            const response = await fetch('index.html');
+            const result = await response.text();
+            templates.innerHTML = result;
+
+            // Get nav bar template from index.html and put it on the page
+            var template = templates.content.querySelector('#navTemplate'); 
+            console.log(template);
+            var clone = template.content.cloneNode(true);
+            document.getElementById("layoutSidenav").appendChild(clone);
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+
+</html>

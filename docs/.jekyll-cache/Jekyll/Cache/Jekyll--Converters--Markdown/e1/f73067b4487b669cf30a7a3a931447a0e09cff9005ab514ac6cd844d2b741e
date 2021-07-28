@@ -1,0 +1,37 @@
+I"ç<p>The agent has several different usage modes:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">download_and_send</code>
+    <ul>
+      <li>Download Jira and/or Git data from your systems; send the resulting data to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">download_only</code>
+    <ul>
+      <li>Download Jira and/or Git data from your systems. Allow the downloaded data to be inspected before itâ€™s sent to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">send_only</code>
+    <ul>
+      <li>Send a previously downloaded dataset to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">print_all_jira_fields</code>
+    <ul>
+      <li>Show the keys and field names for all of your Jira custom fields (to aid in agent configuration).</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">print_apparently_missing_git_repos</code>
+    <ul>
+      <li>Show the names and urls of Git repositories that may be missing from Jellyfish by looking at the Development Jira custom field (to aid in agent configuration).</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">validate</code>
+    <ul>
+      <li>Validate the configuration file using APIs.</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Data that you download from Jira and/or Git may be scrubbed to remove sensitive fields and values before you send it to Jellyfish.</p>
+:ET

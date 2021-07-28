@@ -1,0 +1,9 @@
+I"Í<p>You can pull down the latest Docker image from Docker Hub with:</p>
+
+<p class="code-block"><code>
+    docker pull jellyfishco/jf_agent:stable
+</code></p>
+
+<p>You may also want to periodically perform that <code class="language-plaintext highlighter-rouge">docker pull</code> command, or prepend it to the command you use for <code class="language-plaintext highlighter-rouge">docker run</code>, to ensure youâ€™re using the latest version of the agent.</p>
+
+:ET

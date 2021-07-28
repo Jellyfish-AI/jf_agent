@@ -1,0 +1,18 @@
+I"ô<h2 id="details">Details</h2>
+
+<p>This is where youâ€™ll add and populate your environmental variables file for GitHub.</p>
+
+<h2 id="instructions">Instructions</h2>
+
+<ol>
+  <li>Add the following section to your environment variable file. This is the same file mentioned <a href="env-var-setup-guide.html">in step 2</a>. Adding the following variables allows the agent to access your GitHub data:
+    <p class="code-block"><code>
+     GITHUB_TOKEN=...
+ </code></p>
+  </li>
+  <li>
+    <p>Create a personal access token in GitHub, following the instructions <a href="https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token">here</a>. Use this token as the value for <code class="language-plaintext highlighter-rouge">GITHUB_TOKEN</code>.</p>
+  </li>
+  <li>If you have additional systems not yet configured in your environment variable file, refer back to <a href="env-var-setup-guide.html">step 2</a> to set up your other systems.</li>
+</ol>
+:ET

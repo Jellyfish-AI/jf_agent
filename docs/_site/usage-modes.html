@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+        <title>JF Agent Documentation</title>
+        <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
+        <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
+    <body class="sb-nav-fixed">
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_content">
+                <main class="page-detail-wrapper">
+                    <h1 class="page-title">Usage modes</h1>
+                    <div class="page-blurb">See the different usage modes that the agent offers.</div>
+
+                    <div class="page-body-text">
+                        <p>The agent has several different usage modes:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">download_and_send</code>
+    <ul>
+      <li>Download Jira and/or Git data from your systems; send the resulting data to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">download_only</code>
+    <ul>
+      <li>Download Jira and/or Git data from your systems. Allow the downloaded data to be inspected before it’s sent to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">send_only</code>
+    <ul>
+      <li>Send a previously downloaded dataset to Jellyfish.</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">print_all_jira_fields</code>
+    <ul>
+      <li>Show the keys and field names for all of your Jira custom fields (to aid in agent configuration).</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">print_apparently_missing_git_repos</code>
+    <ul>
+      <li>Show the names and urls of Git repositories that may be missing from Jellyfish by looking at the Development Jira custom field (to aid in agent configuration).</li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">validate</code>
+    <ul>
+      <li>Validate the configuration file using APIs.</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Data that you download from Jira and/or Git may be scrubbed to remove sensitive fields and values before you send it to Jellyfish.</p>
+
+                    </div>
+                </main>
+
+                <footer class="footer pt-5 pb-5 mt-auto bg-dark footer-dark">
+                    <div class="container footer-container">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="mb-3">Find us on:</div>
+                                <div class="icon-list-social mb-3">
+                                    <a class="icon-list-social-link" href="https://www.linkedin.com/company/jellyfish-co/mycompany/"><i class="fab fa-linkedin-in"></i></a><a class="icon-list-social-link" href="https://github.com/Jellyfish-AI"><i class="fab fa-github"></i></a><a class="icon-list-social-link" href="https://twitter.com/jellyfishhq"><i class="fab fa-twitter"></i></a>
+                                </div>
+                            </div>
+                            <div class="col-lg-9"><div class="row"></div></div>
+                        </div>
+                        <hr class="my-2 mb-3" />
+                        <div class="row align-items-center">
+                            <div class="col-md-6 small">Copyright &copy; Jellyfish 2021</div>
+                            <div class="col-md-6 text-md-right small"></div>
+                        </div>
+                    </div>
+                </footer>
+
+            </div>
+        </div>
+    </body>
+
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        $(document).ready(async function() {
+            // Get index.html content
+            var templates = document.createElement('template');
+            const response = await fetch('index.html');
+            const result = await response.text();
+            templates.innerHTML = result;
+
+            // Get nav bar template from index.html and put it on the page
+            var template = templates.content.querySelector('#navTemplate'); 
+            console.log(template);
+            var clone = template.content.cloneNode(true);
+            document.getElementById("layoutSidenav").appendChild(clone);
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+
+</html>
