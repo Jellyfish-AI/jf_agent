@@ -139,3 +139,6 @@ output
 
 .bash_history
 
+# Jekyll/Docs
+.jekyll-cache
+docs/.jekyll-cache
