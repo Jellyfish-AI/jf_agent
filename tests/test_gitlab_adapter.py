@@ -72,7 +72,7 @@ class TestGitLabAdapter(TestCase):
         mock_api_repo = MagicMock()
 
         # Convert to named tuple to make fields accessible with dot notation 
-        api_branch = collections.namedtuple('api_branch', test_branches[0].keys())(*test_branches[0].values())        
+        api_branch = namedtuple('api_branch', test_branches[0].keys())(*test_branches[0].values())        
         self.mock_client.list_project_branches.return_value = [api_branch]
 
         # Act
@@ -93,9 +93,9 @@ class TestGitLabAdapter(TestCase):
         test_branches = _get_test_data('test_branches.json')
 
         # Convert to named tuples to make fields accessible with dot notation
-        api_repo = collections.namedtuple('api_repo', test_repos[0].keys())(*test_repos[0].values())
-        api_group = collections.namedtuple('api_group', test_groups[0].keys())(*test_groups[0].values())
-        api_branch = collections.namedtuple('api_branch', test_branches[0].keys())(*test_branches[0].values())
+        api_repo = namedtuple('api_repo', test_repos[0].keys())(*test_repos[0].values())
+        api_group = namedtuple('api_group', test_groups[0].keys())(*test_groups[0].values())
+        api_branch = namedtuple('api_branch', test_branches[0].keys())(*test_branches[0].values())
         self.mock_client.list_project_branches.return_value = [api_branch]
         
         self.mock_client.list_group_projects.return_value = [api_repo]
@@ -136,7 +136,7 @@ class TestGitLabAdapter(TestCase):
         mock_repos = [mock_repo]
 
         # Convert to named tuples to make fields accessible with dot notation
-        api_commit = collections.namedtuple('api_commits', test_commits[0].keys())(*test_commits[0].values())
+        api_commit = namedtuple('api_commits', test_commits[0].keys())(*test_commits[0].values())
 
         # Set pull_from to very far in the past to ensure fake timestamps in test commits are after this date. 
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
@@ -179,7 +179,7 @@ class TestGitLabAdapter(TestCase):
         mock_repos = [mock_repo]
 
         # Convert to named tuples to make fields accessible with dot notation
-        api_commit = collections.namedtuple('api_commits', test_commits[0].keys())(*test_commits[0].values())
+        api_commit = namedtuple('api_commits', test_commits[0].keys())(*test_commits[0].values())
 
         # Set pull_from to very far in the past to ensure fake timestamps in test commits are after this date. 
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
