@@ -91,8 +91,8 @@
                             <div class="container">
                                 <div class="row align-items-center">
                                     <div class="col-lg-6" data-aos="fade-up">
-                                        <h1 class="page-header-title">Jellyfish Agent Documentation</h1>
-                                        <p class="page-header-text mb-5">Welcome to the JF Agent Documentation! The agent is an on-premise configuration tool you can use to send data to Jellyfish in order to power the metrics and insights that will help your organization. You can use this documentation to guide you in setting up, or troubleshooting.</p>
+                                        <h1 class="page-header-title">{{ page.title }}</h1>
+                                        <p class="page-header-text mb-5">{{ page.welcomeText }}</p>
                                         <a class="btn btn-lg btn-primary font-weight-500 mr-3" href="setup-guide.html">Setup Guide</a><a class="btn btn-lg btn-primary-soft text-primary font-weight-500" href="https://github.com/Jellyfish-AI/jf_agent">Source Code</a>
                                     </div>
                                     <div class="col-lg-6 d-none d-lg-block" data-aos="fade-up" data-aos-delay="100"><img class="img-fluid jf-logo" src="assets/img/logo.png" width="30%" /></div>
@@ -112,8 +112,7 @@
                                 <div class="col-lg-6 order-0 order-lg-1 mb-5 mb-lg-0" data-aos="fade-left">
                                     <div class="mb-5">
                                         <h2>About the agent</h2>
-                                        <p class="mb-2 medium">The Jellyfish agent is intended to help you connect your systems to the Jellyfish application. It is an alternative to giving Jellyfish direct access.</p>
-                                        <p class="mb-2 medium">You can connect services like Jira, GitHub, GitLab, and Bitbucket to be fed into our application to give you back information tailored to your organization.</p>
+                                        <p class="mb-2 medium">{{ page.aboutText | markdownify }}</p>
                                         <p class="mb-2 medium">See the source code <a href="https://github.com/Jellyfish-AI/jf_agent">here</a>.</p>
 
                                     </div>

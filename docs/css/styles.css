@@ -400,6 +400,8 @@ h1, .h1 {
 
 h2, .h2 {
   font-size: 1.4rem;
+  margin-bottom: 1.2rem;
+  margin-top: 3rem;
 }
 
 h3, .h3 {
@@ -21853,6 +21855,7 @@ section {
 
 .page-blurb {
   font-size: 1.3rem;
+  margin-bottom: 2rem;
 }
 
 .page-body-text {
