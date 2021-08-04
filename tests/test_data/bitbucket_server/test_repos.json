@@ -1,0 +1,37 @@
+[{
+    "slug": "test_repo_slug",
+    "id": 1,
+    "name": "test_repo_name",
+    "scmId": "git",
+    "state": "AVAILABLE",
+    "statusMessage": "Available",
+    "forkable": true,
+    "project": {
+      "key": "test_project_key",
+      "id": 1,
+      "name": "test_project_name",
+      "public": false,
+      "type": "NORMAL",
+      "links": {
+        "self": [
+          {
+            "href": "https://bitbucket.test.com/projects/test_project"
+          }
+        ]
+      }
+    },
+    "public": false,
+    "links": {
+      "clone": [
+        {
+          "href": "ssh://git@bitbucket.test.com/test/test_repo.git",
+          "name": "ssh"
+        }
+      ],
+      "self": [
+        {
+          "href": "https://bitbucket.test.com/projects/test_project/repos/test_repo/browse"
+        }
+      ]
+    }
+  }]
