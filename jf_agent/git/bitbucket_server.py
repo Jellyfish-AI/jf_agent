@@ -211,10 +211,9 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
 
     for api_project in api_projects:
         project = client.projects[api_project['key']]
-        project_repos = project.repos
-        for repo in project_repos.list():
+        for repo in project.repos.list():
             if all(filt(repo) for filt in filters):
-                api_repo = project.repos.get(repo['name'])
+                api_repo = project.repos[repo['name']]
                 yield api_repo, _normalize_repo(api_project, api_repo, redact_names_and_urls)
 
     print('✓')

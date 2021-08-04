@@ -56,19 +56,21 @@ class TestBitbucketServer(TestCase):
 
         mock_client = MagicMock()
         mock_project = MagicMock()
-        mock_project_repos = MagicMock()
         mock_repo = MagicMock()
+        mock_branch = MagicMock()
+        mock_repo_list = [mock_repo]
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos = mock_project_repos
-
-        mock_project_repos.list.return_value = test_repos
-        mock_project_repos.get.return_value = mock_repo
+        mock_project.repos.list.return_value = mock_repo_list
+        mock_project.repos.__getitem__.return_value = mock_repo
 
         mock_repo.get.return_value = test_repos[0]
-        mock_repo.default_branch = test_branches[0]
         mock_repo.branches.return_value = test_branches
-        
+        mock_repo.default_branch = mock_branch
+    
+        default_branch_name = 'default_branch_name'
+        mock_branch.__getitem__.return_value = default_branch_name
+
         # Act
         result_repos = list(bitbucket_server.get_repos(mock_client, test_projects, {}, {}, False))
 
@@ -83,7 +85,7 @@ class TestBitbucketServer(TestCase):
         self.assertEqual(result_repo['name'], input_repo['name'], "resulting repo name does not match input")
         self.assertEqual(result_repo['full_name'], input_repo['name'], "resulting repo full_name does not match input")
         self.assertEqual(result_repo['url'], input_repo['links']['self'][0]['href'], "resulting repo url does not match input")
-        self.assertEqual(result_repo['default_branch_name'], test_branches[0]['displayId'], "resulting repo has unexpected default branch")
+        self.assertEqual(result_repo['default_branch_name'], default_branch_name, "resulting repo has unexpected default branch")
         self.assertFalse(result_repo['is_fork'])
 
         # Assert expected branches exist
