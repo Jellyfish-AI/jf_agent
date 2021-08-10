@@ -143,7 +143,9 @@ class TestGitLabAdapter(TestCase):
 
         self.mock_client.list_project_commits.return_value = [api_commit]
         mock_repo_url = "repo_url"
+        mock_repo_default_branch = "default_branch_name"
         mock_repo.url = mock_repo_url
+        mock_repo.default_branch_name = mock_repo_default_branch
 
         mock_short_repo = NormalizedShortRepository(id="test_repo_id", name="test_repo_name", url="test_repo_url")
         mock_repo.short.return_value = mock_short_repo
@@ -161,6 +163,7 @@ class TestGitLabAdapter(TestCase):
         self.assertEqual(result_commit.commit_date, test_commit['committed_date'], "resulting commit date does not match input")
         self.assertEqual(result_commit.author_date, test_commit['authored_date'], "resulting commit author date does not match input")
         self.assertEqual(result_commit.message, test_commit['message'], "resulting commit message does not match input")
+        self.assertEqual(result_commit.branch_name, mock_repo_default_branch, "resulting commit branch does not match input")
         self.assertFalse(result_commit.is_merge)
 
         self.assertEqual(result_commit.repo.id, "test_repo_id", "resulting commit repo id does not match input")
@@ -176,6 +179,7 @@ class TestGitLabAdapter(TestCase):
         # Arrange
         test_commits = _get_test_data('test_commits.json')
         mock_repo = MagicMock()
+        mock_repo.default_branch_name = 'default_branch_name'
         mock_repos = [mock_repo]
 
         # Convert to named tuples to make fields accessible with dot notation
@@ -221,6 +225,7 @@ class TestGitLabAdapter(TestCase):
         test_commit = test_commits[0]
         self.assertEqual(pr_commit.hash, test_commit['id'], "resulting pr commit hash does not match input")
         self.assertEqual(pr_commit.message, test_commit['message'], "resulting pr commit message does not match input")
+        self.assertEqual(pr_commit.branch_name, 'default_branch_name', "resulting pr commit branch does not match input")
         self.assertFalse(pr_commit.is_merge)
 
 def _get_test_data(file_name):

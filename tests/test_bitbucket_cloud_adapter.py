@@ -87,6 +87,7 @@ class TestBitbucketCloudAdapter(TestCase):
         test_commits = _get_test_data('test_commits.json')
 
         mock_normalized_repo = MagicMock()
+        mock_normalized_repo.default_branch_name = 'default_branch_name'
         test_short_repo = NormalizedShortRepository(id='test_id', name='test_name', url='test_url')
         mock_normalized_repo.short.return_value = test_short_repo
         mock_normalized_repos = [mock_normalized_repo]
@@ -111,6 +112,7 @@ class TestBitbucketCloudAdapter(TestCase):
         self.assertEqual(resulting_commit.repo.id, test_short_repo.id, "Resulting commit's repo id does not match input")
         self.assertEqual(resulting_commit.repo.name, test_short_repo.name, "Resulting commit's repo name does not match input")
         self.assertEqual(resulting_commit.repo.url, test_short_repo.url, "Resulting commit's repo url does not match input")
+        self.assertEqual(resulting_commit.branch_name, 'default_branch_name', "Resulting commit's branch name does not match input")
         self.assertFalse(resulting_commit.is_merge)
         self.assertIsNone(resulting_commit.author_date)
 
@@ -120,6 +122,7 @@ class TestBitbucketCloudAdapter(TestCase):
         test_commits = _get_test_data('test_commits.json')
 
         mock_normalized_repo = MagicMock()
+        mock_normalized_repo.default_branch_name = 'default_branch_name'
         mock_normalized_repos = [mock_normalized_repo]
 
         self.mock_client.get_pullrequests.return_value = test_prs
@@ -149,6 +152,7 @@ class TestBitbucketCloudAdapter(TestCase):
 
         self.assertEqual(len(resulting_pr.commits), len(test_commits), f"Resulting pr should have {len(test_commits)} commit")
         self.assertEqual(resulting_pr.commits[0].hash, test_commits[0]['hash'], "Resulting pr should have hash matching input commit")
+        self.assertEqual(resulting_pr.commits[0].branch_name, 'default_branch_name', "Resulting pr commit should have branch name matching input repo")
         self.assertFalse(resulting_pr.is_closed)
         self.assertFalse(resulting_pr.is_merged)
         

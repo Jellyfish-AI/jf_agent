@@ -92,8 +92,8 @@ class NormalizedCommit:
     author_date: str
     author: NormalizedUser
     repo: NormalizedShortRepository
-    branch_name: str
     is_merge: bool
+    branch_name: str
 
 
 @dataclass

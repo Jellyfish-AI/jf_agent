@@ -96,7 +96,7 @@ class TestGithub(TestCase):
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
         
         # Act
-        result_commits = list(github.get_default_branch_commits(mock_client, test_repos, False, test_git_instance_info, False))
+        result_commits = list(github.get_commits_for_included_branches(mock_client, test_repos, {'repo_name': ['included_branch']}, False, test_git_instance_info, False))
 
         # Assert
         self.assertEqual(len(result_commits), 1, "commit size should be 1")
@@ -106,6 +106,7 @@ class TestGithub(TestCase):
             self.assertEqual(result_commit.author.id, test_commit['author']['id'], "resulting author does not match input")
             self.assertEqual(result_commit.url, test_commit['html_url'], "resulting url does not match input")
             self.assertEqual(result_commit.message, test_commit['commit']['message'], "resulting message does not match input")
+            self.assertEqual(result_commit.branch_name, 'included_branch', "resulting commit' branch_name does not match input")
             self.assertFalse(result_commit.is_merge)
 
             expected_repo = test_repos[0]

@@ -276,8 +276,7 @@ def get_commits_for_included_branches(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
             )
 
-            branches = repo_name_to_branch_names[repo['name']]
-            for branch in branches:
+            for branch in repo_name_to_branch_names[repo['name']]:
                 try:
                     for j, commit in enumerate(
                         tqdm(
