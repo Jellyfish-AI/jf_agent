@@ -219,9 +219,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
-def _normalize_commit(commit, api_repo, strip_text_content, redact_names_and_urls):
-    branch_name = api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-    repo = api_repo.get()
+def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
@@ -268,7 +266,7 @@ def get_default_branch_commits(
                         if verbose:
                             print(f"Getting {commit['id']} ({repo['name']})")
                         normalized_commit = _normalize_commit(
-                            commit, api_repo, strip_text_content, redact_names_and_urls
+                            commit, repo, default_branch, strip_text_content, redact_names_and_urls
                         )
                         # commits are ordered newest to oldest
                         # if this is too old, we're done with this repo
