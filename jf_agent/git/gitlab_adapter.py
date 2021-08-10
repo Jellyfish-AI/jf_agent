@@ -421,7 +421,7 @@ def _normalize_commit(
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=normalized_repo.short(),  # use short form of repo
-        branch_name=normalized_repo.default_branch_name
+        branch_name=normalized_repo.default_branch_name if not redact_names_and_urls else _branch_redactor.redact_name(normalized_repo.default_branch_name)
     )
 
 

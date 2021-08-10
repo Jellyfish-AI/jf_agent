@@ -134,6 +134,7 @@ class TestBitbucketServer(TestCase):
             self.assertEqual(result_commit['repo']['id'], expected_repo['id'], "resulting repo id does not match input")
             self.assertEqual(result_commit['repo']['name'], expected_repo['name'], "resulting repo name does not match input")
             self.assertEqual(result_commit['repo']['url'], expected_repo['links']['self'][0]['href'], "resulting repo links do not match input")
+            self.assertEqual(result_commit['branch_name'], 'test_display_id1', "resulting branch name does not match input")
 
     def test_get_pull_requests(self):
         # Arrange
