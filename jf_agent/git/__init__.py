@@ -93,7 +93,7 @@ class NormalizedCommit:
     author: NormalizedUser
     repo: NormalizedShortRepository
     is_merge: bool
-    branch_name: str
+    branch_name: str = None
 
 
 @dataclass
