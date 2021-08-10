@@ -219,7 +219,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
-def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
+def _normalize_commit(commit, repo, default_branch_name, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
@@ -233,7 +233,7 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
         'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
         'repo': _normalize_pr_repo(repo, redact_names_and_urls),
-        'branch_name': branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        'branch_name': default_branch_name if not redact_names_and_urls else _branch_redactor.redact_name(default_branch_name)
     }
 
 
@@ -250,10 +250,7 @@ def get_default_branch_commits(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
             try:
-
-                default_branch = (
-                    api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-                )
+                default_branch = _get_default_branch_name(api_repo)
                 if verbose:
                     print(f"Beginning download of commits for repo {repo['name']}.")
                 commits = api_project.repos[repo['name']].commits(until=default_branch)
@@ -306,6 +303,7 @@ def get_pull_requests(
             repo = api_repo.get()
             if verbose:
                 print(f"Beginning download of PRs for repo {repo}")
+            default_branch = _get_default_branch_name(api_repo)
             api_project = client.projects[repo['project']['key']]
             api_repo = api_project.repos[repo['name']]
             pull_since = pull_since_date_for_repo(
@@ -416,7 +414,7 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+                        _normalize_commit(c, repo, default_branch, strip_text_content, redact_names_and_urls)
                         for c in tqdm(
                             api_pr.commits(),
                             f'downloading commits for PR {pr["id"]}',
@@ -476,3 +474,6 @@ def get_pull_requests(
                     logging.WARNING,
                     f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
                 )
+
+def _get_default_branch_name(api_repo):
+    return api_repo.default_branch['displayId'] if api_repo.default_branch else ''
