@@ -1,3 +1,4 @@
+from datetime import datetime
 from contextlib import contextmanager
 from functools import wraps
 import logging
@@ -135,3 +136,9 @@ def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_i
     print(msg, flush=True)
     if exc_info:
         print(traceback.format_exc())
+
+
+# TODO(asm,2021-08-12): This is sloppy, we should figure out a way to
+# get Python's native logging to behave the way we want.
+def verbose(msg):
+    print(f"[{datetime.now().isoformat()}] {msg}")

@@ -122,7 +122,7 @@ def _normalize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client):
-    print('downloading bitbucket users... ', end='', flush=True)
+    print(f'[{datetime.now().isoformat()}] downloading bitbucket users... ', end='', flush=True)
     users = [_normalize_user(user) for user in client.admin.users]
     print('✓')
     return users
@@ -144,7 +144,7 @@ def _normalize_project(api_project, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client, include_projects, exclude_projects, redact_names_and_urls):
-    print('downloading bitbucket projects... ', end='', flush=True)
+    print(f'[{datetime.now().isoformat()}] downloading bitbucket projects... ', end='', flush=True)
 
     filters = []
     if include_projects:
@@ -201,7 +201,9 @@ def _normalize_repo(api_project, api_repo, redact_names_and_urls):
 
 @agent_logging.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
-    print('downloading bitbucket repositories... ', end='', flush=True)
+    print(
+        f'[{datetime.now().isoformat()}] downloading bitbucket repositories... ', end='', flush=True
+    )
 
     filters = []
     if include_repos:
@@ -243,7 +245,7 @@ def get_default_branch_commits(
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             repo = api_repo.get()
             if verbose:
-                print(f"Beginning download of commits for repo {repo}")
+                agent_logging.verbose(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
@@ -254,7 +256,7 @@ def get_default_branch_commits(
                     api_repo.default_branch['displayId'] if api_repo.default_branch else ''
                 )
                 if verbose:
-                    print(f"Beginning download of commits for repo {repo['name']}.")
+                    agent_logging.verbose(f"Beginning download of commits for repo {repo['name']}.")
                 commits = api_project.repos[repo['name']].commits(until=default_branch)
 
                 for j, commit in enumerate(
@@ -263,7 +265,9 @@ def get_default_branch_commits(
                 ):
                     with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
                         if verbose:
-                            print(f"Getting {commit['id']} ({repo['name']})")
+                            tqdm.write(
+                                f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
+                            )
                         normalized_commit = _normalize_commit(
                             commit, repo, strip_text_content, redact_names_and_urls
                         )
@@ -304,12 +308,17 @@ def get_pull_requests(
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
             repo = api_repo.get()
             if verbose:
-                print(f"Beginning download of PRs for repo {repo}")
+                agent_logging.verbose(f"Beginning download of PRs for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             api_repo = api_project.repos[repo['name']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
             )
+            if verbose:
+                agent_logging.verbose(
+                    f"Pulling pull requests starting at {pull_since} for repo {repo}"
+                )
+
             skipped_prs = 0
 
             for pr in tqdm(
@@ -318,7 +327,7 @@ def get_pull_requests(
                 unit='prs',
             ):
                 if verbose:
-                    print(f"Processing PR {pr['id']}")
+                    tqdm.write(f"[{datetime.now().isoformat()}] Processing PR {pr['id']}")
                 updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
                 # PRs are ordered newest to oldest
                 # if this is too old, we're done with this repo
