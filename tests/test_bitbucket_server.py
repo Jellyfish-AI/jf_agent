@@ -213,7 +213,7 @@ class TestBitbucketServer(TestCase):
             self.assertFalse(result_commit['is_merge'])
 
             expected_repo = test_repos[0]
-
+            
             self.assertEqual(
                 result_commit['repo']['id'],
                 expected_repo['id'],

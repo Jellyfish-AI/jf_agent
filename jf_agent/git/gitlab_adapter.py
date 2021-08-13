@@ -44,7 +44,7 @@ class GitLabAdapter(GitAdapter):
         self, config: GitConfig, outdir: str, compress_output_files: bool, client: GitLabClient
     ):
         super().__init__(config, outdir, compress_output_files)
-        self.client = client
+        self.git_client = client
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -52,8 +52,8 @@ class GitLabAdapter(GitAdapter):
         print('downloading gitlab projects... ', end='', flush=True)
         projects = [
             _normalize_project(
-                self.client.get_group(project_id),
-                self.config.git_redact_names_and_urls,  # are group_ids
+                self.git_client.get_group(project_id),  # are group_ids in v4; are project_ids in v3
+                self.config.git_redact_names_and_urls,
             )
             for project_id in self.config.git_include_projects
         ]
@@ -72,7 +72,7 @@ class GitLabAdapter(GitAdapter):
         users = [
             _normalize_user(user)
             for project_id in self.config.git_include_projects
-            for user in self.client.list_group_members(project_id)
+            for user in self.git_client.list_group_members(project_id)
         ]
         print('✓')
         return users
@@ -91,7 +91,7 @@ class GitLabAdapter(GitAdapter):
 
             for i, api_repo in enumerate(
                 tqdm(
-                    self.client.list_group_projects(nrm_project.id),
+                    self.git_client.list_group_projects(nrm_project.id),
                     desc=f'downloading repos for {nrm_project.name}',
                     unit='repos',
                 ),
@@ -174,11 +174,11 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[NormalizedBranch]:
-        print('downloading gitlab branches... ', end='', flush=True)
+        print('\ndownloading gitlab branches... ', end='', flush=True)
         try:
             return [
                 _normalize_branch(api_branch, self.config.git_redact_names_and_urls)
-                for api_branch in self.client.list_project_branches(api_repo.id)
+                for api_branch in self.git_client.list_project_branches(api_repo.id)
             ]
         except requests.exceptions.RetryError as e:
             log_and_print_request_error(
@@ -202,7 +202,7 @@ class GitLabAdapter(GitAdapter):
                 try:
                     for j, commit in enumerate(
                         tqdm(
-                            self.client.list_project_commits(nrm_repo.id, pull_since),
+                            self.git_client.list_project_commits(nrm_repo.id, pull_since),
                             desc=f'downloading commits for {nrm_repo.name} ({nrm_repo.id})',
                             unit='commits',
                         ),
@@ -232,32 +232,35 @@ class GitLabAdapter(GitAdapter):
         print('downloading gitlab prs... ', end='', flush=True)
 
         for i, nrm_repo in enumerate(normalized_repos, start=1):
-            print(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
+            print(f'\ndownloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
                     pull_since = pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
+                    api_prs = self.git_client.list_project_merge_requests(nrm_repo.id)
 
-                    api_prs = self.client.list_project_merge_requests(nrm_repo.id)
-
+                    api_total = (
+                        api_prs.total if self.git_client.api_version == '4' else len(api_prs)
+                    )
                     for api_pr in tqdm(
                         api_prs,
                         desc=f'processing prs for {nrm_repo.name} ({nrm_repo.id})',
                         unit='prs',
-                        total=api_prs.total,
+                        total=api_total,
                     ):
                         try:
                             updated_at = parser.parse(api_pr.updated_at)
-
                             # PRs are ordered newest to oldest
                             # if this is too old, we're done with this repo
                             if pull_since and updated_at < pull_since:
+                                print("Remaining PR's have already been imported")
                                 break
 
+                            # verify source project is accessible
                             try:
-                                api_pr = self.client.expand_merge_request_data(api_pr)
+                                api_pr = self.git_client.expand_merge_request_data(api_pr)
                             except MissingSourceProjectException as e:
                                 log_and_print_request_error(
                                     e,
@@ -265,7 +268,6 @@ class GitLabAdapter(GitAdapter):
                                     f'for merge_request {api_pr.id}. Skipping...',
                                 )
                                 continue
-
                             nrm_commits: List[NormalizedCommit] = [
                                 _normalize_commit(
                                     commit,
@@ -275,28 +277,27 @@ class GitLabAdapter(GitAdapter):
                                 )
                                 for commit in api_pr.commit_list
                             ]
-                            merge_request = self.client.expand_merge_request_data(api_pr)
-                            merge_commit = None
+                            merge_commit = []
                             if (
-                                merge_request.state == 'merged'
+                                api_pr.state == 'merged'
                                 and nrm_commits is not None
-                                and merge_request.merge_commit_sha
+                                and api_pr.merge_commit_sha
                             ):
                                 merge_commit = _normalize_commit(
-                                    self.client.get_project_commit(
-                                        merge_request.project_id, merge_request.merge_commit_sha
+                                    self.git_client.get_project_commit(
+                                        api_pr.project_id, api_pr.merge_commit_sha
                                     ),
                                     nrm_repo,
                                     self.config.git_strip_text_content,
                                     self.config.git_redact_names_and_urls,
                                 )
-
                             yield _normalize_pr(
                                 api_pr,
                                 nrm_commits,
                                 self.config.git_strip_text_content,
                                 self.config.git_redact_names_and_urls,
                                 merge_commit,
+                                self.git_client.api_version,
                             )
                         except Exception as e:
                             # if something goes wrong with normalizing one of the prs - don't stop pulling. try
@@ -402,7 +403,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
 
 
 def _normalize_commit(
-    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool,
 ):
     author = NormalizedUser(
         id=f'{api_commit.author_name}<{api_commit.author_email}>',
@@ -472,6 +473,7 @@ def _normalize_pr(
     strip_text_content: bool,
     redact_names_and_urls: bool,
     merge_commit,
+    api_vrsn,
 ):
     base_branch_name = merge_request.target_branch
     head_branch_name = merge_request.source_branch
@@ -483,7 +485,10 @@ def _normalize_pr(
     # determine the number of files changed from a patch, but we can get the number of lines added and deleted.
     # To get the number of files changed, we can just use the length of the list returned from changes(), which
     # contains file information for each file changed in the merge request.
-    changed_files = len(merge_request.changes()['changes'])
+    if api_vrsn == '4':
+        changed_files = len(merge_request.changes()['changes'])
+    elif changed_files == None:
+        changed_files = 0
 
     return NormalizedPullRequest(
         id=merge_request.id,
@@ -492,7 +497,7 @@ def _normalize_pr(
         changed_files=changed_files,
         created_at=merge_request.created_at,
         updated_at=merge_request.updated_at,
-        merge_date=merge_request.merged_at,
+        merge_date=merge_request.merge_date,
         closed_date=merge_request.closed_at,
         is_closed=merge_request.state == 'closed',
         is_merged=merge_request.state == 'merged',

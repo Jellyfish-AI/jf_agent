@@ -263,7 +263,6 @@ class TestGitLabAdapter(TestCase):
             test_commit['message'],
             "resulting commit message does not match input",
         )
-
         self.assertFalse(result_commit.is_merge)
 
         self.assertEqual(

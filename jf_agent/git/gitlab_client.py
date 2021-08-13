@@ -31,13 +31,14 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
 
 
 class GitLabClient:
-    def __init__(self, server_url, private_token, verify, per_page_override, session):
+    def __init__(self, server_url, private_token, verify, per_page_override, session, version):
         kwargs = {'private_token': private_token, 'session': session}
         if per_page_override is not None:
             kwargs['per_page'] = per_page_override
         if not verify:
             kwargs['ssl_verify'] = False
         self.client = gitlab.Gitlab(server_url, **kwargs)
+        self.api_version = '4'
 
     @staticmethod
     def _get_diff_string(merge_request):

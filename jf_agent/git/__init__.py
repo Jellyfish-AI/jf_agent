@@ -12,6 +12,7 @@ from jf_agent.session import retry_session
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 from jf_agent.git.github_client import GithubClient
 from jf_agent.git.gitlab_client import GitLabClient
+from jf_agent.git.gitlab_v3_client import GitLabClient_v3
 from jf_agent.config_file_reader import GitConfig
 
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
@@ -27,7 +28,8 @@ BBS_PROVIDER = 'bitbucket_server'
 BBC_PROVIDER = 'bitbucket_cloud'
 GH_PROVIDER = 'github'
 GL_PROVIDER = 'gitlab'
-PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER]
+GL_PROVIDER_V3 = 'gitlab_v3'
+PROVIDERS = [GL_PROVIDER, GL_PROVIDER_V3, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER]
 
 '''
 
@@ -251,6 +253,15 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
                 per_page_override=config.gitlab_per_page_override,
                 session=retry_session(),
             )
+        if config.git_provider == GL_PROVIDER_V3:
+            # per_page_override=config.gitlab_per_page_override,
+            return GitLabClient_v3(
+                server_url=config.git_url,
+                token=git_creds['gitlab_token'],
+                convert_dates=True,
+                ssl_verify=not skip_ssl_verification,
+                ssl_cert=None,
+            )
 
     except Exception as e:
         agent_logging.log_and_print_error_or_warning(
@@ -311,7 +322,7 @@ def load_and_dump_git(
                 endpoint_git_instance_info=endpoint_git_instance_info,
                 git_conn=git_connection,
             )
-        elif config.git_provider == 'gitlab':
+        elif config.git_provider in ['gitlab', 'gitlab_v3']:
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
             GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
@@ -418,8 +429,7 @@ def get_repos_from_git(git_connection, config: GitConfig):
             )
         )
 
-    elif config.git_provider == 'gitlab':
-
+    elif config.git_provider in ['gitlab', 'gitlab_v3']:
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
         gl_adapter = GitLabAdapter(
@@ -506,8 +516,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
             ]
             output_dict[org] = [x.name for x in org_repos]
 
-    elif config.git_provider == 'gitlab':
-
+    elif config.git_provider in ['gitlab', 'gitlab_v3']:
         from jf_agent.git.gitlab_adapter import GitLabAdapter
 
         gl_adapter = GitLabAdapter(

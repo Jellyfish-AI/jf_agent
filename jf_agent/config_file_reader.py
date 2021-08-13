@@ -271,7 +271,7 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
     return [_get_git_config(g, multiple=True) for g in git_config]
 
 
-git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
+git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab', 'gitlab_v3']
 
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:

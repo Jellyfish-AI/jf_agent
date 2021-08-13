@@ -236,8 +236,11 @@ def _get_git_instance_to_creds(git_config):
             'bb_server_username': _check_and_get(f'{prefix}BITBUCKET_USERNAME'),
             'bb_server_password': _check_and_get(f'{prefix}BITBUCKET_PASSWORD'),
         }
-    elif git_provider == 'gitlab':
+    elif git_provider in ('gitlab', 'gitlab_v3'):
         return {'gitlab_token': _check_and_get(f'{prefix}GITLAB_TOKEN')}
+    else:
+        print(f'ERROR: Unknown git provider {git_provider}')
+        raise BadConfigException()
 
 
 def obtain_creds(config):
