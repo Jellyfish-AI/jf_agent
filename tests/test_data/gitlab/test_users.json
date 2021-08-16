@@ -1,18 +1,18 @@
 [
-    {
-      "id": 1,
-      "username": "test_user_1",
-      "name": "Test User 1",
-      "state": "active",
-      "avatar_url": "http://localhost:3000/uploads/user/avatar/1/avatar.jpeg",
-      "web_url": "http://localhost:3000/test_user_1"
-    },
-    {
-      "id": 2,
-      "username": "test_user_2",
-      "name": "Test User 2",
-      "state": "blocked",
-      "avatar_url": "http://localhost:3000/../avatar.jpeg",
-      "web_url": "http://localhost:3000/test_user_2"
-    }
-  ]
+  {
+    "id": 1,
+    "username": "test_user_1",
+    "name": "Test User 1",
+    "state": "active",
+    "avatar_url": "http://localhost:3000/uploads/user/avatar/1/avatar.jpeg",
+    "web_url": "http://localhost:3000/test_user_1"
+  },
+  {
+    "id": 2,
+    "username": "test_user_2",
+    "name": "Test User 2",
+    "state": "blocked",
+    "avatar_url": "http://localhost:3000/../avatar.jpeg",
+    "web_url": "http://localhost:3000/test_user_2"
+  }
+]
