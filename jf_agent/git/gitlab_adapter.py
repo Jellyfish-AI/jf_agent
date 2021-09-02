@@ -101,18 +101,20 @@ class GitLabAdapter(GitAdapter):
                     self.config.git_include_repos
                     and api_repo.id not in self.config.git_include_repos
                 ):
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
-                        f'skipping repo {api_repo.id} because not in include_repos...',
-                    )
+                    if self.config.git_verbose:
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'skipping repo {api_repo.id} because not in include_repos...',
+                        )
                     continue  # skip this repo
                 if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
-                        f'skipping repo {api_repo.id} because in exclude_repos...',
-                    )
+                    if self.config.git_verbose:
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'skipping repo {api_repo.id} because in exclude_repos...',
+                        )
                     continue  # skip this repo
 
                 try:
