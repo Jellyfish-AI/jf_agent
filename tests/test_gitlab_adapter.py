@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from jf_agent.git import NormalizedShortRepository
 from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-TEST_INPUT_FILE_PATH = f'tests/test_data/gitlab/'
+TEST_INPUT_FILE_PATH = 'tests/test_data/gitlab/'
 
 
 class TestGitLabAdapter(TestCase):
