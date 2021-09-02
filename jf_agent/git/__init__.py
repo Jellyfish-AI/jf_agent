@@ -446,7 +446,6 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
     if config.git_provider == 'bitbucket_server':
 
         from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
-        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs, _normalize_repo
 
         projects = get_projects_bbs(
             git_connection, config.git_include_projects, config.git_exclude_projects, False
@@ -481,7 +480,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
     elif config.git_provider == 'github':
 
-        from jf_agent.git.github import get_repos as get_repos_gh, get_projects, _normalize_repo
+        from jf_agent.git.github import _normalize_repo
 
         filters = []
         if config.git_include_repos:

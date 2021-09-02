@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from jf_agent.git import NormalizedShortRepository
 from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-TEST_INPUT_FILE_PATH = f'tests/test_data/bitbucket_cloud/'
+TEST_INPUT_FILE_PATH = 'tests/test_data/bitbucket_cloud/'
 
 
 class TestBitbucketCloudAdapter(TestCase):
