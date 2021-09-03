@@ -104,18 +104,18 @@ def main():
         if config.jira_url and creds.jira_username and creds.jira_password:
             validate_jira(config, creds)
         else:
-            print("No jira URL or credentials provided, skipping jira validation...")
+            print("\nNo Jira URL or credentials provided, skipping Jira validation...")
 
         # Check for Git configs
         if config.git_configs:
             validate_git(config, creds)
         else:
-            print("No git configs provided, skipping git validation...")
+            print("\nNo Git configs provided, skipping Git validation...")
 
         # Finally, display memory usage statistics.
         validate_memory()
 
-        print("Success!")
+        print("\nDone")
 
         return True
 
