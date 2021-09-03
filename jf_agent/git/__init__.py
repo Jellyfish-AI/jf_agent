@@ -457,7 +457,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
         if config.git_exclude_repos:
             filters.append(lambda r: r['name'] not in config.git_exclude_repos)
 
-        for api_project in projects:
+        for (api_project, _normalized_project_dict) in projects:
             project_repos = []
             project = git_connection.projects[api_project['key']]
             for repo in project.repos.list():
