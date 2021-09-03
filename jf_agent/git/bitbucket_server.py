@@ -207,9 +207,9 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
 
     filters = []
     if include_repos:
-        filters.append(lambda r: r['name'] in include_repos)
+        filters.append(lambda r: r['name'].lower() in set([r.lower() for r in include_repos]))
     if exclude_repos:
-        filters.append(lambda r: r['name'] not in exclude_repos)
+        filters.append(lambda r: r['name'].lower() not in set([r.lower() for r in exclude_repos]))
 
     for api_project in api_projects:
         project = client.projects[api_project['key']]

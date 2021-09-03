@@ -99,6 +99,8 @@ class GitLabAdapter(GitAdapter):
             ):
                 if (
                     self.config.git_include_repos
+                    # For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
+                    # no need to be case insensitive
                     and api_repo.id not in self.config.git_include_repos
                 ):
                     if self.config.git_verbose:
@@ -108,7 +110,13 @@ class GitLabAdapter(GitAdapter):
                             f'skipping repo {api_repo.id} because not in include_repos...',
                         )
                     continue  # skip this repo
-                if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
+
+                if (
+                    self.config.git_exclude_repos
+                    # For GitLab, git_exclude_repos holds IDs instead of names (probably unintentionally), so
+                    # no need to be case insensitive
+                    and api_repo.id in self.config.git_exclude_repos
+                ):
                     if self.config.git_verbose:
                         agent_logging.log_and_print(
                             logger,
@@ -303,7 +311,9 @@ class GitLabAdapter(GitAdapter):
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
-                        e, f'getting PRs for repo {nrm_repo.name} ({nrm_repo.id}). Skipping...', log_as_exception=True
+                        e,
+                        f'getting PRs for repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
+                        log_as_exception=True,
                     )
 
     print('✓')
