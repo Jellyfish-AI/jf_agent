@@ -453,9 +453,14 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         filters = []
         if config.git_include_repos:
-            filters.append(lambda r: r['name'] in config.git_include_repos)
+            filters.append(
+                lambda r: r['name'].lower() in set([r.lower() for r in config.git_include_repos])
+            )
         if config.git_exclude_repos:
-            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+            filters.append(
+                lambda r: r['name'].lower()
+                not in set([r.lower() for r in config.git_exclude_repos])
+            )
 
         for (api_project, _normalized_project_dict) in projects:
             project_repos = []
@@ -484,9 +489,14 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         filters = []
         if config.git_include_repos:
-            filters.append(lambda r: r['name'] in config.git_include_repos)
+            filters.append(
+                lambda r: r['name'].lower() in set([r.lower() for r in config.git_include_repos])
+            )
         if config.git_exclude_repos:
-            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+            filters.append(
+                lambda r: r['name'].lower()
+                not in set([r.lower() for r in config.git_exclude_repos])
+            )
 
         for org in config.git_include_projects:
             org_repos = [

@@ -92,7 +92,15 @@ def validate_git(config, creds):
                     print(f"    -- {repo}")
 
             for repo in git_config.git_include_repos:
-                if repo not in all_repos:
+                # Messy: GitLab repos are specified as as ints, not strings
+                if type(repo) == int:
+                    def comp_func(repo):
+                        return repo not in all_repos
+                else:
+                    def comp_func(repo):
+                        return repo.lower() not in set(n.lower() for n in all_repos)
+
+                if comp_func(repo):
                     print(
                         f"  WARNING: {repo} is explicitly defined as an included repo, but agent doesn't seem"
                         f" to see this repository -- possibly missing permissions."
