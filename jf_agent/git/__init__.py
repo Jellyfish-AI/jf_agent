@@ -506,9 +506,12 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         projects = gl_adapter.get_projects()
         for project in projects:
-            project_repos = [x.name for x in gl_adapter.get_repos([project])]
+            # For GitLab, the config file specifies repo IDs not names -- so that's what we want to validate with
+            # project_repos = [x.name for x in gl_adapter.get_repos([project])]
+            project_repos = [x.id for x in gl_adapter.get_repos([project])]
             output_dict[project.name] = project_repos
 
     else:
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
+
     return output_dict
