@@ -16,7 +16,7 @@ This is where you'll add and populate your environmental variables file for GitH
 
 ## Instructions
 
-1. Add the following section to your environment variable file. This is the same file mentioned [in step 2](env-var-setup-guide.html). Adding the following variables allows the agent to access your GitHub data:
+1. Add the following section to your environment variable file. This is the same file mentioned in step 3 above. Adding the following variables allows the agent to access your GitHub data:
     <p class="code-block"><code>
         GITHUB_TOKEN=...
     </code></p>

@@ -6609,8 +6609,66 @@ input[type=button].btn-block {
   }
 }
 
+/* Accordion styling for configuration-setup-guide.md */
+ul.jekyllcodex_accordion {
+  position: relative;
+  margin: 1.4rem 6rem 1.4rem 0 !important;
+  padding-bottom: 0;
+}
+ul.jekyllcodex_accordion li input {
+  display: none;
+}
+ul.jekyllcodex_accordion li label {
+  display: block;
+  cursor: pointer;
+  padding: 1rem;
+  margin: 0;
+}
+ul.jekyllcodex_accordion li div {
+  display: none;
+  padding-bottom: 1.2rem;
+}
+ul.jekyllcodex_accordion li input:checked + label {
+  font-weight: bold;
+}
+ul.jekyllcodex_accordion li input:checked + label + div {
+  display: block;
+  margin: 1rem 3rem 1rem 1rem;
+}
+ul.jekyllcodex_accordion li label::before {
+  content: "+";
+  font-weight: normal;
+  font-size: 130%;
+  line-height: 1.1rem;
+  padding-right: 1rem;
+  position: absolute;
+  right: 0.5rem;
+  transition: all 0.15s ease-in-out;
+}
+ul.jekyllcodex_accordion li input:checked + label::before {
+  transform: rotate(-45deg);
+}
+.accitem:first-of-type {
+  border-top-left-radius: .5rem;
+  border-top-right-radius: .5rem;
+}
+.accitem:last-of-type {
+  border-bottom-right-radius: .5rem;
+  border-bottom-left-radius: .5rem;
+}
+
+.accitem {
+  list-style: none;
+  border: 1px solid #d6d6d6;
+  /* border-bottom: 1px solid #d6d6d6; */
+  margin-left: 0;
+}
+.setup-accordion {
+  margin: 40px;
+}
 .accordion {
   overflow-anchor: none;
+  border-radius: 5px;
 }
 .accordion > .card {
   overflow: hidden;
@@ -6628,6 +6686,56 @@ input[type=button].btn-block {
   border-radius: 0;
   margin-bottom: 0;
 }
+.accordion-item {
+  border: 1px solid rgba(0,0,0,.125);
+}
+.accordion-item:first-of-type {
+  border-top-left-radius: .5rem;
+  border-top-right-radius: .5rem;
+}
+.accordion-item:last-of-type {
+  border-bottom-right-radius: .5rem;
+  border-bottom-left-radius: .5rem;
+}
+.accordion-header {
+}
+.accordion-body {
+  padding: 1rem 1.25rem;
+}
+.accordion-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #212529;
+  text-align: left;
+  border: 0;
+  border-radius: 0.5rem;
+  background-color: white;
+}
+.accordion-button:focus {
+  outline: none;
+}
+.accordion-button:not(.collapsed) {
+
+}
+.accordion-button::after {
+  margin-left: auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  content: "";
+  background-image: url(accordion-btn.svg);
+  background-size: 1.25rem;
+  transition: transform .2s ease-in-out;
+}
+.accordion-button:not(.collapsed)::after {
+  background-image: url(accordion-btn.svg);
+  transform: rotate(-180deg);
+}
+
 
 .breadcrumb {
   display: flex;

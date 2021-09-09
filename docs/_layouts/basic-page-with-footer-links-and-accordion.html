@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+        <title>JF Agent Documentation</title>
+        <link rel="icon" type="image/x-icon" href="assets/img/logo.png" />
+        <script data-search-pseudo-elements defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.24.1/feather.min.js" crossorigin="anonymous"></script>    </head>
+    <body class="sb-nav-fixed">
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_content">
+                <main class="page-detail-wrapper">
+                    <h1 class="page-title">{{ page.title }}</h1>
+                    <div class="page-blurb">{{ page.pageDescription }}</div>
+
+                    <div class="page-body-text">
+                        {{ content }}
+                        <div class="accordion setup-accordion" id="accordionExample">
+                        {% for instructions in site.setups %}
+                        <div class="accordion-item">
+                            <div class="accordion-header" id={{headingId}}>
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#{{ collapseId }}" aria-expanded="true" aria-controls="{{ collapseId }}">
+                                {{ instructions.title }}
+                            </button>
+                            </div>
+                            <div id="{{ collapseId }}" class="accordion-collapse collapse" aria-labelledby="{{ headingId }}" data-bs-parent="#accordionExample">
+                            <div class="accordion-body">
+                                {{ instructions.content }}
+                            </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="accordion-item">
+                            <div class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                Accordion Item #2
+                            </button>
+                            </div>
+                            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionExample">
+                            <div class="accordion-body">
+                                <strong>This is the second item's accordion body.</strong> It is hidden by default, until the collapse plugin adds the appropriate classes that we use to style each element. These classes control the overall appearance, as well as the showing and hiding via CSS transitions. You can modify any of this with custom CSS or overriding our default variables. It's also worth noting that just about any HTML can go within the <code>.accordion-body</code>, though the transition does limit overflow.
+                            </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <div class="accordion-header" id="headingThree">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                Accordion Item #3
+                            </button>
+                            </div>
+                            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#accordionExample">
+                            <div class="accordion-body">
+                                <strong>This is the third item's accordion body.</strong> It is hidden by default, until the collapse plugin adds the appropriate classes that we use to style each element. These classes control the overall appearance, as well as the showing and hiding via CSS transitions. You can modify any of this with custom CSS or overriding our default variables. It's also worth noting that just about any HTML can go within the <code>.accordion-body</code>, though the transition does limit overflow.
+                            </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div class="nav-arrows">
+                        <span class="previous-page" style="{{ page.previousPageStyle }}">
+                            <a href="{{ page.previousPageLink }}"><i class="fas fa-angle-left"></i>&nbsp;&nbsp; {{ page.previousPage }}</a>
+                        </span>
+                        <span class="next-page" style="{{ page.nextPageStyle }}">
+                            <a href="{{ page.nextPageLink }}">{{ page.nextPage }} &nbsp;&nbsp;<i class="fas fa-angle-right"></i></a>
+                        </span>
+                    </div>
+                </main>
+
+                <footer class="footer pt-5 pb-5 mt-auto bg-dark footer-dark">
+                    <div class="container footer-container">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <div class="mb-3">Find us on:</div>
+                                <div class="icon-list-social mb-3">
+                                    <a class="icon-list-social-link" href="https://www.linkedin.com/company/jellyfish-co/mycompany/"><i class="fab fa-linkedin-in"></i></a><a class="icon-list-social-link" href="https://github.com/Jellyfish-AI"><i class="fab fa-github"></i></a><a class="icon-list-social-link" href="https://twitter.com/jellyfishhq"><i class="fab fa-twitter"></i></a>
+                                </div>
+                            </div>
+                            <div class="col-lg-9"><div class="row"></div></div>
+                        </div>
+                        <hr class="my-2 mb-3" />
+                        <div class="row align-items-center">
+                            <div class="col-md-6 small">Copyright &copy; Jellyfish 2021</div>
+                            <div class="col-md-6 text-md-right small"></div>
+                        </div>
+                    </div>
+                </footer>
+
+            </div>
+        </div>
+    </body>
+
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        $(document).ready(async function() {
+            // Get index.html content
+            var templates = document.createElement('template');
+            const response = await fetch('index.html');
+            const result = await response.text();
+            templates.innerHTML = result;
+
+            // Get nav bar template from index.html and put it on the page
+            var template = templates.content.querySelector('#navTemplate'); 
+            var clone = template.content.cloneNode(true);
+            document.getElementById("layoutSidenav").appendChild(clone);
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+
+</html>
