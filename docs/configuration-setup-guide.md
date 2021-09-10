@@ -39,7 +39,7 @@ This will help the agent work with your systems! Using a sample YAML file, along
 
 5. The way the rest of the files look will vary based on your organization's toolset. Choose the options below that match your organization's system to see what changes are required. Depending on your setup, you may need to follow instructions from multiple different sections.
 
-    **If your organization wants to use multiple instances of git with Jellyfish**, make sure that for each of your environment variables, they have a prefix that corresponds to `creds_envvar_prefix` provided in the `example.yml` from step 1.
+    **Make sure that for each of your Git environment variables**, they have a prefix that corresponds to `creds_envvar_prefix` provided in the `example.yml` from step 1.
 
     For example, if the `creds_envvar_prefix` is set to `ORG1` for a Bitbucket instance, the configuration would include the following variables:
     <p class="code-block"><code>
@@ -47,7 +47,7 @@ This will help the agent work with your systems! Using a sample YAML file, along
         ORG1_BITBUCKET_PASSWORD=...
     </code></p>  
 
-    When in multi-git mode, `creds_envvar_prefix` is required for all git instances. See [this section](https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml#L189-L211) in the `example.yml` from step 1 for more details.
+    For each of the following examples, we will be using `ORG1` as our `creds_envvar_prefix`.
 
 <ul class="jekyllcodex_accordion">
     {% for item in site.setups %}
