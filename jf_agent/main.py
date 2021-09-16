@@ -433,7 +433,6 @@ def send_data(config, creds):
         with open(fname, 'rb') as f_in:
             with gzip.open(f'{fname}.gz', 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
-        os.remove(fname)
 
     print('Sending data to Jellyfish... ')
 
@@ -445,6 +444,8 @@ def send_data(config, creds):
     for directory in directories:
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
+            if file_name.endswith('.json'):
+                continue
             filenames.append(f'{directory}/{file_name}')
 
     signed_urls = get_signed_url(filenames)

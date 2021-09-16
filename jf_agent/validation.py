@@ -122,8 +122,8 @@ def validate_memory():
             f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)} MB"
         )
 
-        output_dir_size = os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
-        usage = shutil.disk_usage('/home/jf_agent/output/')
+        output_dir_size = os.popen('du -hs ./output').readlines()[0].split("\t")[0]
+        usage = shutil.disk_usage('./output')
 
         print(
             f'  Disk usage for jf_agent/output: {int(round(usage.used / (1024 ** 3)))} GB / {int(round(usage.total / 1024 ** 3))} GB'
