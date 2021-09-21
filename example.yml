@@ -129,7 +129,7 @@ jira:
 ######################################
 git:
   # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
-  # `gitlab` and `github`.
+  # `gitlab`, `gitlab_v3` and `github`.
   provider: bitbucket_server
 
   # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
