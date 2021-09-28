@@ -206,9 +206,9 @@ def get_repos(
 
     filters = []
     if include_repos:
-        filters.append(lambda r: r['name'] in include_repos)
+        filters.append(lambda r: r['name'].lower() in set([r.lower() for r in include_repos]))
     if exclude_repos:
-        filters.append(lambda r: r['name'] not in exclude_repos)
+        filters.append(lambda r: r['name'].lower() not in set([r.lower() for r in exclude_repos]))
 
     repos = [
         (r, _normalize_repo(client, org, r, redact_names_and_urls))

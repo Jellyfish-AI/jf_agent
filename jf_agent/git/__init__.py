@@ -447,7 +447,6 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
     if config.git_provider == 'bitbucket_server':
 
         from jf_agent.git.bitbucket_server import get_projects as get_projects_bbs
-        from jf_agent.git.bitbucket_server import get_repos as get_repos_bbs, _normalize_repo
 
         projects = get_projects_bbs(
             git_connection, config.git_include_projects, config.git_exclude_projects, False
@@ -455,11 +454,16 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         filters = []
         if config.git_include_repos:
-            filters.append(lambda r: r['name'] in config.git_include_repos)
+            filters.append(
+                lambda r: r['name'].lower() in set([r.lower() for r in config.git_include_repos])
+            )
         if config.git_exclude_repos:
-            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+            filters.append(
+                lambda r: r['name'].lower()
+                not in set([r.lower() for r in config.git_exclude_repos])
+            )
 
-        for api_project in projects:
+        for (api_project, _normalized_project_dict) in projects:
             project_repos = []
             project = git_connection.projects[api_project['key']]
             for repo in project.repos.list():
@@ -471,7 +475,9 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
-        bbc_adapter = BitbucketCloudAdapter(config=config, outdir='', compress_output_files=False, client=git_connection)
+        bbc_adapter = BitbucketCloudAdapter(
+            config=config, outdir='', compress_output_files=False, client=git_connection
+        )
 
         projects = bbc_adapter.get_projects()
         for project in projects:
@@ -480,13 +486,18 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
     elif config.git_provider == 'github':
 
-        from jf_agent.git.github import get_repos as get_repos_gh, get_projects, _normalize_repo
+        from jf_agent.git.github import _normalize_repo
 
         filters = []
         if config.git_include_repos:
-            filters.append(lambda r: r['name'] in config.git_include_repos)
+            filters.append(
+                lambda r: r['name'].lower() in set([r.lower() for r in config.git_include_repos])
+            )
         if config.git_exclude_repos:
-            filters.append(lambda r: r['name'] not in config.git_exclude_repos)
+            filters.append(
+                lambda r: r['name'].lower()
+                not in set([r.lower() for r in config.git_exclude_repos])
+            )
 
         for org in config.git_include_projects:
             org_repos = [
@@ -506,9 +517,12 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         projects = gl_adapter.get_projects()
         for project in projects:
-            project_repos = [x.name for x in gl_adapter.get_repos([project])]
+            # For GitLab, the config file specifies repo IDs not names -- so that's what we want to validate with
+            # project_repos = [x.name for x in gl_adapter.get_repos([project])]
+            project_repos = [x.id for x in gl_adapter.get_repos([project])]
             output_dict[project.name] = project_repos
 
     else:
         raise ValueError(f'{config.git_provider} is not a supported git_provider for this run_mode')
+
     return output_dict

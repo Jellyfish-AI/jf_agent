@@ -81,23 +81,38 @@ class BitbucketCloudAdapter(GitAdapter):
                 )
             ):
                 # If we have an explicit repo allow list and this isn't in it, skip
-                if (
-                    self.config.git_include_repos
-                    and api_repo['name'] not in self.config.git_include_repos
-                    and api_repo['uuid'] not in self.config.git_include_repos
-                ):
-                    if self.config.git_verbose:
-                        print(f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's not in git_include_repos''')
-                    continue
+                if self.config.git_include_repos:
+                    git_include_repos_lowered = set(
+                        n.lower() for n in self.config.git_include_repos
+                    )
+                    if (
+                        api_repo['name'].lower() not in git_include_repos_lowered
+                        and api_repo['uuid'].lower() not in git_include_repos_lowered
+                    ):
+                        if self.config.git_verbose:
+                            agent_logging.log_and_print(
+                                logger,
+                                logging.INFO,
+                                f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's not in git_include_repos''',
+                            )
+                        continue
 
                 # If we have an explicit repo deny list and this is in it, skip
-                if self.config.git_exclude_repos and (
-                    api_repo['name'] in self.config.git_exclude_repos
-                    or api_repo['uuid'] in self.config.git_exclude_repos
-                ):
-                    if self.config.git_verbose:
-                        print(f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's in git_exclude_repos''')
-                    continue
+                if self.config.git_exclude_repos:
+                    git_exclude_repos_lowered = set(
+                        n.lower() for n in self.config.git_exclude_repos
+                    )
+                    if (
+                        api_repo['name'].lower() in git_exclude_repos_lowered
+                        or api_repo['uuid'].lower() in git_exclude_repos_lowered
+                    ):
+                        if self.config.git_verbose:
+                            agent_logging.log_and_print(
+                                logger,
+                                logging.INFO,
+                                f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's in git_exclude_repos''',
+                            )
+                        continue
 
                 # If this repo is in a project, apply project filters:
                 repo_project = api_repo.get('project')
@@ -109,9 +124,11 @@ class BitbucketCloudAdapter(GitAdapter):
                         and repo_project['uuid'] not in self.config.git_include_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            print(
+                            agent_logging.log_and_print(
+                                logger,
+                                logging.INFO,
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
-                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is not in git_include_bbcloud_projects'''
+                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is not in git_include_bbcloud_projects''',
                             )
                         continue
 
@@ -121,9 +138,11 @@ class BitbucketCloudAdapter(GitAdapter):
                         or repo_project['uuid'] in self.config.git_exclude_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            print(
+                            agent_logging.log_and_print(
+                                logger,
+                                logging.INFO,
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
-                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is in git_exclude_bbcloud_projects'''
+                                f'''("{repo_project['key']}"/{repo_project['uuid']}) is in git_exclude_bbcloud_projects''',
                             )
                         continue
 

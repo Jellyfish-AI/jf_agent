@@ -1,11 +1,11 @@
 ---
-title: Step 3&#58; Ensure proper network configuration
+title: Step 2&#58; Ensure proper network configuration
 layout: basic-page-with-footer-links
 pageDescription: On this page, you will find instructions on how to make sure your network configuration is set up properly.
 nextPage: How to run the agent
 nextPageLink: run-agent.html
-previousPage: Step 2&#58; Create environment variable file
-previousPageLink: env-var-setup-guide.html
+previousPage: Step 1&#58; Configure the Agent
+previousPageLink: configuration-setup-guide.html
 ---
 
 ## Details

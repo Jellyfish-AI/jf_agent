@@ -1,4 +1,5 @@
-[{
+[
+  {
     "slug": "test_repo_slug",
     "id": 1,
     "name": "test_repo_name",
@@ -34,4 +35,5 @@
         }
       ]
     }
-  }]
+  }
+]

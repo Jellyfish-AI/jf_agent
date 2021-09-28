@@ -1,88 +1,88 @@
 [
     {
-    "scm": "git",
-    "website": "www.example.com",
-    "has_wiki": false,
-    "description": "A repository for my bits and bobs",
-    "language": "python",
-    "fork_policy": "allow_forks",
-    "links": {
-        "clone": [
-            {
-                "href": "https://bitbucket.org/example-username/bits_and_bobs.git",
-                "name": "https"
-            },
-            {
-                "href": "git@bitbucket.org:example-username/bits_and_bobs.git",
-                "name": "ssh"
-            }
-        ],
-        "watchers": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/watchers"
-        },
-        "branches": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/refs/branches"
-        },
-        "tags": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/refs/tags"
-        },
-        "commits": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/commits"
-        },
-        "downloads": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/downloads"
-        },
-        "source": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/src"
-        },
-        "html": {
-            "href": "https://bitbucket.org/example-username/bits_and_bobs"
-        },
-        "avatar": {
-            "href": "https://bytebucket.org/ravatar/%7B7708d810-964c-403f-aa6d-4e949280d614%7D?ts=python"
-        },
-        "forks": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/forks"
-        },
-        "self": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs"
-        },
-        "pullrequests": {
-            "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/pullrequests"
-        }
-    },
-    "name": "bits_and_bobs",
-    "created_on": "2018-06-20T23:17:33.616037+00:00",
-    "mainbranch": {
-        "type": "branch",
-        "name": "master"
-    },
-    "full_name": "example-username/bits_and_bobs",
-    "has_issues": false,
-    "owner": {
-        "username": "example-username",
-        "display_name": "Example Username",
-        "account_id": "123456:daffbc08-1a80-4bd0-98bf-7997de0a3d10",
+        "scm": "git",
+        "website": "www.example.com",
+        "has_wiki": false,
+        "description": "A repository for my bits and bobs",
+        "language": "python",
+        "fork_policy": "allow_forks",
         "links": {
-            "self": {
-                "href": "https://api.bitbucket.org/2.0/users/example-username"
+            "clone": [
+                {
+                    "href": "https://bitbucket.org/example-username/bits_and_bobs.git",
+                    "name": "https"
+                },
+                {
+                    "href": "git@bitbucket.org:example-username/bits_and_bobs.git",
+                    "name": "ssh"
+                }
+            ],
+            "watchers": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/watchers"
+            },
+            "branches": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/refs/branches"
+            },
+            "tags": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/refs/tags"
+            },
+            "commits": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/commits"
+            },
+            "downloads": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/downloads"
+            },
+            "source": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/src"
             },
             "html": {
-                "href": "https://bitbucket.org/example-username/"
+                "href": "https://bitbucket.org/example-username/bits_and_bobs"
             },
             "avatar": {
-                "href": "https://bitbucket.org/account/example-username/avatar/"
+                "href": "https://bytebucket.org/ravatar/%7B7708d810-964c-403f-aa6d-4e949280d614%7D?ts=python"
+            },
+            "forks": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/forks"
+            },
+            "self": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs"
+            },
+            "pullrequests": {
+                "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/pullrequests"
             }
         },
-        "nickname": "example-username",
-        "type": "user",
-        "uuid": "{58021780-82b6-4517-b153-0ae73ce3e4b4}"
-    },
-    "updated_on": "2018-06-20T23:17:33.616037+00:00",
-    "size": 33348,
-    "type": "repository",
-    "slug": "bits_and_bobs",
-    "is_private": true,
-    "uuid": "{7708d810-964c-403f-aa6d-4e949280d614}"
+        "name": "bits_and_bobs",
+        "created_on": "2018-06-20T23:17:33.616037+00:00",
+        "mainbranch": {
+            "type": "branch",
+            "name": "master"
+        },
+        "full_name": "example-username/bits_and_bobs",
+        "has_issues": false,
+        "owner": {
+            "username": "example-username",
+            "display_name": "Example Username",
+            "account_id": "123456:daffbc08-1a80-4bd0-98bf-7997de0a3d10",
+            "links": {
+                "self": {
+                    "href": "https://api.bitbucket.org/2.0/users/example-username"
+                },
+                "html": {
+                    "href": "https://bitbucket.org/example-username/"
+                },
+                "avatar": {
+                    "href": "https://bitbucket.org/account/example-username/avatar/"
+                }
+            },
+            "nickname": "example-username",
+            "type": "user",
+            "uuid": "{58021780-82b6-4517-b153-0ae73ce3e4b4}"
+        },
+        "updated_on": "2018-06-20T23:17:33.616037+00:00",
+        "size": 33348,
+        "type": "repository",
+        "slug": "bits_and_bobs",
+        "is_private": true,
+        "uuid": "{7708d810-964c-403f-aa6d-4e949280d614}"
     }
 ]

@@ -99,20 +99,30 @@ class GitLabAdapter(GitAdapter):
             ):
                 if (
                     self.config.git_include_repos
+                    # For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
+                    # no need to be case insensitive
                     and api_repo.id not in self.config.git_include_repos
                 ):
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
-                        f'skipping repo {api_repo.id} because not in include_repos...',
-                    )
+                    if self.config.git_verbose:
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'skipping repo {api_repo.id} because not in include_repos...',
+                        )
                     continue  # skip this repo
-                if self.config.git_exclude_repos and api_repo.id in self.config.git_exclude_repos:
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
-                        f'skipping repo {api_repo.id} because in exclude_repos...',
-                    )
+
+                if (
+                    self.config.git_exclude_repos
+                    # For GitLab, git_exclude_repos holds IDs instead of names (probably unintentionally), so
+                    # no need to be case insensitive
+                    and api_repo.id in self.config.git_exclude_repos
+                ):
+                    if self.config.git_verbose:
+                        agent_logging.log_and_print(
+                            logger,
+                            logging.INFO,
+                            f'skipping repo {api_repo.id} because in exclude_repos...',
+                        )
                     continue  # skip this repo
 
                 try:
@@ -193,7 +203,7 @@ class GitLabAdapter(GitAdapter):
                     for j, commit in enumerate(
                         tqdm(
                             self.client.list_project_commits(nrm_repo.id, pull_since),
-                            desc=f'downloading commits for {nrm_repo.name}',
+                            desc=f'downloading commits for {nrm_repo.name} ({nrm_repo.id})',
                             unit='commits',
                         ),
                         start=1,
@@ -221,33 +231,22 @@ class GitLabAdapter(GitAdapter):
     ) -> List[NormalizedPullRequest]:
         print('downloading gitlab prs... ', end='', flush=True)
 
-        for i, nrm_repo in enumerate(
-            tqdm(normalized_repos, desc='downloading prs for repos', unit='repos'), start=1
-        ):
+        for i, nrm_repo in enumerate(normalized_repos, start=1):
+            print(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
-
                     pull_since = pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
 
                     api_prs = self.client.list_project_merge_requests(nrm_repo.id)
-                    total_api_prs = api_prs.total
-
-                    if total_api_prs == 0:
-                        agent_logging.log_and_print(
-                            logger,
-                            logging.INFO,
-                            f'no prs found for repo {nrm_repo.id}. Skipping... ',
-                        )
-                        continue
 
                     for api_pr in tqdm(
                         api_prs,
-                        desc=f'processing prs for {nrm_repo.name}',
+                        desc=f'processing prs for {nrm_repo.name} ({nrm_repo.id})',
                         unit='prs',
-                        total=total_api_prs,
+                        total=api_prs.total,
                     ):
                         try:
                             updated_at = parser.parse(api_pr.updated_at)
@@ -305,14 +304,16 @@ class GitLabAdapter(GitAdapter):
                             pr_id = f' {api_pr.id}' if api_pr else ''
                             log_and_print_request_error(
                                 e,
-                                f'normalizing PR {pr_id} from repo {nrm_repo.id}. Skipping...',
+                                f'normalizing PR {pr_id} from repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
                                 log_as_exception=True,
                             )
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.
                     log_and_print_request_error(
-                        e, f'getting PRs for repo {nrm_repo.id}. Skipping...', log_as_exception=True
+                        e,
+                        f'getting PRs for repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
+                        log_as_exception=True,
                     )
 
     print('✓')

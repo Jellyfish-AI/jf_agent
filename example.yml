@@ -166,13 +166,13 @@ git:
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
   # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-  # GitLab: use the GitLab "Project ID" (e.g.: 123)
+  # GitLab: use project ID (e.g.: 123) (not project name)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
   # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
-  # GitLab: use the GitLab "Project ID" (e.g.: 123)
+  # GitLab: use project ID (e.g.: 123) (not project name)
   # exclude_repos:
   #    - repo_to_skip
 

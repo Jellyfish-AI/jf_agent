@@ -1,43 +1,43 @@
 [
-    {
-      "name": "test_user_name_1",
-      "emailAddress": "test_user1@test.com",
-      "id": 1,
-      "displayName": "test_user_display_name_1",
-      "active": true,
-      "slug": "test_user_slug_1",
-      "type": "NORMAL",
-      "directoryName": "directory_name_1",
-      "deletable": false,
-      "lastAuthenticationTimestamp": 123,
-      "mutableDetails": false,
-      "mutableGroups": false,
-      "links": {
-        "self": [
-          {
-            "href": "https://bitbucket.test.com/users/test_user_1"
-          }
-        ]
-      }
-    },
-    {
-      "name": "test_user_name_2",
-      "emailAddress": "test_user2@email.com",
-      "id": 2,
-      "displayName": "test_user_display_name_2",
-      "active": true,
-      "slug": "test_user_slug_2",
-      "type": "NORMAL",
-      "directoryName": "directory_name_2",
-      "deletable": false,
-      "mutableDetails": false,
-      "mutableGroups": false,
-      "links": {
-        "self": [
-          {
-            "href": "https://bitbucket.test.com/users/test_user_2"
-          }
-        ]
-      }
+  {
+    "name": "test_user_name_1",
+    "emailAddress": "test_user1@test.com",
+    "id": 1,
+    "displayName": "test_user_display_name_1",
+    "active": true,
+    "slug": "test_user_slug_1",
+    "type": "NORMAL",
+    "directoryName": "directory_name_1",
+    "deletable": false,
+    "lastAuthenticationTimestamp": 123,
+    "mutableDetails": false,
+    "mutableGroups": false,
+    "links": {
+      "self": [
+        {
+          "href": "https://bitbucket.test.com/users/test_user_1"
+        }
+      ]
     }
-  ]
+  },
+  {
+    "name": "test_user_name_2",
+    "emailAddress": "test_user2@email.com",
+    "id": 2,
+    "displayName": "test_user_display_name_2",
+    "active": true,
+    "slug": "test_user_slug_2",
+    "type": "NORMAL",
+    "directoryName": "directory_name_2",
+    "deletable": false,
+    "mutableDetails": false,
+    "mutableGroups": false,
+    "links": {
+      "self": [
+        {
+          "href": "https://bitbucket.test.com/users/test_user_2"
+        }
+      ]
+    }
+  }
+]
