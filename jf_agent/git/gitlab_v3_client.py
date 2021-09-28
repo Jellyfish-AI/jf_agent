@@ -36,8 +36,8 @@ class GitLabClient_v3:
     """
     __init__(self, server_url, token=None, convert_dates=True, ssl_verify=None, ssl_cert=None)
 
-    Initialize a GitLab connection and optionally supply auth token. 
-    convert_dates can be set to False to disable automatic conversion of date strings to datetime objects. 
+    Initialize a GitLab connection and optionally supply auth token.
+    convert_dates can be set to False to disable automatic conversion of date strings to datetime objects.
     ssl_verify and ssl_cert are passed to python-requests as the verify and cert arguments, respectively.
     """
 
@@ -115,7 +115,7 @@ class GitLabClient_v3:
         return merge_request
 
     def get_group(self, group_id):
-        return self.get_project(group_id)
+        return self.client.get_group(group_id)
 
     def get_branch(self, project, branch_name):
         return project.find_branch(name=branch_name)
