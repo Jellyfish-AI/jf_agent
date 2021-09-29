@@ -181,8 +181,6 @@ git:
   # If a repo appears here with branch names which do not include the default branch, commits from
   # the default branch will not be pulled.
   # 
-  # Note: This is currently only supported for Github users. BitBucket and Gitlab commits
-  # will only be pulled for the default branch of a repository.
   # include_branches: 
   #   my_repository: 
   #     - master

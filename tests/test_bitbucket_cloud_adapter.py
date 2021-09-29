@@ -149,7 +149,7 @@ class TestBitbucketCloudAdapter(TestCase):
 
         # Act
         resulting_commits = list(
-            self.adapter.get_default_branch_commits(mock_normalized_repos, test_git_instance_info)
+            self.adapter.get_commits_for_included_branches(mock_normalized_repos, {'test_repo': ['test_branch_name']}, test_git_instance_info)
         )
 
         # Assert

@@ -51,7 +51,7 @@
                 "href": "https://api.bitbucket.org/2.0/repositories/example-username/bits_and_bobs/pullrequests"
             }
         },
-        "name": "bits_and_bobs",
+        "name": "test_repo",
         "created_on": "2018-06-20T23:17:33.616037+00:00",
         "mainbranch": {
             "type": "branch",

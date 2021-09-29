@@ -161,35 +161,43 @@ class BitbucketCloudAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_default_branch_commits(
-        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
+    def get_commits_for_included_branches(
+        self, normalized_repos: List[NormalizedRepository], included_branches: dict, server_git_instance_info,
     ) -> List[NormalizedCommit]:
-        print('downloading bitbucket default branch commits... ', end='', flush=True)
+        print('downloading bitbucket commits on included branches... ', end='', flush=True)
         for i, repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
                     server_git_instance_info, repo.project.login, repo.id, 'commits'
                 )
-                for j, commit in enumerate(
-                    tqdm(
-                        self.client.get_commits(repo.project.id, repo.id, repo.default_branch_name),
-                        desc=f'downloading commits for {repo.name}',
-                        unit='commits',
-                    ),
-                    start=1,
-                ):
-                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
-                        commit = _normalize_commit(
-                            commit,
-                            repo,
-                            self.config.git_strip_text_content,
-                            self.config.git_redact_names_and_urls,
-                        )
-                        yield commit
 
-                        # yield one commit older than we want to see
-                        if commit.commit_date < pull_since:
-                            break
+                # Find branches for which we should pull commits, specified by customer in config.
+                # If specific branches are not specified, just pull from default branch.
+                branches_for_repo = included_branches.get(repo.name)
+                branches = branches_for_repo if branches_for_repo else [repo.default_branch_name]
+
+                for branch in branches:
+                    for j, commit in enumerate(
+                        tqdm(
+                            self.client.get_commits(repo.project.id, repo.id, branch),
+                            desc=f'downloading commits for {repo.name} on branch {branch}',
+                            unit='commits',
+                        ),
+                        start=1,
+                    ):
+                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                            commit = _normalize_commit(
+                                commit,
+                                repo,
+                                branch,
+                                self.config.git_strip_text_content,
+                                self.config.git_redact_names_and_urls,
+                            )
+                            yield commit
+
+                            # yield one commit older than we want to see
+                            if commit.commit_date < pull_since:
+                                break
 
         print('✓')
 
@@ -332,7 +340,7 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_commit(
-    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, branch_name, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = _normalize_user(api_commit['author'])
     commit_url = api_commit['links']['html']['href'] if not redact_names_and_urls else None
@@ -345,7 +353,7 @@ def _normalize_commit(
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=len(api_commit['parents']) > 1,
         repo=normalized_repo.short(),  # use short form of repo
-        branch_name=normalized_repo.default_branch_name if not redact_names_and_urls else _branch_redactor.redact_name(normalized_repo.default_branch_name)
+        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
     )
 
 
@@ -462,7 +470,7 @@ def _normalize_pr(
 
     # Commits
     commits = [
-        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+        _normalize_commit(c, repo, api_pr['destination']['branch']['name'], strip_text_content, redact_names_and_urls)
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
     merge_commit = None

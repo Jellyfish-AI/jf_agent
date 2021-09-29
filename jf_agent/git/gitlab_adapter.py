@@ -190,37 +190,44 @@ class GitLabAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_default_branch_commits(
-        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
+    def get_commits_for_included_branches(
+        self, normalized_repos: List[NormalizedRepository], included_branches: dict, server_git_instance_info,
     ) -> List[NormalizedCommit]:
-        print('downloading gitlab default branch commits... ', end='', flush=True)
+        print('downloading gitlab commits on included branches... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
                     server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
                 )
+
+                # Find branches for which we should pull commits, specified by customer in config.
+                # If specific branches are not specified, just pull from default branch.
+                branches_for_repo = included_branches.get(nrm_repo.name)
+                branches = branches_for_repo if branches_for_repo else [nrm_repo.default_branch_name]
                 try:
-                    for j, commit in enumerate(
-                        tqdm(
-                            self.client.list_project_commits(nrm_repo.id, pull_since),
-                            desc=f'downloading commits for {nrm_repo.name} ({nrm_repo.id})',
-                            unit='commits',
-                        ),
-                        start=1,
-                    ):
-                        with agent_logging.log_loop_iters(
-                            logger, 'branch commit inside repo', j, 100
+                    for branch in branches:
+                        for j, commit in enumerate(
+                            tqdm(
+                                self.client.list_project_commits(nrm_repo.id, pull_since, branch),
+                                desc=f'downloading commits for {nrm_repo.name} ({nrm_repo.id})',
+                                unit='commits',
+                            ),
+                            start=1,
                         ):
-                            yield _normalize_commit(
-                                commit,
-                                nrm_repo,
-                                self.config.git_strip_text_content,
-                                self.config.git_redact_names_and_urls,
-                            )
+                            with agent_logging.log_loop_iters(
+                                logger, 'branch commit inside repo', j, 100
+                            ):
+                                yield _normalize_commit(
+                                    commit,
+                                    nrm_repo,
+                                    branch,
+                                    self.config.git_strip_text_content,
+                                    self.config.git_redact_names_and_urls,
+                                )
 
                 except Exception as e:
                     print(
-                        f':WARN: Got exception for branch {nrm_repo.default_branch_name}: {e}. Skipping...'
+                        f':WARN: Got exception for branch {branch}: {e}. Skipping...'
                     )
         print('✓')
 
@@ -270,6 +277,7 @@ class GitLabAdapter(GitAdapter):
                                 _normalize_commit(
                                     commit,
                                     nrm_repo,
+                                    api_pr.target_branch,
                                     self.config.git_strip_text_content,
                                     self.config.git_redact_names_and_urls,
                                 )
@@ -402,7 +410,7 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
 
 
 def _normalize_commit(
-    api_commit, normalized_repo, strip_text_content: bool, redact_names_and_urls: bool
+    api_commit, normalized_repo, branch_name, strip_text_content: bool, redact_names_and_urls: bool
 ):
     author = NormalizedUser(
         id=f'{api_commit.author_name}<{api_commit.author_email}>',
@@ -422,7 +430,7 @@ def _normalize_commit(
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=normalized_repo.short(),  # use short form of repo
-        branch_name=normalized_repo.default_branch_name if not redact_names_and_urls else _branch_redactor.redact_name(normalized_repo.default_branch_name)
+        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
     )
 
 

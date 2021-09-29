@@ -221,6 +221,7 @@ class TestGitLabAdapter(TestCase):
         mock_repo_url = "repo_url"
         mock_repo_default_branch = "default_branch_name"
         mock_repo.url = mock_repo_url
+        mock_repo.name = "test_repo_name"
         mock_repo.default_branch_name = mock_repo_default_branch
 
         mock_short_repo = NormalizedShortRepository(
@@ -230,7 +231,7 @@ class TestGitLabAdapter(TestCase):
 
         # Act
         resulting_commits = list(
-            self.adapter.get_default_branch_commits(mock_repos, test_git_instance_info)
+            self.adapter.get_commits_for_included_branches(mock_repos, {'test_repo_name': ['default_branch_name']}, test_git_instance_info)
         )
 
         # Assert
