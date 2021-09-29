@@ -115,7 +115,7 @@ class GitLabClient_v3:
         return merge_request
 
     def get_group(self, group_id):
-        return self.client.get_group(group_id)
+        return self.client.get_group(str(group_id))
 
     def get_branch(self, project, branch_name):
         return project.find_branch(name=branch_name)
