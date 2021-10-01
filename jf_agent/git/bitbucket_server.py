@@ -319,7 +319,6 @@ def get_pull_requests(
             repo = api_repo.get()
             if verbose:
                 agent_logging.verbose(f"Beginning download of PRs for repo {repo}")
-            default_branch = _get_default_branch_name(api_repo)
             api_project = client.projects[repo['project']['key']]
             api_repo = api_project.repos[repo['name']]
             pull_since = pull_since_date_for_repo(
@@ -435,7 +434,7 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(c, repo, default_branch, strip_text_content, redact_names_and_urls)
+                        _normalize_commit(c, repo, pr['toRef']['displayId'], strip_text_content, redact_names_and_urls)
                         for c in tqdm(
                             api_pr.commits(),
                             f'downloading commits for PR {pr["id"]}',

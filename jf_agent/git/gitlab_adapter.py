@@ -201,7 +201,7 @@ class GitLabAdapter(GitAdapter):
                 )
 
                 # Find branches for which we should pull commits, specified by customer in config.
-                # If specific branches are not specified, just pull from default branch.
+                # If specific branches are not specified for a repo, just pull from default branch.
                 branches_for_repo = included_branches.get(nrm_repo.name)
                 branches = branches_for_repo if branches_for_repo else [nrm_repo.default_branch_name]
                 try:
@@ -295,6 +295,7 @@ class GitLabAdapter(GitAdapter):
                                         merge_request.project_id, merge_request.merge_commit_sha
                                     ),
                                     nrm_repo,
+                                    api_pr.target_branch,
                                     self.config.git_strip_text_content,
                                     self.config.git_redact_names_and_urls,
                                 )
