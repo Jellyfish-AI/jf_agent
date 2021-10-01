@@ -176,10 +176,9 @@ git:
   # exclude_repos:
   #    - repo_to_skip
 
-  # Uncomment this to pull commit data from each of the specified branches for each repository.
-  # By default, we will pull commit data from only the default branch of a repository.
-  # If a repo appears here with branch names which do not include the default branch, commits from
-  # the default branch will not be pulled.
+  # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
+  # the repo's default branch if no additional branches are provided here, commits will only be pulled from the
+  # default branch.
   # 
   # include_branches: 
   #   my_repository: 

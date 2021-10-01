@@ -1,3 +1,4 @@
+from jf_agent.git.utils import get_branches_for_normalized_repo
 import gitlab
 from tqdm import tqdm
 import requests
@@ -200,12 +201,8 @@ class GitLabAdapter(GitAdapter):
                     server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
                 )
 
-                # Find branches for which we should pull commits, specified by customer in config.
-                # If specific branches are not specified for a repo, just pull from default branch.
-                branches_for_repo = included_branches.get(nrm_repo.name)
-                branches = branches_for_repo if branches_for_repo else [nrm_repo.default_branch_name]
                 try:
-                    for branch in branches:
+                    for branch in get_branches_for_normalized_repo(nrm_repo, included_branches):
                         for j, commit in enumerate(
                             tqdm(
                                 self.client.list_project_commits(nrm_repo.id, pull_since, branch),

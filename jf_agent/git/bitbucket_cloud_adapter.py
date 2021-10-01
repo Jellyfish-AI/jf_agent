@@ -1,3 +1,4 @@
+from jf_agent.git.utils import get_branches_for_normalized_repo
 from tqdm import tqdm
 import re
 from dateutil import parser
@@ -171,12 +172,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     server_git_instance_info, repo.project.login, repo.id, 'commits'
                 )
 
-                # Find branches for which we should pull commits, specified by customer in config.
-                # If specific branches are not specified, just pull from default branch.
-                branches_for_repo = included_branches.get(repo.name)
-                branches = branches_for_repo if branches_for_repo else [repo.default_branch_name]
-
-                for branch in branches:
+                for branch in get_branches_for_normalized_repo(repo, included_branches):
                     for j, commit in enumerate(
                         tqdm(
                             self.client.get_commits(repo.project.id, repo.id, branch),

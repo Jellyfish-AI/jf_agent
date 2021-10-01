@@ -243,16 +243,6 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
 def get_commits_for_included_branches(
     client, api_repos, included_branches, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose,
 ):
-
-    # Determine branches to pull commits from for each repo. If no branches are explicitly
-    # provided in a config, only pull from the repo's default branch.
-    repo_name_to_branch_names = {}
-    for api_repo in api_repos:
-        repo = api_repo.get()
-        repo_name = repo['name']
-        branches_for_repo = included_branches.get(repo_name)
-        repo_name_to_branch_names[repo_name] = branches_for_repo if branches_for_repo else [_get_default_branch_name(api_repo)]
-
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             repo = api_repo.get()
@@ -263,7 +253,14 @@ def get_commits_for_included_branches(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
 
-            for branch in repo_name_to_branch_names[repo['name']]:
+            # Determine branches to pull commits from for this repo. If no branches are explicitly
+            # provided in a config, only pull from the repo's default branch.
+            repo_branches = [_get_default_branch_name(api_repo)]
+            additional_branches = included_branches.get(api_repo.get()['name'])
+            if additional_branches:
+                repo_branches.extend(additional_branches)
+
+            for branch in repo_branches:
                 try:
                     if verbose:
                         agent_logging.verbose(f"Beginning download of commits for repo {repo['name']}.")

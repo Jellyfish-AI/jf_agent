@@ -261,22 +261,20 @@ def get_commits_for_included_branches(
     server_git_instance_info,
     redact_names_and_urls,
 ):
-
-    # Determine branches to pull commits from for each repo. If no branches are explicitly
-    # provided in a config, only pull from the repo's default branch.
-    repo_name_to_branch_names = {}
-    for repo in api_repos:
-        repo_name = repo['name']
-        branches_for_repo = included_branches.get(repo_name)
-        repo_name_to_branch_names[repo_name] = branches_for_repo if branches_for_repo else [repo['default_branch']]
-
     for i, repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
             )
 
-            for branch in repo_name_to_branch_names[repo['name']]:
+            # Determine branches to pull commits from for this repo. If no branches are explicitly
+            # provided in a config, only pull from the repo's default branch.
+            repo_branches = [repo['default_branch']]
+            additional_branches = included_branches.get(repo['name'])
+            if additional_branches:
+                repo_branches.extend(additional_branches)
+
+            for branch in repo_branches:
                 try:
                     for j, commit in enumerate(
                         tqdm(
