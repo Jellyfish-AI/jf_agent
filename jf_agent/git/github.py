@@ -269,10 +269,12 @@ def get_commits_for_included_branches(
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly
             # provided in a config, only pull from the repo's default branch.
+            # We are working with the github api object rather than a NormalizedRepository here, 
+            # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
             repo_branches = [repo['default_branch']]
             additional_branches = included_branches.get(repo['name'])
             if additional_branches:
-                repo_branches.extend(additional_branches)
+                repo_branches.extend(branch for branch in additional_branches if branch not in repo_branches)
 
             for branch in repo_branches:
                 try:
