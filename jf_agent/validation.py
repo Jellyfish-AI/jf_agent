@@ -72,6 +72,8 @@ def validate_git(config, creds):
         print(f"  Included repos: {git_config.git_include_repos}")
         if len(git_config.git_exclude_repos) > 0:
             print(f"  Excluded repos: {git_config.git_exclude_repos}")
+        if len(git_config.git_include_branches) > 0:
+                print(f"  Included Branches: {git_config.git_include_branches}")
 
         print('==> Testing Git connection...')
 

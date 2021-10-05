@@ -136,9 +136,9 @@ class GitLabClient:
             state=state_filter, as_list=False, order_by='updated_at', sort='desc'
         )
 
-    def list_project_commits(self, project_id, since_date):
+    def list_project_commits(self, project_id, since_date, branch_name=None):
         project = self.get_project(project_id)
-        return project.commits.list(since=since_date, as_list=False)
+        return project.commits.list(since=since_date, ref_name=branch_name, as_list=False)
 
     def get_project_commit(self, project_id, sha):
         project = self.get_project(project_id)
