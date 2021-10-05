@@ -7,4 +7,4 @@ def get_branches_for_normalized_repo(repo: NormalizedRepository, included_branch
     additional_branches_for_repo = included_branches.get(repo.name)
     if additional_branches_for_repo:
         repo_branches.extend(additional_branches_for_repo)
-    return repo_branches
+    return set(repo_branches)
