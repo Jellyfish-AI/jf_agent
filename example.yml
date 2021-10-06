@@ -177,7 +177,7 @@ git:
   #    - repo_to_skip
 
   # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
-  # the repo's default branch if no additional branches are provided here, commits will only be pulled from the
+  # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's 
   # default branch.
   # 
   # include_branches: 
