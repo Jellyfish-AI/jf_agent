@@ -247,7 +247,6 @@ class GitLabAdapter(GitAdapter):
                     api_prs = self.client.list_project_merge_requests(nrm_repo.id)
 
                     if not api_prs or not api_prs.total:
-                        # if there are no prs
                         agent_logging.log_and_print(
                             logger,
                             logging.WARNING,
