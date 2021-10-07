@@ -74,10 +74,11 @@ def load_and_dump(
             outdir,
             'bb_commits',
             compress_output_files,
-            generator_func=get_default_branch_commits,
+            generator_func=get_commits_for_included_branches,
             generator_func_args=(
                 git_conn,
                 api_repos,
+                config.git_include_branches,
                 config.git_strip_text_content,
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
@@ -223,7 +224,7 @@ def get_repos(
     return repos
 
 
-def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
+def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
     author = commit.get('author') or {}
     author.update(
         {'name': commit['commit']['author']['name'], 'email': commit['commit']['author']['email']}
@@ -238,6 +239,7 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         author=_normalize_user(author),
         is_merge=len(commit['parents']) > 1,
         repo=_normalize_pr_repo(repo, redact_names_and_urls),
+        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
     )
 
 
@@ -251,9 +253,10 @@ def _normalize_pr_repo(repo, redact_names_and_urls):
     )
 
 
-def get_default_branch_commits(
+def get_commits_for_included_branches(
     client: GithubClient,
     api_repos,
+    included_branches,
     strip_text_content,
     server_git_instance_info,
     redact_names_and_urls,
@@ -263,24 +266,35 @@ def get_default_branch_commits(
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
             )
-            try:
-                for j, commit in enumerate(
-                    tqdm(
-                        client.get_commits(
-                            repo['full_name'], repo['default_branch'], since=pull_since, until=None
-                        ),
-                        desc=f'downloading commits for {repo["name"]}',
-                        unit='commits',
-                    ),
-                    start=1,
-                ):
-                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
-                        yield _normalize_commit(
-                            commit, repo, strip_text_content, redact_names_and_urls
-                        )
 
-            except Exception as e:
-                print(f':WARN: Got exception for branch {repo["default_branch"]}: {e}. Skipping...')
+            # Determine branches to pull commits from for this repo. If no branches are explicitly
+            # provided in a config, only pull from the repo's default branch.
+            # We are working with the github api object rather than a NormalizedRepository here, 
+            # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
+            repo_branches = [repo['default_branch']]
+            additional_branches = included_branches.get(repo['name'])
+            if additional_branches:
+                repo_branches.extend(branch for branch in additional_branches if branch not in repo_branches)
+
+            for branch in repo_branches:
+                try:
+                    for j, commit in enumerate(
+                        tqdm(
+                            client.get_commits(
+                                repo['full_name'], branch, since=pull_since, until=None
+                            ),
+                            desc=f'downloading commits on branch {branch} for {repo["name"]}',
+                            unit='commits',
+                        ),
+                        start=1,
+                    ):
+                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                            yield _normalize_commit(
+                                commit, repo, branch, strip_text_content, redact_names_and_urls
+                            )
+
+                except Exception as e:
+                    print(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
 
 
 def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
@@ -290,7 +304,7 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
         )
         if api_merge_commit:
             return _normalize_commit(
-                api_merge_commit, pr['base']['repo'], strip_text_content, redact_names_and_urls
+                api_merge_commit, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls
             )
         else:
             return None
@@ -328,7 +342,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
             _normalize_user(client.get_json(pr['merged_by']['url'])) if pr['merged'] else None
         ),
         commits=[
-            _normalize_commit(c, pr['base']['repo'], strip_text_content, redact_names_and_urls)
+            _normalize_commit(c, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls)
             for c in tqdm(
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
                 f'downloading commits for PR {pr["number"]}',

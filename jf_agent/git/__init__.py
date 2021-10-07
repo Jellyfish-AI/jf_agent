@@ -93,6 +93,7 @@ class NormalizedCommit:
     author: NormalizedUser
     repo: NormalizedShortRepository
     is_merge: bool
+    branch_name: str = None
 
 
 @dataclass
@@ -156,7 +157,7 @@ class GitAdapter(ABC):
         pass
 
     @abstractmethod
-    def get_default_branch_commits(
+    def get_commits_for_included_branches(
         self, api_repos, server_git_instance_info
     ) -> List[NormalizedCommit]:
         pass
@@ -193,8 +194,8 @@ class GitAdapter(ABC):
                 self.outdir,
                 'bb_commits',
                 self.compress_output_files,
-                generator_func=self.get_default_branch_commits,
-                generator_func_args=(nrm_repos, endpoint_git_instance_info,),
+                generator_func=self.get_commits_for_included_branches,
+                generator_func_args=(nrm_repos, self.config.git_include_branches, endpoint_git_instance_info,),
                 item_id_dict_key='hash',
             )
 

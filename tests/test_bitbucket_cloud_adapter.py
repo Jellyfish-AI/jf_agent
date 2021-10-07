@@ -137,6 +137,7 @@ class TestBitbucketCloudAdapter(TestCase):
         test_commits = _get_test_data('test_commits.json')
 
         mock_normalized_repo = MagicMock()
+        mock_normalized_repo.default_branch_name = 'default_branch_name'
         test_short_repo = NormalizedShortRepository(id='test_id', name='test_name', url='test_url')
         mock_normalized_repo.short.return_value = test_short_repo
         mock_normalized_repos = [mock_normalized_repo]
@@ -148,7 +149,7 @@ class TestBitbucketCloudAdapter(TestCase):
 
         # Act
         resulting_commits = list(
-            self.adapter.get_default_branch_commits(mock_normalized_repos, test_git_instance_info)
+            self.adapter.get_commits_for_included_branches(mock_normalized_repos, {'test_repo': ['test_branch_name']}, test_git_instance_info)
         )
 
         # Assert
@@ -208,6 +209,7 @@ class TestBitbucketCloudAdapter(TestCase):
         test_commits = _get_test_data('test_commits.json')
 
         mock_normalized_repo = MagicMock()
+        mock_normalized_repo.default_branch_name = 'default_branch_name'
         mock_normalized_repos = [mock_normalized_repo]
 
         self.mock_client.get_pullrequests.return_value = test_prs

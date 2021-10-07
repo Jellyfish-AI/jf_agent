@@ -22,7 +22,7 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
 
     if log_as_exception:
         agent_logging.log_and_print_error_or_warning(
-            logger, logging.ERROR, msg_args=[error_name, response_code, action, e], error_code=3131,
+            logger, logging.ERROR, msg_args=[error_name, response_code, action, e], error_code=3131, exc_info=True
         )
     else:
         agent_logging.log_and_print_error_or_warning(
@@ -136,9 +136,9 @@ class GitLabClient:
             state=state_filter, as_list=False, order_by='updated_at', sort='desc'
         )
 
-    def list_project_commits(self, project_id, since_date):
+    def list_project_commits(self, project_id, since_date, branch_name=None):
         project = self.get_project(project_id)
-        return project.commits.list(since=since_date, as_list=False)
+        return project.commits.list(since=since_date, ref_name=branch_name, as_list=False)
 
     def get_project_commit(self, project_id, sha):
         project = self.get_project(project_id)

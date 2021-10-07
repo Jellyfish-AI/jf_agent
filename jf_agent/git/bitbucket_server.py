@@ -67,10 +67,11 @@ def load_and_dump(
             outdir,
             'bb_commits',
             compress_output_files,
-            generator_func=get_default_branch_commits,
+            generator_func=get_commits_for_included_branches,
             generator_func_args=(
                 bb_conn,
                 api_repos,
+                config.git_include_branches,
                 config.git_strip_text_content,
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
@@ -221,7 +222,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
-def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
+def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
@@ -235,11 +236,12 @@ def _normalize_commit(commit, repo, strip_text_content, redact_names_and_urls):
         'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
         'repo': _normalize_pr_repo(repo, redact_names_and_urls),
+        'branch_name': branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
     }
 
 
-def get_default_branch_commits(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose,
+def get_commits_for_included_branches(
+    client, api_repos, included_branches, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose,
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
@@ -250,38 +252,45 @@ def get_default_branch_commits(
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
             )
-            try:
 
-                default_branch = (
-                    api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-                )
-                if verbose:
-                    agent_logging.verbose(f"Beginning download of commits for repo {repo['name']}.")
-                commits = api_project.repos[repo['name']].commits(until=default_branch)
+            # Determine branches to pull commits from for this repo. If no branches are explicitly
+            # provided in a config, only pull from the repo's default branch.
+            # We are working with the BBS api object rather than a NormalizedRepository here, 
+            # so we can not use get_branches_for_normalized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
+            repo_branches = [_get_default_branch_name(api_repo)]
+            additional_branches = included_branches.get(api_repo.get()['name'])
+            if additional_branches:
+                repo_branches.extend(branch for branch in additional_branches if branch not in repo_branches)
 
-                for j, commit in enumerate(
-                    tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
-                    start=1,
-                ):
-                    with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
-                        if verbose:
-                            tqdm.write(
-                                f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
+            for branch in repo_branches:
+                try:
+                    if verbose:
+                        agent_logging.verbose(f"Beginning download of commits for repo {repo['name']}.")
+                    commits = api_project.repos[repo['name']].commits(until=branch)
+
+                    for j, commit in enumerate(
+                        tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
+                        start=1,
+                    ):
+                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                            if verbose:
+                                tqdm.write(
+                                    f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
+                                )
+                            normalized_commit = _normalize_commit(
+                                commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
-                        normalized_commit = _normalize_commit(
-                            commit, repo, strip_text_content, redact_names_and_urls
-                        )
-                        # commits are ordered newest to oldest
-                        # if this is too old, we're done with this repo
-                        if pull_since and normalized_commit['commit_date'] < pull_since:
-                            break
+                            # commits are ordered newest to oldest
+                            # if this is too old, we're done with this repo
+                            if pull_since and normalized_commit['commit_date'] < pull_since:
+                                break
 
-                        yield normalized_commit
+                            yield normalized_commit
 
-            except stashy.errors.NotFoundException as e:
-                print(
-                    f'WARN: Got NotFoundException for branch \"{repo.get("default_branch_name", "")}\": {e}. Skipping...'
-                )
+                except stashy.errors.NotFoundException as e:
+                    print(
+                        f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...'
+                    )
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
@@ -424,7 +433,7 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(c, repo, strip_text_content, redact_names_and_urls)
+                        _normalize_commit(c, repo, pr['toRef']['displayId'], strip_text_content, redact_names_and_urls)
                         for c in tqdm(
                             api_pr.commits(),
                             f'downloading commits for PR {pr["id"]}',
@@ -484,3 +493,6 @@ def get_pull_requests(
                     logging.WARNING,
                     f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
                 )
+
+def _get_default_branch_name(api_repo):
+    return api_repo.default_branch['displayId'] if api_repo.default_branch else ''
