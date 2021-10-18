@@ -30,15 +30,35 @@ logger = logging.getLogger(__name__)
 
 
 def _get_raw_jira_connection(config, creds, max_retries=3):
-    jira_conn = JIRA(
-        server=config.jira_url,
-        basic_auth=(creds.jira_username, creds.jira_password),
-        max_retries=max_retries,
-        options={
+    kwargs = {
+        'server': config.jira_url,
+        'max_retries': max_retries,
+        'options': {
             'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
             'verify': not config.skip_ssl_verification,
         },
-    )
+    }
+    if creds.jira_username and creds.jira_password:
+        kwargs['basic_auth'] = (creds.jira_username, creds.jira_password)
+    elif creds.jira_bearer_token:
+        # HACK(asm,2021-10-18): This is copypasta from
+        # https://github.com/pycontribs/jira/blob/df8a6a9879b48083ba940ef9b00d6543bcea5015/jira/client.py#L307-L315
+        # I would like to get bearer token support merged upstream,
+        # however this is a short term fix to enable customers who
+        # have already disabled basic authentication.
+        kwargs['options']['headers'] = {
+            'Authorization': f'Bearer {creds.jira_bearer_token}',
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Atlassian-Token': 'no-check',
+        }
+    else:
+        raise RuntimeError(
+            'No valid Jira credentials found! Check your JIRA_USERNAME, JIRA_PASSWORD, or JIRA_BEARER_TOKEN environment variables.'
+        )
+
+    jira_conn = JIRA(**kwargs)
 
     jira_conn._session.headers[
         'User-Agent'
