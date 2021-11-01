@@ -495,4 +495,7 @@ def get_pull_requests(
                 )
 
 def _get_default_branch_name(api_repo):
-    return api_repo.default_branch['displayId'] if api_repo.default_branch else ''
+    try:
+        return api_repo.default_branch['displayId'] if api_repo.default_branch else ''
+    except stashy.errors.NotFoundException:
+        return ''
