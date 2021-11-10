@@ -24,11 +24,6 @@ Before you begin, determine which credential setup you will need to use. Most of
 
 2. Retrieve a Personal Access Token for the user from step 2 following [this guide](https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html).
 
-3. Add the following section to your environment variable file. This is the same file mentioned in step 3 above. Adding the following variables allows the agent to access your Jira data:
-    <p class="code-block"><code>
-        JIRA_BEARER_TOKEN=...<br/>
-    </code></p>
-
 3. Add the Personal Access Token from the previous step to the environment variable file. This is the same file mentioned in step 3 above. This will allow the agent to access your Jira data. The variable to which this token should be assigned will differ depending upon whether you are using Jira Server or Jira Cloud<br/>
 
     **Jira Server**:<br/>
