@@ -29,4 +29,16 @@ Before you begin, determine which credential setup you will need to use. Most of
         JIRA_BEARER_TOKEN=...<br/>
     </code></p>
 
+3. Add the Personal Access Token from the previous step to the environment variable file. This is the same file mentioned in step 3 above. This will allow the agent to access your Jira data. The variable to which this token should be assigned will differ depending upon whether you are using Jira Server or Jira Cloud<br/>
+
+    **Jira Server**:<br/>
+    <p class="code-block"><code>
+    JIRA_BEARER_TOKEN=...<br/>
+    </code></p>
+
+    **Jira Cloud**:<br/>
+    <p class="code-block"><code>
+    JIRA_PASSWORD=...<br/>
+    </code></p>
+
 4. Populate the appropriate values for your Jira configuration in the `example.yml` file you copied above from step 1. This is [this](https://github.com/Jellyfish-AI/jf_agent/blob/master/example.yml#L13-L111) section of the yml file. Follow the instructions provided in the yml file.
