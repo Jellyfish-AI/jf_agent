@@ -113,17 +113,25 @@ class GitLabClient:
         return merge_request
 
     def get_group(self, group_id):
-        return self.client.groups.get(group_id)
+        try:
+            return self.client.groups.get(group_id)
+        except gitlab.exceptions.GitlabGetError as e:
+            log_and_print_request_error(e, f'error fetching data for group {group_id}')
+            return None
 
     def get_project(self, project_id):
         return self.client.projects.get(project_id)
 
     def list_group_projects(self, group_id):
         group = self.get_group(group_id)
+        if group is None:
+            return []
         return group.projects.list(as_list=False, include_subgroups=True)
 
     def list_group_members(self, group_id):
         group = self.get_group(group_id)
+        if group is None:
+            return []
         return group.members.list(as_list=False)
 
     def list_project_branches(self, project_id):

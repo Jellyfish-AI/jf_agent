@@ -51,12 +51,20 @@ class GitLabAdapter(GitAdapter):
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[NormalizedProject]:
         print('downloading gitlab projects... ', end='', flush=True)
-        projects = [
-            _normalize_project(
-                self.client.get_group(project_id),
-                self.config.git_redact_names_and_urls,  # are group_ids
+        projects = []
+
+        for project_id in self.config.git_include_projects:
+            group = self.client.get_group(project_id)
+
+            if group is None:  # skip groups that errored out when fetching data
+                continue
+
+            projects.append(
+                _normalize_project(
+                    group,
+                    self.config.git_redact_names_and_urls,  # are group_ids
+                )
             )
-            for project_id in self.config.git_include_projects
         ]
         print('✓')
 
