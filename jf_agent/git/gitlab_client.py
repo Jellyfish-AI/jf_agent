@@ -22,7 +22,11 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
 
     if log_as_exception:
         agent_logging.log_and_print_error_or_warning(
-            logger, logging.ERROR, msg_args=[error_name, response_code, action, e], error_code=3131, exc_info=True
+            logger,
+            logging.ERROR,
+            msg_args=[error_name, response_code, action, e],
+            error_code=3131,
+            exc_info=True,
         )
     else:
         agent_logging.log_and_print_error_or_warning(

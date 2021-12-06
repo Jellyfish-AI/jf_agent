@@ -179,7 +179,13 @@ class TestBitbucketServer(TestCase):
         # Act
         result_commits = list(
             bitbucket_server.get_commits_for_included_branches(
-                mock_client, mock_api_repos, {'test_repo_name': ['test_display_id1']}, False, test_git_instance_info, False, False
+                mock_client,
+                mock_api_repos,
+                {'test_repo_name': ['test_display_id1']},
+                False,
+                test_git_instance_info,
+                False,
+                False,
             )
         )
 
