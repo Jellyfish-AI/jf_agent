@@ -163,7 +163,10 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_commits_for_included_branches(
-        self, normalized_repos: List[NormalizedRepository], included_branches: dict, server_git_instance_info,
+        self,
+        normalized_repos: List[NormalizedRepository],
+        included_branches: dict,
+        server_git_instance_info,
     ) -> List[NormalizedCommit]:
         print('downloading bitbucket commits on included branches... ', end='', flush=True)
         for i, repo in enumerate(normalized_repos, start=1):
@@ -181,7 +184,9 @@ class BitbucketCloudAdapter(GitAdapter):
                         ),
                         start=1,
                     ):
-                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                        with agent_logging.log_loop_iters(
+                            logger, 'branch commit inside repo', j, 100
+                        ):
                             commit = _normalize_commit(
                                 commit,
                                 repo,
@@ -349,7 +354,9 @@ def _normalize_commit(
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=len(api_commit['parents']) > 1,
         repo=normalized_repo.short(),  # use short form of repo
-        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        branch_name=branch_name
+        if not redact_names_and_urls
+        else _branch_redactor.redact_name(branch_name),
     )
 
 
@@ -466,7 +473,13 @@ def _normalize_pr(
 
     # Commits
     commits = [
-        _normalize_commit(c, repo, api_pr['destination']['branch']['name'], strip_text_content, redact_names_and_urls)
+        _normalize_commit(
+            c,
+            repo,
+            api_pr['destination']['branch']['name'],
+            strip_text_content,
+            redact_names_and_urls,
+        )
         for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
     ]
     merge_commit = None
@@ -480,7 +493,11 @@ def _normalize_pr(
             repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
         )
         merge_commit = _normalize_commit(
-            api_merge_commit, repo, api_pr['destination']['branch']['name'], strip_text_content, redact_names_and_urls
+            api_merge_commit,
+            repo,
+            api_pr['destination']['branch']['name'],
+            strip_text_content,
+            redact_names_and_urls,
         )
 
     # Repo links
