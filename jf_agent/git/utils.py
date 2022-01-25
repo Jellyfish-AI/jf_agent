@@ -17,6 +17,6 @@ def get_branches_for_normalized_repo(repo: NormalizedRepository, included_branch
 def get_matching_branches(included_branch_patterns: List[str], repo_branch_names: List[str]) -> List[str]:
     matching_branches = []
     for repo_branch_name in repo_branch_names:
-        if any(re.compile(pattern).fullmatch(repo_branch_name) for pattern in included_branch_patterns):
+        if any(re.fullmatch(pattern, repo_branch_name) for pattern in included_branch_patterns):
             matching_branches.append(repo_branch_name)
     return matching_branches
