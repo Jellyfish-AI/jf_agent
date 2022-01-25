@@ -73,7 +73,7 @@ def validate_git(config, creds):
         if len(git_config.git_exclude_repos) > 0:
             print(f"  Excluded repos: {git_config.git_exclude_repos}")
         if len(git_config.git_include_branches) > 0:
-                print(f"  Included Branches: {git_config.git_include_branches}")
+            print(f"  Included Branches: {git_config.git_include_branches}")
 
         print('==> Testing Git connection...')
 
@@ -96,9 +96,12 @@ def validate_git(config, creds):
             for repo in git_config.git_include_repos:
                 # Messy: GitLab repos are specified as as ints, not strings
                 if type(repo) == int:
+
                     def comp_func(repo):
                         return repo not in all_repos
+
                 else:
+
                     def comp_func(repo):
                         return repo.lower() not in set(n.lower() for n in all_repos)
 

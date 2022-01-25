@@ -101,7 +101,9 @@ def main():
         print('Validating configuration...')
 
         # Check for Jira credentials
-        if config.jira_url and creds.jira_username and creds.jira_password:
+        if config.jira_url and (
+            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
+        ):
             validate_jira(config, creds)
         else:
             print("\nNo Jira URL or credentials provided, skipping Jira validation...")
@@ -189,7 +191,13 @@ def main():
 
 UserProvidedCreds = namedtuple(
     'UserProvidedCreds',
-    ['jellyfish_api_token', 'jira_username', 'jira_password', 'git_instance_to_creds'],
+    [
+        'jellyfish_api_token',
+        'jira_username',
+        'jira_password',
+        'jira_bearer_token',
+        'git_instance_to_creds',
+    ],
 )
 
 JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info'])
@@ -248,6 +256,7 @@ def obtain_creds(config):
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
     jira_password = os.environ.get('JIRA_PASSWORD', None)
+    jira_bearer_token = os.environ.get('JIRA_BEARER_TOKEN', None)
 
     # obtain git slug to credentials
     git_instance_to_creds = {
@@ -255,14 +264,16 @@ def obtain_creds(config):
         for git_config in config.git_configs
     }
 
-    if config.jira_url and not (jira_username and jira_password):
+    jira_username_pass_missing = bool(not (jira_username and jira_password))
+    jira_bearer_token_missing = bool(not jira_bearer_token)
+    if config.jira_url and jira_username_pass_missing and jira_bearer_token_missing:
         print(
-            'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD.'
+            'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD or JIRA_BEARER_TOKEN.'
         )
         raise BadConfigException()
 
     return UserProvidedCreds(
-        jellyfish_api_token, jira_username, jira_password, git_instance_to_creds
+        jellyfish_api_token, jira_username, jira_password, jira_bearer_token, git_instance_to_creds
     )
 
 

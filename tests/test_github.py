@@ -139,7 +139,12 @@ class TestGithub(TestCase):
         # Act
         result_commits = list(
             github.get_commits_for_included_branches(
-                mock_client, test_repos, {'repo_name': ['master']}, False, test_git_instance_info, False,
+                mock_client,
+                test_repos,
+                {'repo_name': ['master']},
+                False,
+                test_git_instance_info,
+                False,
             )
         )
 

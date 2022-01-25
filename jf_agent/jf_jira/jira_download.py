@@ -140,9 +140,27 @@ def download_projects_and_versions(
     if exclude_projects:
         filters.append(lambda proj: proj.key not in exclude_projects)
     if include_categories:
-        filters.append(lambda proj: proj.projectCategory.name in include_categories)
+
+        def _include_filter(proj):
+            # If we have a category-based allowlist and the project
+            # does not have a category, do not include it.
+            if not hasattr(proj, 'projectCategory'):
+                return False
+
+            return proj.projectCategory.name in include_categories
+
+        filters.append(_include_filter)
     if exclude_categories:
-        filters.append(lambda proj: proj.projectCategory.name not in exclude_categories)
+
+        def _exclude_filter(proj):
+            # If we have a category-based excludelist and the project
+            # does not have a category, include it.
+            if not hasattr(proj, 'projectCategory'):
+                return True
+
+            return proj.projectCategory.name not in exclude_categories
+
+        filters.append(_exclude_filter)
 
     def project_is_accessible(project_id):
         try:

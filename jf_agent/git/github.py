@@ -239,7 +239,9 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
         author=_normalize_user(author),
         is_merge=len(commit['parents']) > 1,
         repo=_normalize_pr_repo(repo, redact_names_and_urls),
-        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        branch_name=branch_name
+        if not redact_names_and_urls
+        else _branch_redactor.redact_name(branch_name),
     )
 
 
@@ -269,12 +271,14 @@ def get_commits_for_included_branches(
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly
             # provided in a config, only pull from the repo's default branch.
-            # We are working with the github api object rather than a NormalizedRepository here, 
+            # We are working with the github api object rather than a NormalizedRepository here,
             # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
             repo_branches = [repo['default_branch']]
             additional_branches = included_branches.get(repo['name'])
             if additional_branches:
-                repo_branches.extend(branch for branch in additional_branches if branch not in repo_branches)
+                repo_branches.extend(
+                    branch for branch in additional_branches if branch not in repo_branches
+                )
 
             for branch in repo_branches:
                 try:
@@ -288,7 +292,9 @@ def get_commits_for_included_branches(
                         ),
                         start=1,
                     ):
-                        with agent_logging.log_loop_iters(logger, 'branch commit inside repo', j, 100):
+                        with agent_logging.log_loop_iters(
+                            logger, 'branch commit inside repo', j, 100
+                        ):
                             yield _normalize_commit(
                                 commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
@@ -304,7 +310,11 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
         )
         if api_merge_commit:
             return _normalize_commit(
-                api_merge_commit, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls
+                api_merge_commit,
+                pr['base']['repo'],
+                pr['base']['ref'],
+                strip_text_content,
+                redact_names_and_urls,
             )
         else:
             return None
@@ -342,7 +352,9 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
             _normalize_user(client.get_json(pr['merged_by']['url'])) if pr['merged'] else None
         ),
         commits=[
-            _normalize_commit(c, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls)
+            _normalize_commit(
+                c, pr['base']['repo'], pr['base']['ref'], strip_text_content, redact_names_and_urls
+            )
             for c in tqdm(
                 client.get_pr_commits(pr['base']['repo']['full_name'], pr['number']),
                 f'downloading commits for PR {pr["number"]}',

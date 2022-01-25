@@ -51,13 +51,17 @@ class GitLabAdapter(GitAdapter):
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[NormalizedProject]:
         print('downloading gitlab projects... ', end='', flush=True)
-        projects = [
-            _normalize_project(
-                self.client.get_group(project_id),
-                self.config.git_redact_names_and_urls,  # are group_ids
+        projects = []
+
+        for project_id in self.config.git_include_projects:
+            group = self.client.get_group(project_id)
+
+            if group is None:  # skip groups that errored out when fetching data
+                continue
+
+            projects.append(
+                _normalize_project(group, self.config.git_redact_names_and_urls,)  # are group_ids
             )
-            for project_id in self.config.git_include_projects
-        ]
         print('✓')
 
         if not projects:
@@ -192,7 +196,10 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_commits_for_included_branches(
-        self, normalized_repos: List[NormalizedRepository], included_branches: dict, server_git_instance_info,
+        self,
+        normalized_repos: List[NormalizedRepository],
+        included_branches: dict,
+        server_git_instance_info,
     ) -> List[NormalizedCommit]:
         print('downloading gitlab commits on included branches... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
@@ -223,9 +230,7 @@ class GitLabAdapter(GitAdapter):
                                 )
 
                 except Exception as e:
-                    print(
-                        f':WARN: Got exception for branch {branch}: {e}. Skipping...'
-                    )
+                    print(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
         print('✓')
 
     @diagnostics.capture_timing()
@@ -245,6 +250,12 @@ class GitLabAdapter(GitAdapter):
                     )
 
                     api_prs = self.client.list_project_merge_requests(nrm_repo.id)
+
+                    if not api_prs or not api_prs.total:
+                        agent_logging.log_and_print(
+                            logger, logging.WARNING, f"No PRs returned for repo {nrm_repo.id}"
+                        )
+                        continue
 
                     for api_pr in tqdm(
                         api_prs,
@@ -428,7 +439,9 @@ def _normalize_commit(
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=normalized_repo.short(),  # use short form of repo
-        branch_name=branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        branch_name=branch_name
+        if not redact_names_and_urls
+        else _branch_redactor.redact_name(branch_name),
     )
 
 
