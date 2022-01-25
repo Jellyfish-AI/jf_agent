@@ -5,12 +5,12 @@ from jf_agent.git import NormalizedRepository
 # Return branches for which we should pull commits, specified by customer in git config.
 # The repo's default branch will always be included in the returned list.
 def get_branches_for_normalized_repo(repo: NormalizedRepository, included_branches: dict):
-    included_branches = [repo.default_branch_name]
+    branches_to_process = [repo.default_branch_name]
     additional_branches_for_repo = included_branches.get(repo.name)
     if additional_branches_for_repo:
         repo_branch_names = [b.name for b in repo.branches]
-        included_branches.extend(get_matching_branches(additional_branches_for_repo, repo_branch_names))
-    return set(included_branches)
+        branches_to_process.extend(get_matching_branches(additional_branches_for_repo, repo_branch_names))
+    return set(branches_to_process)
 
 # Given a list of patterns, either literal branch names or regexes meant to match a set of branches in a repo, 
 # return the list of branches from repo_branches match any of the patterns.

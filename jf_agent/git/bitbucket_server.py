@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-from typing import List
 import stashy
 import pytz
 from tqdm import tqdm
@@ -267,14 +266,14 @@ def get_commits_for_included_branches(
             # provided in a config, only pull from the repo's default branch.
             # We are working with the BBS api object rather than a NormalizedRepository here,
             # so we can not use get_branches_for_normalized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
-            included_branches = [_get_default_branch_name(api_repo)]
+            branches_to_process = [_get_default_branch_name(api_repo)]
             additional_branch_patterns = included_branches.get(api_repo.get()['name'])
         
             if additional_branch_patterns:
                 repo_branches = [b['displayId'] for b in api_repo.branches()]
-                included_branches.extend(get_matching_branches(additional_branch_patterns, repo_branches))
+                branches_to_process.extend(get_matching_branches(additional_branch_patterns, repo_branches))
 
-            for branch in included_branches:
+            for branch in branches_to_process:
                 try:
                     if verbose:
                         agent_logging.verbose(

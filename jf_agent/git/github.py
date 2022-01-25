@@ -274,16 +274,16 @@ def get_commits_for_included_branches(
             # provided in a config, only pull from the repo's default branch.
             # We are working with the github api object rather than a NormalizedRepository here,
             # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
-            included_branches = [repo['default_branch']]
+            branches_to_process = [repo['default_branch']]
             additional_branch_patterns = included_branches.get(repo['name'])
 
             if additional_branch_patterns:
                 repo_branches = [b['name'] for b in client.get_branches(repo['full_name'])]
-                included_branches.extend(
+                branches_to_process.extend(
                     get_matching_branches(additional_branch_patterns, repo_branches)
                 )
 
-            for branch in repo_branches:
+            for branch in branches_to_process:
                 try:
                     for j, commit in enumerate(
                         tqdm(
