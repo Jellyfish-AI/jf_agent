@@ -15,6 +15,7 @@ from jf_agent.git import (
     NormalizedUser,
 )
 from jf_agent.git import pull_since_date_for_repo
+from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
 from jf_agent.config_file_reader import GitConfig
@@ -273,11 +274,13 @@ def get_commits_for_included_branches(
             # provided in a config, only pull from the repo's default branch.
             # We are working with the github api object rather than a NormalizedRepository here,
             # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
-            repo_branches = [repo['default_branch']]
-            additional_branches = included_branches.get(repo['name'])
-            if additional_branches:
-                repo_branches.extend(
-                    branch for branch in additional_branches if branch not in repo_branches
+            included_branches = [repo['default_branch']]
+            additional_branch_patterns = included_branches.get(repo['name'])
+
+            if additional_branch_patterns:
+                repo_branches = [b['name'] for b in client.get_branches(repo['full_name'])]
+                included_branches.extend(
+                    get_matching_branches(additional_branch_patterns, repo_branches)
                 )
 
             for branch in repo_branches:
