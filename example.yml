@@ -178,7 +178,7 @@ git:
 
   # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
   # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's 
-  # default branch.
+  # default branch. Branch names may be either a literal branch name or a regex matching a set of branches in a repo.
   # 
   # include_branches: 
   #   my_repository: 

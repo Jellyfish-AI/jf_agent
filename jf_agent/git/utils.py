@@ -13,7 +13,7 @@ def get_branches_for_normalized_repo(repo: NormalizedRepository, included_branch
     return set(branches_to_process)
 
 # Given a list of patterns, either literal branch names or regexes meant to match a set of branches in a repo, 
-# return the list of branches from repo_branches match any of the patterns.
+# return the list of branches from repo_branches that match any of the branch name patterns.
 def get_matching_branches(included_branch_patterns: List[str], repo_branch_names: List[str]) -> List[str]:
     matching_branches = []
     for repo_branch_name in repo_branch_names:
