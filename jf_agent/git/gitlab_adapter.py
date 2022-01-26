@@ -213,7 +213,7 @@ class GitLabAdapter(GitAdapter):
                         for j, commit in enumerate(
                             tqdm(
                                 self.client.list_project_commits(nrm_repo.id, pull_since, branch),
-                                desc=f'downloading commits for {nrm_repo.name} ({nrm_repo.id})',
+                                desc=f'downloading commits for branch {branch} in repo {nrm_repo.name} ({nrm_repo.id})',
                                 unit='commits',
                             ),
                             start=1,
