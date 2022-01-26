@@ -178,7 +178,9 @@ git:
 
   # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
   # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's 
-  # default branch. Branch names may be either a literal branch name or a regex matching a set of branches in a repo.
+  # default branch. Branch names may be either a full branch name or a branch name pattern with the special characters * or ?.
+  #   * will match against all subsequent characters. For example, dev* will match against the branches 'dev', 'develop', 'dev_1' etc.
+  #   ? will match against a single character. For example, dev? will match against the branches 'dev1', 'dev2', 'dev3' etc.
   # 
   # include_branches: 
   #   my_repository: 
