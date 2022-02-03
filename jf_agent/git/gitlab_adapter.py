@@ -251,17 +251,10 @@ class GitLabAdapter(GitAdapter):
 
                     api_prs = self.client.list_project_merge_requests(nrm_repo.id)
 
-                    if not api_prs or not api_prs.total:
-                        agent_logging.log_and_print(
-                            logger, logging.WARNING, f"No PRs returned for repo {nrm_repo.id}"
-                        )
-                        continue
-
                     for api_pr in tqdm(
                         api_prs,
                         desc=f'processing prs for {nrm_repo.name} ({nrm_repo.id})',
                         unit='prs',
-                        total=api_prs.total,
                     ):
                         try:
                             updated_at = parser.parse(api_pr.updated_at)
