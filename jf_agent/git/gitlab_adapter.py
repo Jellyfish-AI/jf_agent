@@ -102,33 +102,8 @@ class GitLabAdapter(GitAdapter):
                 ),
                 start=1,
             ):
-                if (
-                    self.config.git_include_repos
-                    # For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
-                    # no need to be case insensitive
-                    and api_repo.id not in self.config.git_include_repos
-                ):
-                    if self.config.git_verbose:
-                        agent_logging.log_and_print(
-                            logger,
-                            logging.INFO,
-                            f'skipping repo {api_repo.id} because not in include_repos...',
-                        )
-                    continue  # skip this repo
-
-                if (
-                    self.config.git_exclude_repos
-                    # For GitLab, git_exclude_repos holds IDs instead of names (probably unintentionally), so
-                    # no need to be case insensitive
-                    and api_repo.id in self.config.git_exclude_repos
-                ):
-                    if self.config.git_verbose:
-                        agent_logging.log_and_print(
-                            logger,
-                            logging.INFO,
-                            f'skipping repo {api_repo.id} because in exclude_repos...',
-                        )
-                    continue  # skip this repo
+                if not _should_fetch_repo_data(api_repo, self.config):
+                    continue
 
                 try:
                     nrm_branches = self.get_branches(api_repo)
@@ -587,3 +562,54 @@ def _get_attribute(object, property, default=None):
         return value if value else default
     except AttributeError:
         return default
+
+
+def _should_fetch_repo_data(api_repo: gitlab.v4.objects.projects.GroupProject, config: GitConfig) -> bool:
+    """
+    Determines whether a certain repo data should be fetched depending whether
+
+    For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
+    no need to be case insensitive
+    """
+    include_rules_defined = bool(config.git_include_repos or config.git_include_projects_recursively)
+    exclude_rules_defined = bool(config.git_exclude_repos or config.git_exclude_projects_recursively)
+
+    if not (include_rules_defined or exclude_rules_defined):
+        # Always pull from a repo if there are no special rules
+        return True
+
+    api_repo_parent_project_id = api_repo.namespace["id"]
+
+    included_explicitly = bool(config.git_include_repos) and api_repo.id in config.git_include_repos
+    included_recursively = bool(config.git_include_projects_recursively) \
+        and api_repo_parent_project_id in config.git_include_projects_recursively
+
+    included = included_explicitly or included_recursively
+
+    excluded_explicitly = bool(config.git_exclude_repos) and api_repo.id not in config.git_exclude_repos
+    excluded_recursively = bool(config.git_exclude_projects_recursively) \
+        and api_repo_parent_project_id not in config.git_exclude_projects_recursively
+
+    excluded = excluded_explicitly or excluded_recursively
+
+    if include_rules_defined and not included:
+        if config.git_verbose:
+            agent_logging.log_and_print(
+                logger,
+                logging.INFO,
+                f"skipping repo {api_repo.id} because it is not included explicitly or recursively, "
+                f"while include rules are defined...",
+            )
+        return False
+
+    if exclude_rules_defined and excluded:
+        if config.git_verbose:
+            agent_logging.log_and_print(
+                logger,
+                logging.INFO,
+                f'skipping repo {api_repo.id} because it is excluded explicitly or recursively,'
+                f'while exclude rules are defined...',
+            )
+        return False
+
+    return True
