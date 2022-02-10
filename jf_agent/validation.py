@@ -87,29 +87,35 @@ def validate_git(config, creds):
             project_repo_dict = get_nested_repos_from_git(client, git_config)
             all_repos = sum(project_repo_dict.values(), [])
 
-            print("  All projects and repositories available to agent:")
-            for project_name, repo_list in project_repo_dict.items():
-                print(f"  -- {project_name}")
-                for repo in repo_list:
-                    print(f"    -- {repo}")
+            if not all_repos:
+                print(
+                    " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
+                )
+                
+            else : 
+                print("  All projects and repositories available to agent:")
+                for project_name, repo_list in project_repo_dict.items():
+                    print(f"  -- {project_name}")
+                    for repo in repo_list:
+                        print(f"    -- {repo}")
 
-            for repo in git_config.git_include_repos:
-                # Messy: GitLab repos are specified as as ints, not strings
-                if type(repo) == int:
+                for repo in git_config.git_include_repos:
+                    # Messy: GitLab repos are specified as as ints, not strings
+                    if type(repo) == int:
 
-                    def comp_func(repo):
-                        return repo not in all_repos
+                        def comp_func(repo):
+                            return repo not in all_repos
 
-                else:
+                    else:
 
-                    def comp_func(repo):
-                        return repo.lower() not in set(n.lower() for n in all_repos)
+                        def comp_func(repo):
+                            return repo.lower() not in set(n.lower() for n in all_repos)
 
-                if comp_func(repo):
-                    print(
-                        f"  WARNING: {repo} is explicitly defined as an included repo, but agent doesn't seem"
-                        f" to see this repository -- possibly missing permissions."
-                    )
+                    if comp_func(repo):
+                        print(
+                            f"  WARNING: {repo} is explicitly defined as an included repo, but agent doesn't seem"
+                            f" to see this repository -- possibly missing permissions."
+                        )
 
         except Exception as e:
             print(f"Git connection unsuccessful! Exception: {e}")
