@@ -29,7 +29,6 @@ def load_and_dump(
 ):
     write_file(outdir, 'bb_users', compress_output_files, get_users(bb_conn))
 
-    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     bitbucket_projects = get_projects(
             bb_conn,
             config.git_include_projects,
@@ -39,6 +38,7 @@ def load_and_dump(
     if not bitbucket_projects:
         logger.warn(" No projects and repositories available to agent: Please Check Configuration")
         return
+    # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
     api_projects, projects = zip(
         *bitbucket_projects
     )
