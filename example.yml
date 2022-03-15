@@ -164,6 +164,14 @@ git:
   # exclude_bitbucket_cloud_projects:
   #     - PROJ1
 
+  # GitLab only: a list of GitLab Group IDs for which we want to include ALL constituent repos
+  # include_all_repos_inside_projects:
+  #     - 123
+
+  # GitLab only: a list of GitLab Group IDs for which we want to exclude ALL constituent repos
+  # exclude_all_repos_inside_projects:
+  #     - 123
+
   # Only pull from specific repos.  Comment this out to pull from all repos.
   # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
   # GitLab: use project ID (e.g.: 123) (not project name)
@@ -177,13 +185,13 @@ git:
   #    - repo_to_skip
 
   # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
-  # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's 
+  # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's
   # default branch. Branch names may be either a full branch name or a branch name pattern with the special characters * or ?.
   #   * will match against all subsequent characters. For example, dev* will match against the branches 'dev', 'develop', 'dev_1' etc.
   #   ? will match against a single character. For example, dev? will match against the branches 'dev1', 'dev2', 'dev3' etc.
-  # 
-  # include_branches: 
-  #   my_repository: 
+  #
+  # include_branches:
+  #   my_repository:
   #     - master
   #     - develop
 
