@@ -580,9 +580,9 @@ def _should_fetch_repo_data(api_repo: gitlab.v4.objects.projects.GroupProject, c
 
     included = included_explicitly or included_implicitly
 
-    excluded_explicitly = bool(config.git_exclude_repos) and api_repo.id not in config.git_exclude_repos
+    excluded_explicitly = bool(config.git_exclude_repos) and api_repo.id in config.git_exclude_repos
     excluded_implicitly = bool(config.git_exclude_all_repos_inside_projects) \
-        and api_repo_parent_project_id not in config.git_exclude_all_repos_inside_projects
+        and api_repo_parent_project_id in config.git_exclude_all_repos_inside_projects
 
     excluded = excluded_explicitly or excluded_implicitly
 
