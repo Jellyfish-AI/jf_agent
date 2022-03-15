@@ -559,38 +559,39 @@ def _get_attribute(object, property, default=None):
 
 def _should_fetch_repo_data(api_repo: gitlab.v4.objects.projects.GroupProject, config: GitConfig) -> bool:
     """
-    Determines whether a certain repo data should be fetched depending whether
+    Determines whether a certain repo's data should be fetched.
 
     For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
     no need to be case insensitive
     """
-    include_rules_defined = bool(config.git_include_repos or config.git_include_projects_recursively)
-    exclude_rules_defined = bool(config.git_exclude_repos or config.git_exclude_projects_recursively)
+    include_rules_defined = bool(config.git_include_repos or config.git_include_all_repos_inside_projects)
+    exclude_rules_defined = bool(config.git_exclude_repos or config.git_exclude_all_repos_inside_projects)
 
     if not (include_rules_defined or exclude_rules_defined):
         # Always pull from a repo if there are no special rules
         return True
 
+    # In GitLab's terminology, a group ID; in Jellyfish's terminology, a project ID
     api_repo_parent_project_id = api_repo.namespace["id"]
 
     included_explicitly = bool(config.git_include_repos) and api_repo.id in config.git_include_repos
-    included_recursively = bool(config.git_include_projects_recursively) \
-        and api_repo_parent_project_id in config.git_include_projects_recursively
+    included_implicitly = bool(config.git_include_all_repos_inside_projects) \
+        and api_repo_parent_project_id in config.git_include_all_repos_inside_projects
 
-    included = included_explicitly or included_recursively
+    included = included_explicitly or included_implicitly
 
     excluded_explicitly = bool(config.git_exclude_repos) and api_repo.id not in config.git_exclude_repos
-    excluded_recursively = bool(config.git_exclude_projects_recursively) \
-        and api_repo_parent_project_id not in config.git_exclude_projects_recursively
+    excluded_implicitly = bool(config.git_exclude_all_repos_inside_projects) \
+        and api_repo_parent_project_id not in config.git_exclude_all_repos_inside_projects
 
-    excluded = excluded_explicitly or excluded_recursively
+    excluded = excluded_explicitly or excluded_implicitly
 
     if include_rules_defined and not included:
         if config.git_verbose:
             agent_logging.log_and_print(
                 logger,
                 logging.INFO,
-                f"skipping repo {api_repo.id} because it is not included explicitly or recursively, "
+                f"skipping repo {api_repo.id} because it is not included explicitly or implicitly, "
                 f"while include rules are defined...",
             )
         return False
@@ -600,7 +601,7 @@ def _should_fetch_repo_data(api_repo: gitlab.v4.objects.projects.GroupProject, c
             agent_logging.log_and_print(
                 logger,
                 logging.INFO,
-                f'skipping repo {api_repo.id} because it is excluded explicitly or recursively,'
+                f'skipping repo {api_repo.id} because it is excluded explicitly or implicitly,'
                 f'while exclude rules are defined...',
             )
         return False

@@ -19,8 +19,8 @@ class GitConfig:
     git_instance_slug: str
     git_include_projects: List
     git_exclude_projects: List
-    git_include_projects_recursively: List
-    git_exclude_projects_recursively: List
+    git_include_all_repos_inside_projects: List
+    git_exclude_all_repos_inside_projects: List
     git_include_repos: List
     git_exclude_repos: List
     git_include_branches: dict
@@ -282,8 +282,8 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
-    git_include_projects_recursively = set(git_config.get('include_projects_recursively', []))
-    git_exclude_projects_recursively = set(git_config.get('exclude_projects_recursively', []))
+    git_include_all_repos_inside_projects = set(git_config.get('include_all_repos_inside_projects', []))
+    git_exclude_all_repos_inside_projects = set(git_config.get('exclude_all_repos_inside_projects', []))
     git_instance_slug = git_config.get('instance_slug', None)
     creds_envvar_prefix = git_config.get('creds_envvar_prefix', None)
     git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', []))
@@ -346,8 +346,8 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_url=git_url,
         git_include_projects=list(git_include_projects),
         git_exclude_projects=list(git_exclude_projects),
-        git_include_projects_recursively=list(git_include_projects_recursively),
-        git_exclude_projects_recursively=list(git_exclude_projects_recursively),
+        git_include_all_repos_inside_projects=list(git_include_all_repos_inside_projects),
+        git_exclude_all_repos_inside_projects=list(git_exclude_all_repos_inside_projects),
         git_include_repos=list(git_include_repos),
         git_exclude_repos=list(git_exclude_repos),
         git_include_branches=dict(git_include_branches),
