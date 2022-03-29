@@ -2,3 +2,7 @@
 .git
 .gitignore
 tests
+.envrc
+output
+.DS_Store
+.jekyll-cache

@@ -11,7 +11,6 @@ from dateutil import parser
 from jira.exceptions import JIRAError
 from jira.resources import dict2resource
 from jira.utils import json_loads
-import numpy
 import queue
 import sys
 import string
@@ -19,6 +18,7 @@ import threading
 from tqdm import tqdm
 
 from jf_agent import diagnostics, agent_logging
+from jf_agent.util import split
 
 logger = logging.getLogger(__name__)
 
@@ -465,7 +465,7 @@ def download_necessary_issues(
         math.ceil(len(issue_ids_to_download) / actual_batch_size), num_parallel_threads
     )
     random.shuffle(issue_ids_to_download)
-    issue_ids_for_threads = numpy.array_split(issue_ids_to_download, num_threads_to_use)
+    issue_ids_for_threads = list(split(issue_ids_to_download, num_threads_to_use))
 
     # Make threads to talk to Jira and write batches of issues to the queue
     q = queue.Queue()
@@ -475,7 +475,7 @@ def download_necessary_issues(
             args=[
                 thread_num,
                 jira_connection,
-                issue_ids_for_threads[thread_num].tolist(),
+                issue_ids_for_threads[thread_num],
                 field_spec,
                 actual_batch_size,
                 q,

@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [requires]
-python_version = "3.7"
+python_version = "3.9"
 
 [packages]
 urllib3 = ">=1.26.5"
@@ -16,6 +16,5 @@ dateparser = "*"
 jsonstreams = "*"
 psutil = "*"
 python-gitlab = "*"
-numpy = ">= 1.18, < 1.19"
 
 [dev-packages]
