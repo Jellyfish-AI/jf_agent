@@ -369,7 +369,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
         comments=[
             NormalizedPullRequestComment(
                 user=_normalize_user(client.get_json(c['user']['url'])),
-                body=c['body'],
+                body=sanitize_text(c['body'], strip_text_content),
                 created_at=c['created_at'],
             )
             for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
