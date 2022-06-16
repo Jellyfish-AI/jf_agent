@@ -34,7 +34,17 @@ class GithubClient:
 
     def get_all_users(self, org):
         url = f'{self.base_url}/orgs/{org}/members'
-        return (self.get_json(m['url']) for m in self.get_all_pages(url))
+        for m in self.get_all_pages(url):
+            try:
+                yield self.get_json(m['url'])
+            except requests.exceptions.HTTPError as e:
+                # non-403 and non-404 should bubble up
+                if e.response.status_code not in (403, 404):
+                    raise
+
+                agent_logging.log_and_print_error_or_warning(
+                    logger, logging.WARNING, msg_args=[m["url"], e.response.status_code], error_code=3061,
+                )
 
     def get_all_repos(self, org):
         url = f'{self.base_url}/orgs/{org}/repos'
