@@ -16,7 +16,6 @@ ENV BUILDTIME="${BUILDTIME}"
 COPY --from=py-deps /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 
 RUN apt-get update && apt-get -y upgrade && rm -rf /var/lib/apt/lists/* && \
-    pip install awscli && \
     mkdir -p /home/jf_agent && \
     useradd --home-dir /home/jf_agent --shell /bin/bash --user-group jf_agent && \
     chown -R jf_agent:jf_agent /home/jf_agent
