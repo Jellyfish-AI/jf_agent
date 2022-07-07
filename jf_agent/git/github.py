@@ -37,7 +37,10 @@ def load_and_dump(
     git_conn,
 ):
     write_file(
-        outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
+        outdir,
+        'bb_users',
+        compress_output_files,
+        get_users(git_conn, config.git_include_projects),
     )
 
     write_file(
@@ -166,7 +169,17 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
     return projects
 
 
+_cached_organizations = {}
+
+
 def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls):
+    organization = (
+        _cached_organizations[repo['organization']['url']]
+        if repo['organization']['url'] in _cached_organizations
+        else client.get_json(repo['organization']['url'])
+    )
+    _cached_organizations[repo['organization']['url']] = organization
+
     return NormalizedRepository(
         id=repo['id'],
         name=(
@@ -182,9 +195,7 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
         url=repo['html_url'] if not redact_names_and_urls else None,
         is_fork=repo['fork'],
         default_branch_name=repo['default_branch'],
-        project=_normalize_project(
-            client.get_json(repo['organization']['url']), redact_names_and_urls
-        ),
+        project=_normalize_project(organization, redact_names_and_urls),
         branches=[
             NormalizedBranch(
                 name=(
