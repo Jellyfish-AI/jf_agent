@@ -14,9 +14,17 @@ TEST_INPUT_FILE_PATH = 'tests/test_data/gitlab/'
 class TestGitLabAdapter(TestCase):
     def setUp(self):
         self.mock_config = MagicMock()
-        self.mock_config.git_include_repos = [1]
+        # Gitlab identifies repositories and groups by number,
+        # so we use (lists of) numbers here. These map to the
+        # `test/test-repo` repository in `test_repos.json`
+        # and the `Test Group` group in `test_groups.json`
+        included_repositories = [1]
+        included_projects = [1]
+
+        self.mock_config.git_include_repos = included_repositories
         self.mock_config.git_exclude_repos = None
-        self.mock_config.git_include_projects = [5]
+        # Groups in Gitlab parlance == Projects in Jellyfish parlance
+        self.mock_config.git_include_projects = included_projects
         self.mock_config.git_strip_text_content = False
         self.mock_config.git_redact_names_and_urls = False
 
