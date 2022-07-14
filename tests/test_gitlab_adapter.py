@@ -14,9 +14,17 @@ TEST_INPUT_FILE_PATH = 'tests/test_data/gitlab/'
 class TestGitLabAdapter(TestCase):
     def setUp(self):
         self.mock_config = MagicMock()
-        self.mock_config.git_include_repos = None
+        # Gitlab identifies repositories and groups by number,
+        # so we use (lists of) numbers here. These map to the
+        # `test/test-repo` repository in `test_repos.json`
+        # and the `Test Group` group in `test_groups.json`
+        included_repositories = [1]
+        included_projects = [1]
+
+        self.mock_config.git_include_repos = included_repositories
         self.mock_config.git_exclude_repos = None
-        self.mock_config.git_include_projects = ['test_project_id']
+        # Groups in Gitlab parlance == Projects in Jellyfish parlance
+        self.mock_config.git_include_projects = included_projects
         self.mock_config.git_strip_text_content = False
         self.mock_config.git_redact_names_and_urls = False
 
@@ -225,7 +233,7 @@ class TestGitLabAdapter(TestCase):
         mock_repo.default_branch_name = mock_repo_default_branch
 
         mock_short_repo = NormalizedShortRepository(
-            id="test_repo_id", name="test_repo_name", url="test_repo_url"
+            id=1, name="test_repo_name", url="test_repo_url"
         )
         mock_repo.short.return_value = mock_short_repo
 
@@ -272,7 +280,7 @@ class TestGitLabAdapter(TestCase):
         self.assertFalse(result_commit.is_merge)
 
         self.assertEqual(
-            result_commit.repo.id, "test_repo_id", "resulting commit repo id does not match input"
+            result_commit.repo.id, 1, "resulting commit repo id does not match input"
         )
         self.assertEqual(
             result_commit.repo.name,

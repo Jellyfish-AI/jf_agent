@@ -4,6 +4,7 @@ from tqdm import tqdm
 import requests
 from dateutil import parser
 from typing import List
+from gitlab.v4.objects.projects import GroupProject
 import logging
 from jf_agent.git import (
     GitAdapter,
@@ -557,7 +558,7 @@ def _get_attribute(object, property, default=None):
         return default
 
 
-def _should_fetch_repo_data(api_repo: gitlab.v4.objects.projects.GroupProject, config: GitConfig) -> bool:
+def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
     """
     Determines whether a certain repo's data should be fetched.
 
