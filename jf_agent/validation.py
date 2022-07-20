@@ -2,6 +2,8 @@ import os
 import psutil
 import shutil
 
+from jira.exceptions import JIRAError
+
 from jf_jira import _get_raw_jira_connection
 from jf_jira.jira_download import download_users
 from jf_agent.git import get_git_client, get_nested_repos_from_git
@@ -22,7 +24,13 @@ def validate_jira(config, creds):
         print('==> Testing Jira connection...')
         jira_connection = _get_raw_jira_connection(config, creds, max_retries=1)
         jira_connection.myself()
-    except Exception as e:
+    except JIRAError as e:
+        print('Response:')
+        print('  Headers:', e.headers)
+        print('  URL:', e.url)
+        print('  Status Code:', e.status_code)
+        print('  Text:', e.text)
+
         if 'Basic authentication with passwords is deprecated.' in str(e):
             print(
                 f'Error connecting to Jira instance at {config.jira_url}. Please use a Jira API token, see https://confluence.atlassian.com/cloud/api-tokens-938839638.html.'
@@ -32,6 +40,8 @@ def validate_jira(config, creds):
                 f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
             )
         return False
+    except Exception as e:
+        raise
 
     # test jira users permission
     try:
