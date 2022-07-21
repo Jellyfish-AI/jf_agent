@@ -3,6 +3,7 @@ import psutil
 import shutil
 
 from jira.exceptions import JIRAError
+from requests.exceptions import RequestException
 
 from jf_jira import _get_raw_jira_connection
 from jf_jira.jira_download import download_users
@@ -39,6 +40,27 @@ def validate_jira(config, creds):
             print(
                 f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
             )
+        return False
+    except RequestException as e:
+
+        # Print debugging information related to the request exception
+        if e.request:
+            print('Request:')
+            print('  Headers:', e.request.headers)
+            print('  URL:', e.request.method, e.request.url)
+            print('  Body:', e.request.body)
+        else:
+            print('RequestException contained no "request" value.')
+
+        if e.response:
+            print('Response:')
+            print('  Headers:', e.response.headers)
+            print('  URL:', e.response.url)
+            print('  Status Code:', e.response.status_code)
+            print('  Text:', e.response.text)
+        else:
+            print('RequestException contained no "response" value.')
+
         return False
     except Exception as e:
         raise
