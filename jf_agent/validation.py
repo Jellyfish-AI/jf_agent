@@ -26,6 +26,8 @@ def validate_jira(config, creds):
         jira_connection = _get_raw_jira_connection(config, creds, max_retries=1)
         jira_connection.myself()
     except JIRAError as e:
+        print(e)
+
         print('Response:')
         print('  Headers:', e.headers)
         print('  URL:', e.url)
@@ -42,11 +44,11 @@ def validate_jira(config, creds):
             )
         return False
     except RequestException as e:
+        print(e)
 
         # Print debugging information related to the request exception
         if e.request:
             print('Request:')
-            print('  Headers:', e.request.headers)
             print('  URL:', e.request.method, e.request.url)
             print('  Body:', e.request.body)
         else:
