@@ -3,7 +3,7 @@ COPY ./Pipfile ./Pipfile.lock ./
 RUN pip install -U pip setuptools pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
 
-FROM python:3.9.7-slim
+FROM python:3.9.14-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
