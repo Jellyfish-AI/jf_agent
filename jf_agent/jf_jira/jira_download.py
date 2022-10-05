@@ -290,89 +290,106 @@ IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_all_issue_metadata(
-    jira_connection, project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
+    jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
 ) -> Dict[int, IssueMetadata]:
     print('downloading issue metadata... ', end='', flush=True)
-    issue_jql = (
-        f'project in ({",".join(project_ids)}) and updatedDate > '
-        f'{"0" if not earliest_issue_dt else earliest_issue_dt.strftime("%Y-%m-%d")}'
-    )
-    if issue_filter:
-        issue_jql += f' and {issue_filter}'
-    total_num_issues = jira_connection.search_issues(issue_jql, fields=['id']).total
-    issues_per_thread = math.ceil(total_num_issues / num_parallel_threads)
+
+    # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
+    # Set to 20K to be on the safe side
+    max_length = 20000    
+    len_project_ids_string = len(",".join(all_project_ids))
+    num_pulls = len_project_ids_string // max_length + 1
+
+    project_ids_array = []
+    if num_pulls == 1:
+        project_ids_array.append(all_project_ids)
+    else:
+        # Over 20K characters - break up project_ids evenly based on num_pulls
+        n = len(all_project_ids) // num_pulls
+        project_ids_array = [all_project_ids[i:i + n] for i in range(0, len(all_project_ids), n)]
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
-    thread_exceptions = [None] * num_parallel_threads
+    for project_ids in project_ids_array:
 
-    def _download_some(thread_num, start_at, end_at):
-        batch_size = 1000
-        try:
-            while start_at < min(end_at, total_num_issues):
-                try:
-                    api_resp = jira_connection.search_issues(
-                        f'{issue_jql} order by id asc',
-                        fields=['updated'],
-                        startAt=start_at,
-                        maxResults=batch_size,
-                    )
-                except (JIRAError, KeyError) as e:
-                    if hasattr(e, 'status_code') and e.status_code < 500:
-                        # something wrong with our request; re-raise
-                        raise
-
-                    # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
-                    # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
-                    # object instead of a JSON object with an "issues" key, which results in the
-                    # `search_issues()` function in the Jira library throwing a KeyError.
-                    #
-                    # Sometimes both cloud and server will return a 5xx.
-                    #
-                    # In either case, reduce the maxResults parameter and try again, on the theory that
-                    # a smaller ask will prevent the server from choking.
-                    batch_size = int(batch_size / 2)
-                    if batch_size > 0:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
-                        )
-                        continue
-                    else:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, error_code=3022,
-                        )
-                        raise
-
-                issue_metadata = {
-                    int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
-                    for iss in api_resp
-                }
-                all_issue_metadata.update(issue_metadata)
-                start_at += len(issue_metadata)
-
-        except Exception as e:
-            thread_exceptions[thread_num] = e
-            agent_logging.log_and_print_error_or_warning(
-                logger,
-                logging.ERROR,
-                msg_args=[thread_num, traceback.format_exc()],
-                error_code=3032,
-            )
-
-    threads = [
-        threading.Thread(
-            target=_download_some, args=[i, i * issues_per_thread, (i + 1) * issues_per_thread]
+        issue_jql = (
+            f'project in ({",".join(project_ids)}) and updatedDate > '
+            f'{"0" if not earliest_issue_dt else earliest_issue_dt.strftime("%Y-%m-%d")}'
         )
-        for i in range(num_parallel_threads)
-    ]
+        if issue_filter:
+            issue_jql += f' and {issue_filter}'
+        total_num_issues = jira_connection.search_issues(issue_jql, fields=['id']).total
+        issues_per_thread = math.ceil(total_num_issues / num_parallel_threads)
 
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+        thread_exceptions = [None] * num_parallel_threads
 
-    if any(thread_exceptions):
-        any_exception = [e for e in thread_exceptions if e][0]
-        raise Exception('Some thread(s) threw exceptions') from any_exception
+        def _download_some(thread_num, start_at, end_at):
+            batch_size = 1000
+            try:
+                while start_at < min(end_at, total_num_issues):
+                    try:
+                        api_resp = jira_connection.search_issues(
+                            f'{issue_jql} order by id asc',
+                            fields=['updated'],
+                            startAt=start_at,
+                            maxResults=batch_size,
+                        )
+                    except (JIRAError, KeyError) as e:
+                        if hasattr(e, 'status_code') and e.status_code < 500:
+                            # something wrong with our request; re-raise
+                            raise
+
+                        # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
+                        # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
+                        # object instead of a JSON object with an "issues" key, which results in the
+                        # `search_issues()` function in the Jira library throwing a KeyError.
+                        #
+                        # Sometimes both cloud and server will return a 5xx.
+                        #
+                        # In either case, reduce the maxResults parameter and try again, on the theory that
+                        # a smaller ask will prevent the server from choking.
+                        batch_size = int(batch_size / 2)
+                        if batch_size > 0:
+                            agent_logging.log_and_print_error_or_warning(
+                                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
+                            )
+                            continue
+                        else:
+                            agent_logging.log_and_print_error_or_warning(
+                                logger, logging.ERROR, error_code=3022,
+                            )
+                            raise
+
+                    issue_metadata = {
+                        int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
+                        for iss in api_resp
+                    }
+                    all_issue_metadata.update(issue_metadata)
+                    start_at += len(issue_metadata)
+
+            except Exception as e:
+                thread_exceptions[thread_num] = e
+                agent_logging.log_and_print_error_or_warning(
+                    logger,
+                    logging.ERROR,
+                    msg_args=[thread_num, traceback.format_exc()],
+                    error_code=3032,
+                )
+
+        threads = [
+            threading.Thread(
+                target=_download_some, args=[i, i * issues_per_thread, (i + 1) * issues_per_thread]
+            )
+            for i in range(num_parallel_threads)
+        ]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        if any(thread_exceptions):
+            any_exception = [e for e in thread_exceptions if e][0]
+            raise Exception('Some thread(s) threw exceptions') from any_exception
 
     print('✓')
 
