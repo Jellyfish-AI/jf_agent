@@ -108,7 +108,17 @@ jira:
   #   - comment
 
 
-  # is_email_required
+  # if your Jira Users include customer records, you may wish to filter 
+  # the users sent to Jellyfish by enumerating a set of required email domains
+  #
+  # required_email_domains:
+  #   - jellyfish.co
+
+  # it's possible for a user to have no email.  if we need to restrict users
+  # by email domain, should null-email users be included?  uncomment this 
+  # if they shouldn't:
+  #
+  # is_email_required = True
 
 #############################
 # 3. Git configuration
