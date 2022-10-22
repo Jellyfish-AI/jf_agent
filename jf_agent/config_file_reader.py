@@ -139,7 +139,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_exclude_fields = set(jira_config.get('exclude_fields', []))
     jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
     jira_gdpr_active = jira_config.get('gdpr_active', False)
-    jira_required_email_domains = jira_config.get('required_email_domains', [])
+    jira_required_email_domains = set(jira_config.get('required_email_domains', []))
     jira_is_email_required = jira_config.get('is_email_required', False)
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
@@ -248,12 +248,12 @@ def obtain_config(args) -> ValidatedConfig:
         jira_exclude_fields,
         jira_issue_batch_size,
         jira_gdpr_active,
-        jira_required_email_domains,
-        jira_is_email_required,
         jira_include_projects,
         jira_exclude_projects,
         jira_include_project_categories,
         jira_exclude_project_categories,
+        jira_required_email_domains,
+        jira_is_email_required,
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
