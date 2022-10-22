@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 # Returns an array of User dicts
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_users(jira_connection, gdpr_active, quiet=False):
+def download_users(
+        jira_connection, gdpr_active, quiet=False, filter_email_domains=None, include_users_without_email=False
+):
     if not quiet:
         print('downloading jira users... ', end='', flush=True)
 
@@ -48,6 +50,28 @@ def download_users(jira_connection, gdpr_active, quiet=False):
         raise RuntimeError(
             'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
         )
+
+    if filter_email_domains:
+        def _get_email_domain(email: str):
+            try:
+                return email.split("@")[1]
+            except AttributeError:
+                return ""
+            except IndexError:
+                return ""
+
+        filtered_users = []
+        for user in jira_users:
+            try:
+                email = user['emailAddress']
+                email_domain = _get_email_domain(email)
+                if email_domain in filter_email_domains:
+                    filtered_users.append(user)
+            except KeyError:
+                if include_users_without_email:
+                    filtered_users.append(user)
+
+        jira_users = filtered_users
 
     if not quiet:
         print('✓')

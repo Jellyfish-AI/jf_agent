@@ -132,7 +132,12 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             config.outdir,
             'jira_users',
             config.compress_output_files,
-            download_users(jira_connection, config.jira_gdpr_active),
+            download_users(
+                jira_connection,
+                config.jira_gdpr_active,
+                filter_email_domains=config.jira_include_email_domains,
+                include_users_without_email=config.jira_include_users_without_email
+            ),
         )
         write_file(
             config.outdir,

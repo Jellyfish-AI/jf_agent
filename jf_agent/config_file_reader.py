@@ -55,6 +55,8 @@ ValidatedConfig = namedtuple(
         'jira_exclude_projects',
         'jira_include_project_categories',
         'jira_exclude_project_categories',
+        'jira_include_email_domains',
+        'jira_include_users_without_email',
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
@@ -137,6 +139,8 @@ def obtain_config(args) -> ValidatedConfig:
     jira_exclude_fields = set(jira_config.get('exclude_fields', []))
     jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
     jira_gdpr_active = jira_config.get('gdpr_active', False)
+    jira_include_email_domains = jira_config.get('include_email_domains', [])
+    jira_include_users_without_email = jira_config.get('include_users_without_email', False)
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
@@ -238,6 +242,8 @@ def obtain_config(args) -> ValidatedConfig:
         jira_exclude_fields,
         jira_issue_batch_size,
         jira_gdpr_active,
+        jira_include_email_domains,
+        jira_include_users_without_email,
         jira_include_projects,
         jira_exclude_projects,
         jira_include_project_categories,
