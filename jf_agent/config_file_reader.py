@@ -56,7 +56,7 @@ ValidatedConfig = namedtuple(
         'jira_include_project_categories',
         'jira_exclude_project_categories',
         'jira_include_email_domains',
-        'jira_include_users_without_email',
+        'jira_is_email_required',
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
@@ -140,7 +140,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
     jira_gdpr_active = jira_config.get('gdpr_active', False)
     jira_include_email_domains = jira_config.get('include_email_domains', [])
-    jira_include_users_without_email = jira_config.get('include_users_without_email', False)
+    jira_is_email_required = jira_config.get('is_email_required', False)
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
@@ -154,13 +154,19 @@ def obtain_config(args) -> ValidatedConfig:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
             agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
+                logger,
+                logging.WARNING,
+                msg_args=[list(missing_required_fields)],
+                error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
             agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
+                logger,
+                logging.WARNING,
+                msg_args=[list(excluded_required_fields)],
+                error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
@@ -243,7 +249,7 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_batch_size,
         jira_gdpr_active,
         jira_include_email_domains,
-        jira_include_users_without_email,
+        jira_is_email_required,
         jira_include_projects,
         jira_exclude_projects,
         jira_include_project_categories,
@@ -288,8 +294,12 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
-    git_include_all_repos_inside_projects = set(git_config.get('include_all_repos_inside_projects', []))
-    git_exclude_all_repos_inside_projects = set(git_config.get('exclude_all_repos_inside_projects', []))
+    git_include_all_repos_inside_projects = set(
+        git_config.get('include_all_repos_inside_projects', [])
+    )
+    git_exclude_all_repos_inside_projects = set(
+        git_config.get('exclude_all_repos_inside_projects', [])
+    )
     git_instance_slug = git_config.get('instance_slug', None)
     creds_envvar_prefix = git_config.get('creds_envvar_prefix', None)
     git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', []))

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_users(
-        jira_connection, gdpr_active, quiet=False, filter_email_domains=None, include_users_without_email=False
+    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
 ):
     if not quiet:
         print('downloading jira users... ', end='', flush=True)
@@ -51,7 +51,8 @@ def download_users(
             'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
         )
 
-    if filter_email_domains:
+    if required_email_domains:
+
         def _get_email_domain(email: str):
             try:
                 return email.split("@")[1]
@@ -65,10 +66,10 @@ def download_users(
             try:
                 email = user['emailAddress']
                 email_domain = _get_email_domain(email)
-                if email_domain in filter_email_domains:
+                if email_domain in required_email_domains:
                     filtered_users.append(user)
             except KeyError:
-                if include_users_without_email:
+                if is_email_required:
                     filtered_users.append(user)
 
         jira_users = filtered_users
@@ -200,7 +201,10 @@ def download_projects_and_versions(
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
                 agent_logging.log_and_print_error_or_warning(
-                    logger, logging.ERROR, msg_args=[project_id], error_code=2112,
+                    logger,
+                    logging.ERROR,
+                    msg_args=[project_id],
+                    error_code=2112,
                 )
                 return False
             else:
@@ -261,7 +265,10 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             except JIRAError as e:
                 if e.status_code == 400:
                     agent_logging.log_and_print_error_or_warning(
-                        logger, logging.ERROR, msg_args=[project_id], error_code=2202,
+                        logger,
+                        logging.ERROR,
+                        msg_args=[project_id],
+                        error_code=2202,
                     )
                     break
                 raise
@@ -320,7 +327,7 @@ def download_all_issue_metadata(
 
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
-    max_length = 20000    
+    max_length = 20000
     len_project_ids_string = len(",".join(all_project_ids))
     num_pulls = len_project_ids_string // max_length + 1
 
@@ -330,7 +337,7 @@ def download_all_issue_metadata(
     else:
         # Over 20K characters - break up project_ids evenly based on num_pulls
         n = len(all_project_ids) // num_pulls
-        project_ids_array = [all_project_ids[i:i + n] for i in range(0, len(all_project_ids), n)]
+        project_ids_array = [all_project_ids[i : i + n] for i in range(0, len(all_project_ids), n)]
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
     for project_ids in project_ids_array:
@@ -374,12 +381,17 @@ def download_all_issue_metadata(
                         batch_size = int(batch_size / 2)
                         if batch_size > 0:
                             agent_logging.log_and_print_error_or_warning(
-                                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
+                                logger,
+                                logging.WARNING,
+                                msg_args=[batch_size],
+                                error_code=3012,
                             )
                             continue
                         else:
                             agent_logging.log_and_print_error_or_warning(
-                                logger, logging.ERROR, error_code=3022,
+                                logger,
+                                logging.ERROR,
+                                error_code=3022,
                             )
                             raise
 
@@ -567,7 +579,10 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
                 agent_logging.log_and_print_error_or_warning(
-                    logger=logger, level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
+                    logger=logger,
+                    level=logging.WARNING,
+                    error_code=3082,
+                    msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -625,7 +640,11 @@ def _download_jira_issues_segment(
 
     except BaseException as e:
         agent_logging.log_and_print_error_or_warning(
-            logger, logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
+            logger,
+            logging.ERROR,
+            msg_args=[thread_num],
+            error_code=3042,
+            exc_info=True,
         )
         q.put(e)
 
@@ -664,14 +683,21 @@ def _download_jira_issues_page(
 
             batch_size = int(batch_size / 2)
             agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+                logger,
+                logging.WARNING,
+                msg_args=[e, batch_size],
+                error_code=3052,
+                exc_info=True,
             )
             if batch_size == 0:
                 if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                     return [], 1
                 elif not get_changelog:
                     agent_logging.log_and_print_error_or_warning(
-                        logger, logging.WARNING, msg_args=[search_params], error_code=3062,
+                        logger,
+                        logging.WARNING,
+                        msg_args=[search_params],
+                        error_code=3062,
                     )
                     return [], 0
                 else:
@@ -940,7 +966,9 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
             except JIRAError as e:
                 if e.status_code == 403:
                     agent_logging.log_and_print_error_or_warning(
-                        logger, logging.ERROR, error_code=2122,
+                        logger,
+                        logging.ERROR,
+                        error_code=2122,
                     )
                     return []
 

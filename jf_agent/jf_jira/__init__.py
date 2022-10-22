@@ -135,8 +135,8 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             download_users(
                 jira_connection,
                 config.jira_gdpr_active,
-                filter_email_domains=config.jira_include_email_domains,
-                include_users_without_email=config.jira_include_users_without_email
+                required_email_domains=config.jira_include_email_domains,
+                is_email_required=config.jira_is_email_required,
             ),
         )
         write_file(
