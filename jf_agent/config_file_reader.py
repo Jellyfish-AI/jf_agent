@@ -55,6 +55,8 @@ ValidatedConfig = namedtuple(
         'jira_exclude_projects',
         'jira_include_project_categories',
         'jira_exclude_project_categories',
+        'jira_required_email_domains',
+        'jira_is_email_required',
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
@@ -137,6 +139,8 @@ def obtain_config(args) -> ValidatedConfig:
     jira_exclude_fields = set(jira_config.get('exclude_fields', []))
     jira_issue_batch_size = jira_config.get('issue_batch_size', 100)
     jira_gdpr_active = jira_config.get('gdpr_active', False)
+    jira_required_email_domains = set(jira_config.get('required_email_domains', []))
+    jira_is_email_required = jira_config.get('is_email_required', False)
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
@@ -242,6 +246,8 @@ def obtain_config(args) -> ValidatedConfig:
         jira_exclude_projects,
         jira_include_project_categories,
         jira_exclude_project_categories,
+        jira_required_email_domains,
+        jira_is_email_required,
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
@@ -282,8 +288,12 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
     git_exclude_projects = set(git_config.get('exclude_projects', []))
-    git_include_all_repos_inside_projects = set(git_config.get('include_all_repos_inside_projects', []))
-    git_exclude_all_repos_inside_projects = set(git_config.get('exclude_all_repos_inside_projects', []))
+    git_include_all_repos_inside_projects = set(
+        git_config.get('include_all_repos_inside_projects', [])
+    )
+    git_exclude_all_repos_inside_projects = set(
+        git_config.get('exclude_all_repos_inside_projects', [])
+    )
     git_instance_slug = git_config.get('instance_slug', None)
     creds_envvar_prefix = git_config.get('creds_envvar_prefix', None)
     git_include_bbcloud_projects = set(git_config.get('include_bitbucket_cloud_projects', []))

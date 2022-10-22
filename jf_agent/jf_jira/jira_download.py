@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 # Returns an array of User dicts
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_users(jira_connection, gdpr_active, quiet=False):
+def download_users(
+    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
+):
     if not quiet:
         print('downloading jira users... ', end='', flush=True)
 
@@ -48,6 +50,29 @@ def download_users(jira_connection, gdpr_active, quiet=False):
         raise RuntimeError(
             'The agent is unable to see any users. Please verify that this user has the "browse all users" permission.'
         )
+
+    if required_email_domains:
+
+        def _get_email_domain(email: str):
+            try:
+                return email.split("@")[1]
+            except AttributeError:
+                return ""
+            except IndexError:
+                return ""
+
+        filtered_users = []
+        for user in jira_users:
+            try:
+                email = user['emailAddress']
+                email_domain = _get_email_domain(email)
+                if email_domain in required_email_domains:
+                    filtered_users.append(user)
+            except KeyError:
+                if is_email_required:
+                    filtered_users.append(user)
+
+        jira_users = filtered_users
 
     if not quiet:
         print('✓')
@@ -296,7 +321,7 @@ def download_all_issue_metadata(
 
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
-    max_length = 20000    
+    max_length = 20000
     len_project_ids_string = len(",".join(all_project_ids))
     num_pulls = len_project_ids_string // max_length + 1
 
@@ -306,7 +331,7 @@ def download_all_issue_metadata(
     else:
         # Over 20K characters - break up project_ids evenly based on num_pulls
         n = len(all_project_ids) // num_pulls
-        project_ids_array = [all_project_ids[i:i + n] for i in range(0, len(all_project_ids), n)]
+        project_ids_array = [all_project_ids[i : i + n] for i in range(0, len(all_project_ids), n)]
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
     for project_ids in project_ids_array:
