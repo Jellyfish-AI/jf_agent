@@ -321,8 +321,13 @@ def download_all_issue_metadata(
 
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
+    # An issue id is 5 numbers long and the escaped comma is 3 characters
+    # The actual url will be longer than the len_project_ids_string due to the escaped commas
+    # and there is some other params in the url so add 2 for each comma and then add on 200
+    # for extra params
+
     max_length = 20000
-    len_project_ids_string = len(",".join(all_project_ids))
+    len_project_ids_string = len(",".join(all_project_ids)) + len(all_project_ids) * 2 + 200
     num_pulls = len_project_ids_string // max_length + 1
 
     project_ids_array = []
