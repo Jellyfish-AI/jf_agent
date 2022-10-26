@@ -319,6 +319,9 @@ def download_all_issue_metadata(
 ) -> Dict[int, IssueMetadata]:
     print('downloading issue metadata... ', end='', flush=True)
 
+    # all_project_ids is passed in as a set - need it to be a list so it can be split
+    all_project_ids = list(all_project_ids)
+
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
     # An issue id is 5 numbers long and the escaped comma is 3 characters
