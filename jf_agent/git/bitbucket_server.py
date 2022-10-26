@@ -231,7 +231,7 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
-        'author': commit['author'],
+        'author': _normalize_user(commit['author']),
         'author_date': datetime_from_bitbucket_server_timestamp(commit['authorTimestamp']),
         'url': (
             repo['links']['self'][0]['href'].replace('browse', f'commits/{commit["id"]}')

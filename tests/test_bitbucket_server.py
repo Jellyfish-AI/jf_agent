@@ -201,9 +201,14 @@ class TestBitbucketServer(TestCase):
                 "resulting commit hash does not match input",
             )
             self.assertEqual(
-                result_commit['author'],
-                test_commit['author'],
-                "resulting author does not match input",
+                result_commit['author']['email'],
+                test_commit['author']['emailAddress'],
+                "resulting author email does not match"
+            )
+            self.assertEqual(
+                result_commit['author']['login'],
+                test_commit['author']['name'],
+                "resulting author logins should match"
             )
             expected_url = test_repos[0]['links']['self'][0]['href'].replace(
                 'browse', f'commits/{test_commit["id"]}'
@@ -234,6 +239,11 @@ class TestBitbucketServer(TestCase):
                 result_commit['repo']['url'],
                 expected_repo['links']['self'][0]['href'],
                 "resulting repo links do not match input",
+            )
+            self.assertNotIn(
+                'emailAddress',
+                result_commit['author'].keys(),
+                "author field of commit was not normalized"
             )
 
     def test_get_pull_requests(self):
