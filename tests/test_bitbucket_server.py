@@ -203,12 +203,12 @@ class TestBitbucketServer(TestCase):
             self.assertEqual(
                 result_commit['author']['email'],
                 test_commit['author']['emailAddress'],
-                "resulting author email does not match"
+                "resulting author email does not match input"
             )
             self.assertEqual(
                 result_commit['author']['login'],
                 test_commit['author']['name'],
-                "resulting author logins should match"
+                "resulting author login does not match input"
             )
             expected_url = test_repos[0]['links']['self'][0]['href'].replace(
                 'browse', f'commits/{test_commit["id"]}'
