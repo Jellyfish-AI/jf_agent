@@ -243,7 +243,12 @@ class TestBitbucketServer(TestCase):
             self.assertNotIn(
                 'emailAddress',
                 result_commit['author'].keys(),
-                "author field of commit was not normalized"
+                "author field of commit was not normalized; 'emailAddress' not renamed to 'email'"
+            )
+            self.assertIn(
+                'login',
+                result_commit['author'].keys(),
+                "author field of commit was not normalized; 'login' not present as username key"
             )
 
     def test_get_pull_requests(self):
