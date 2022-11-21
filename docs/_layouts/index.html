@@ -29,52 +29,7 @@
                         </div>
                         <div class="nav-title">Agent Documentation</div>
                         
-                        <div class="sb-sidenav-menu">
-                            <div class="nav">
-                                <a class="nav-link" href="index.html">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-home"></i></div>
-                                    Home
-                                </a>
-                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseGuides" aria-expanded="false" aria-controls="collapseGuides">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-cogs"></i></div>
-                                    Setup Guide
-                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                </a>
-                                <div class="collapse" id="collapseGuides" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="setup-guide.html">Getting Started</a>
-                                        <a class="nav-link" href="configuration-setup-guide.html">Step 1: Configure the Agent</a>
-                                        <a class="nav-link" href="network-config-setup-guide.html">Step 2: Ensure proper network configuration</a>
-                                    </nav>
-                                </div>
-                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseRunning" aria-expanded="false" aria-controls="collapseRunning">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-book-open"></i></div>
-                                    Running the Agent
-                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                </a>
-                                <div class="collapse" id="collapseRunning" aria-labelledby="headingTwo" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="run-agent.html">Run the agent</a>
-                                        <a class="nav-link" href="agent-updated.html">Keep the agent updated</a>
-                                        <a class="nav-link" href="specify-usage.html">Specify a usage mode</a>
-                                        <a class="nav-link" href="save-download.html">Save downloaded output</a>
-                                        <a class="nav-link" href="send-dataset.html">Send a downloaded dataset</a>
-                                    </nav>
-                                </div>
-                                <a class="nav-link" href="usage-modes.html">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                    Usage Modes
-                                </a>
-                                <a class="nav-link" href="jira-fields.html">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-tasks"></i></div>
-                                    Specify Jira fields
-                                </a>
-                                <a class="nav-link" href="faq.html">
-                                    <div class="sb-nav-link-icon"><i class="fas fa-question-circle"></i></div>
-                                    FAQ
-                                </a>
-                            </div>
-                        </div>
+                        
                     </nav>
                 </div>
 
@@ -92,7 +47,7 @@
                                     <div class="col-lg-6" data-aos="fade-up">
                                         <h1 class="page-header-title">{{ page.title }}</h1>
                                         <p class="page-header-text mb-5">{{ page.welcomeText }}</p>
-                                        <a class="btn btn-lg btn-primary font-weight-500 mr-3" href="setup-guide.html">Setup Guide</a><a class="btn btn-lg btn-primary-soft text-primary font-weight-500" href="https://github.com/Jellyfish-AI/jf_agent">Source Code</a>
+                                        <a class="btn btn-lg btn-primary font-weight-500 mr-3" href="https://jf-public.s3.amazonaws.com/Jellyfish+Agent+Guide.pdf">Setup Guide</a><a class="btn btn-lg btn-primary-soft text-primary font-weight-500" href="https://github.com/Jellyfish-AI/jf_agent">Source Code</a>
                                     </div>
                                     <div class="col-lg-6 d-none d-lg-block" data-aos="fade-up" data-aos-delay="100"><img class="img-fluid jf-logo" src="assets/img/logo.png" width="30%" /></div>
                                 </div>
@@ -102,23 +57,6 @@
                             <!-- Rounded SVG Border--><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144.54 17.34" preserveAspectRatio="none" fill="currentColor"><path d="M144.54,17.34H0V0H144.54ZM0,0S32.36,17.34,72.27,17.34,144.54,0,144.54,0"></path></svg>
                         </div>
                     </header>
-                    <section id="agentDetails" class="bg-light py-10">
-                        <div class="container">
-                            <div class="row align-items-center justify-content-center">
-                                <div class="col-md-9 col-lg-6 order-1 order-lg-0" data-aos="fade-right">
-                                    <div class="content-skewed content-skewed-right"><img class="content-skewed-item img-fluid shadow-lg rounded-lg" src="assets/img/laptop.jpeg" alt="..." /></div>
-                                </div>
-                                <div class="col-lg-6 order-0 order-lg-1 mb-5 mb-lg-0" data-aos="fade-left">
-                                    <div class="mb-5">
-                                        <h2>About the agent</h2>
-                                        <p class="mb-2 medium">{{ page.aboutText | markdownify }}</p>
-                                        <p class="mb-2 medium">See the source code <a href="https://github.com/Jellyfish-AI/jf_agent">here</a>.</p>
-
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
                     <hr class="m-0" />
                 </main>
                 <footer class="footer pt-5 pb-5 mt-auto bg-dark footer-dark">
