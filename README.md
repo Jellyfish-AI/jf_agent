@@ -2,7 +2,7 @@
 
 An agent that can run on-premise to download and send data to [Jellyfish](https://jellyfish.co/).
 
-See the documentation [here](https://jellyfish-ai.github.io/jf_agent/)
+See the documentation [here](https://jf-public.s3.amazonaws.com/Jellyfish+Agent+Guide.pdf)
 
 ## Using the agent with custom SSL/TLS certificates
 
