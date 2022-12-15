@@ -96,7 +96,7 @@ jira:
   # issue_jql: 'text ~ pattern and issuetype != "Secret Type"'
 
   #############################
-  # Options for filtering fileds.  Use these if you need fine-grained control
+  # Options for filtering fields.  Use these if you need fine-grained control
   # over exactly which fields are pulled for each issue.  This can be useful
   # if some of your fields contain sensitive data that you don't want to
   # send to Jellyfish
