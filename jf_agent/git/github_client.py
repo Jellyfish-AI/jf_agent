@@ -159,7 +159,8 @@ class GithubClient:
                 agent_logging.log_and_print_error_or_warning(
                     logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
-                time.sleep(reset_wait_in_seconds)
+                # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added. 
+                time.sleep(reset_wait_in_seconds + 2)
                 continue  # retry
 
     # Handle pagination
