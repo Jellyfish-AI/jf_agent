@@ -370,15 +370,18 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             print_all_jira_fields(config, jira_connection)
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    
+    if len(config.git_configs) == 0: 
+        return download_data_status
+
     # git downloading is parallelized by the number of configurations. 
     futures = []
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
         for git_config in config.git_configs:
             agent_logging.log_and_print(
                 logger,
                 logging.INFO,
-                f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download {"in parallel" if len(config.git_configs) > 1 else ""}...',
+                f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
+                + f'in parallel with {config.git_max_concurrent} workers' if len(config.git_configs) > 1 else "..."
             )
             futures.append(
                 executor.submit(
