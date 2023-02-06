@@ -18,8 +18,12 @@ def validate_jira(config, creds):
     print('\nJira details:')
     print(f'  URL:      {config.jira_url}')
     print(f'  Username: {creds.jira_username}')
-    pw_len = len(creds.jira_password) - 2
-    print(f'  Password: {creds.jira_password[:2]:*<{pw_len}}')
+    if creds.jira_username and creds.jira_password:
+        masking_stars = len(creds.jira_password) - 2
+        print(f'  Password: {creds.jira_password[:2]:*<{masking_stars}}')
+    elif creds.jira_bearer_token:
+        masking_stars = len(creds.jira_bearer_token) - 2
+        print(f'  Token: {creds.jira_bearer_token[:2]:*<{masking_stars}}')
     # test Jira connection
     try:
         print('==> Testing Jira connection...')
