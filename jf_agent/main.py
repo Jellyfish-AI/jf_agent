@@ -1,4 +1,5 @@
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import gzip
 import logging
 import os
@@ -263,6 +264,9 @@ def obtain_creds(config):
         git_config.git_instance_slug: _get_git_instance_to_creds(git_config)
         for git_config in config.git_configs
     }
+    if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(git_instance_to_creds):
+        print('ERROR: Token for each git instance must be unique even if they are for the same provider.')
+        raise BadConfigException()
 
     jira_username_pass_missing = bool(not (jira_username and jira_password))
     jira_bearer_token_missing = bool(not jira_bearer_token)
@@ -366,37 +370,56 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             print_all_jira_fields(config, jira_connection)
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    is_multi_git_config = len(config.git_configs) > 1
-    for git_config in config.git_configs:
-        agent_logging.log_and_print(
-            logger,
-            logging.INFO,
-            f'Obtained {git_config.git_provider} configuration, attempting download...',
-        )
-        if is_multi_git_config:
-            instance_slug = git_config.git_instance_slug
-            instance_info = endpoint_git_instances_info.get(instance_slug)
-            instance_creds = creds.git_instance_to_creds.get(instance_slug)
-        else:
-            # support legacy single-git support, which assumes only one available git instance
-            instance_info = list(endpoint_git_instances_info.values())[0]
-            instance_creds = list(creds.git_instance_to_creds.values())[0]
+    if len(config.git_configs) == 0: 
+        return download_data_status
 
-        git_connection = get_git_client(
-            git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
-        )
-
-        download_data_status.append(
-            load_and_dump_git(
-                config=git_config,
-                endpoint_git_instance_info=instance_info,
-                outdir=config.outdir,
-                compress_output_files=config.compress_output_files,
-                git_connection=git_connection,
+    # git downloading is parallelized by the number of configurations. 
+    futures = []
+    with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
+        for git_config in config.git_configs:
+            agent_logging.log_and_print(
+                logger,
+                logging.INFO,
+                f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
+                + f'in parallel with {config.git_max_concurrent} workers' if len(config.git_configs) > 1 else "..."
             )
-        )
+            futures.append(
+                executor.submit(
+                    _download_git_data,
+                    git_config,
+                    config,
+                    creds,
+                    endpoint_git_instances_info,
+                    len(config.git_configs) > 1,
+                )
+            )
 
-    return download_data_status
+    return download_data_status + [f.result() for f in futures]
+
+
+def _download_git_data(
+    git_config, config, creds, endpoint_git_instances_info, is_multi_git_config
+) -> dict:
+
+    if is_multi_git_config:
+        instance_slug = git_config.git_instance_slug
+        instance_info = endpoint_git_instances_info.get(instance_slug)
+        instance_creds = creds.git_instance_to_creds.get(instance_slug)
+    else:
+        # support legacy single-git support, which assumes only one available git instance
+        instance_info = list(endpoint_git_instances_info.values())[0]
+        instance_creds = list(creds.git_instance_to_creds.values())[0]
+
+    git_connection = get_git_client(
+        git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
+    )
+    return load_and_dump_git(
+        config=git_config,
+        endpoint_git_instance_info=instance_info,
+        outdir=config.outdir,
+        compress_output_files=config.compress_output_files,
+        git_connection=git_connection,
+    )
 
 
 def send_data(config, creds):
