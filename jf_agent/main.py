@@ -264,8 +264,12 @@ def obtain_creds(config):
         git_config.git_instance_slug: _get_git_instance_to_creds(git_config)
         for git_config in config.git_configs
     }
-    if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(git_instance_to_creds):
-        print('ERROR: Token for each git instance must be unique even if they are for the same provider.')
+    if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(
+        git_instance_to_creds
+    ):
+        print(
+            'ERROR: Token for each git instance must be unique even if they are for the same provider.'
+        )
         raise BadConfigException()
 
     jira_username_pass_missing = bool(not (jira_username and jira_password))
@@ -370,10 +374,10 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             print_all_jira_fields(config, jira_connection)
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    if len(config.git_configs) == 0: 
+    if len(config.git_configs) == 0:
         return download_data_status
 
-    # git downloading is parallelized by the number of configurations. 
+    # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
         for git_config in config.git_configs:
@@ -381,7 +385,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 logger,
                 logging.INFO,
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
-                + f'in parallel with {config.git_max_concurrent} workers' if len(config.git_configs) > 1 else "..."
+                + f'in parallel with {config.git_max_concurrent} workers'
+                if len(config.git_configs) > 1
+                else "...",
             )
             futures.append(
                 executor.submit(
@@ -499,6 +505,11 @@ def send_data(config, creds):
         t.join()
 
     if any(thread_exceptions):
+        # Run through exceptions and inject them into the agent log
+        for exception in thread_exceptions:
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.ERROR, error_code=1000, msg_args=[exception], exc_info=True
+            )
         print(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )

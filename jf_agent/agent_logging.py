@@ -67,6 +67,7 @@ def log_loop_iters(
 # Mapping of error/warning codes to templated error messages to be called by
 # log_and_print_error_or_warning(). This allows for Jellyfish to better categorize errors/warnings.
 ERROR_MESSAGES = {
+    0000: 'An unknown error has occurred. Error message: {}',
     3000: 'Failed to upload file {} to S3 bucket',
     3010: 'Rate limiter: thought we were operating within our limit (made {}/{} calls for {}), but got HTTP 429 anyway!',
     3020: 'Next available time to make call is after the timeout of {} seconds. Giving up.',
