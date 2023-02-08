@@ -526,16 +526,16 @@ def send_data(config, creds):
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
+    # Upload log files as last step before uploading the .done file
+    log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
+    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
+
     if success:
         # creating .done file, only on success
         done_file_path = f'{os.path.join(config.outdir, ".done")}'
         Path(done_file_path).touch()
         done_file_dict = get_signed_url(['.done'])['.done']
         upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
-
-    # Upload log files as last step
-    log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
-    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
 
     return success
 
