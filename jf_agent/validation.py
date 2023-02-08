@@ -19,9 +19,9 @@ def validate_jira(config, creds):
     print(f'  URL:      {config.jira_url}')
     print(f'  Username: {creds.jira_username}')
     if creds.jira_username and creds.jira_password:
-        print(f'  Password: **********')
+        print('  Password: **********')
     elif creds.jira_bearer_token:
-        print(f'  Token: **********')
+        print('  Token: **********')
     # test Jira connection
     try:
         print('==> Testing Jira connection...')
