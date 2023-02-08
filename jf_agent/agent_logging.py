@@ -24,13 +24,15 @@ Since we generally want errors/warnings to go to BOTH stdout and the logger, we
 should generally use log_and_print() instead of logger.whatever().
 '''
 
+LOG_FILE_NAME = 'jf_agent.log'
+
 
 def configure(outdir):
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        filename=os.path.join(outdir, 'jf_agent.log'),
+        filename=os.path.join(outdir, LOG_FILE_NAME),
         filemode='a',  # May be adding to a file created in a previous run
     )
 
