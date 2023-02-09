@@ -19,7 +19,6 @@ class BadConfigException(Exception):
 
 
 def write_file(outdir, filename_prefix, compress, results):
-
     if compress:
         with gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wb') as outfile:
             outfile.write(json.dumps(results, indent=2, cls=StrDefaultEncoder).encode('utf-8'))

@@ -30,18 +30,16 @@ def load_and_dump(
     write_file(outdir, 'bb_users', compress_output_files, get_users(bb_conn))
 
     bitbucket_projects = get_projects(
-            bb_conn,
-            config.git_include_projects,
-            config.git_exclude_projects,
-            config.git_redact_names_and_urls,
-        )
+        bb_conn,
+        config.git_include_projects,
+        config.git_exclude_projects,
+        config.git_redact_names_and_urls,
+    )
     if not bitbucket_projects:
         logger.warn(" No projects and repositories available to agent: Please Check Configuration")
         return
     # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
-    api_projects, projects = zip(
-        *bitbucket_projects
-    )
+    api_projects, projects = zip(*bitbucket_projects)
     write_file(outdir, 'bb_projects', compress_output_files, projects)
 
     api_repos = None
@@ -272,10 +270,12 @@ def get_commits_for_included_branches(
             # so we can not use get_branches_for_normalized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
             branches_to_process = [_get_default_branch_name(api_repo)]
             additional_branch_patterns = included_branches.get(api_repo.get()['name'])
-        
+
             if additional_branch_patterns:
                 repo_branches = [b['displayId'] for b in api_repo.branches()]
-                branches_to_process.extend(get_matching_branches(additional_branch_patterns, repo_branches))
+                branches_to_process.extend(
+                    get_matching_branches(additional_branch_patterns, repo_branches)
+                )
 
             for branch in branches_to_process:
                 try:

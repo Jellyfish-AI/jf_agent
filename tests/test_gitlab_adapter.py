@@ -279,9 +279,7 @@ class TestGitLabAdapter(TestCase):
 
         self.assertFalse(result_commit.is_merge)
 
-        self.assertEqual(
-            result_commit.repo.id, 1, "resulting commit repo id does not match input"
-        )
+        self.assertEqual(result_commit.repo.id, 1, "resulting commit repo id does not match input")
         self.assertEqual(
             result_commit.repo.name,
             "test_repo_name",

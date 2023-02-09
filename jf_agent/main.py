@@ -147,7 +147,6 @@ def main():
             )
 
             if config.run_mode_is_print_apparently_missing_git_repos:
-
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
                     config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
@@ -264,8 +263,12 @@ def obtain_creds(config):
         git_config.git_instance_slug: _get_git_instance_to_creds(git_config)
         for git_config in config.git_configs
     }
-    if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(git_instance_to_creds):
-        print('ERROR: Token for each git instance must be unique even if they are for the same provider.')
+    if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(
+        git_instance_to_creds
+    ):
+        print(
+            'ERROR: Token for each git instance must be unique even if they are for the same provider.'
+        )
         raise BadConfigException()
 
     jira_username_pass_missing = bool(not (jira_username and jira_password))
@@ -370,10 +373,10 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             print_all_jira_fields(config, jira_connection)
         download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
 
-    if len(config.git_configs) == 0: 
+    if len(config.git_configs) == 0:
         return download_data_status
 
-    # git downloading is parallelized by the number of configurations. 
+    # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
         for git_config in config.git_configs:
@@ -381,7 +384,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 logger,
                 logging.INFO,
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
-                + f'in parallel with {config.git_max_concurrent} workers' if len(config.git_configs) > 1 else "..."
+                + f'in parallel with {config.git_max_concurrent} workers'
+                if len(config.git_configs) > 1
+                else "...",
             )
             futures.append(
                 executor.submit(
@@ -400,7 +405,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 def _download_git_data(
     git_config, config, creds, endpoint_git_instances_info, is_multi_git_config
 ) -> dict:
-
     if is_multi_git_config:
         instance_slug = git_config.git_instance_slug
         instance_info = endpoint_git_instances_info.get(instance_slug)
