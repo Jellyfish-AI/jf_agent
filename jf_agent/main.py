@@ -478,6 +478,11 @@ def send_data(config, creds):
     # obtain file names from the directory
     _, directories, filenames = next(os.walk(config.outdir))
 
+    # Remove the log file from filenames that will get uploaded in bulk
+    # We want to save the jf_agent.log file and upload it last, to ensure
+    # we are capturing as much information as possible
+    filenames.remove(agent_logging.LOG_FILE_NAME)
+
     # get the full file paths for each of the immediate
     # subdirectories (we're assuming only a single level)
     for directory in directories:
@@ -502,24 +507,35 @@ def send_data(config, creds):
     for t in threads:
         t.join()
 
+    success = True
     if any(thread_exceptions):
+        # Run through exceptions and inject them into the agent log
+        for exception in thread_exceptions:
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
+            )
         print(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
-        return False
+        success = False
 
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
-    # creating .done file
-    done_file_path = f'{os.path.join(config.outdir, ".done")}'
-    Path(done_file_path).touch()
-    done_file_dict = get_signed_url(['.done'])['.done']
-    upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+    # Upload log files as last step before uploading the .done file
+    log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
+    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
 
-    return True
+    if success:
+        # creating .done file, only on success
+        done_file_path = f'{os.path.join(config.outdir, ".done")}'
+        Path(done_file_path).touch()
+        done_file_dict = get_signed_url(['.done'])['.done']
+        upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+
+    return success
 
 
 def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):

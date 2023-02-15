@@ -24,13 +24,15 @@ Since we generally want errors/warnings to go to BOTH stdout and the logger, we
 should generally use log_and_print() instead of logger.whatever().
 '''
 
+LOG_FILE_NAME = 'jf_agent.log'
+
 
 def configure(outdir):
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        filename=os.path.join(outdir, 'jf_agent.log'),
+        filename=os.path.join(outdir, LOG_FILE_NAME),
         filemode='a',  # May be adding to a file created in a previous run
     )
 
@@ -67,6 +69,7 @@ def log_loop_iters(
 # Mapping of error/warning codes to templated error messages to be called by
 # log_and_print_error_or_warning(). This allows for Jellyfish to better categorize errors/warnings.
 ERROR_MESSAGES = {
+    0000: 'An unknown error has occurred. Error message: {}',
     3000: 'Failed to upload file {} to S3 bucket',
     3010: 'Rate limiter: thought we were operating within our limit (made {}/{} calls for {}), but got HTTP 429 anyway!',
     3020: 'Next available time to make call is after the timeout of {} seconds. Giving up.',
