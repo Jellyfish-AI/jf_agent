@@ -92,7 +92,6 @@ class GitLabAdapter(GitAdapter):
 
         nrm_repos: List[NormalizedRepository] = []
         for nrm_project in normalized_projects:
-
             repos_that_failed_to_download = []
 
             for i, api_repo in enumerate(
@@ -565,8 +564,12 @@ def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
     For GitLab, git_include_repos holds IDs instead of names (probably unintentionally), so
     no need to be case insensitive
     """
-    include_rules_defined = bool(config.git_include_repos or config.git_include_all_repos_inside_projects)
-    exclude_rules_defined = bool(config.git_exclude_repos or config.git_exclude_all_repos_inside_projects)
+    include_rules_defined = bool(
+        config.git_include_repos or config.git_include_all_repos_inside_projects
+    )
+    exclude_rules_defined = bool(
+        config.git_exclude_repos or config.git_exclude_all_repos_inside_projects
+    )
 
     if not (include_rules_defined or exclude_rules_defined):
         # Always pull from a repo if there are no special rules
@@ -576,14 +579,18 @@ def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
     api_repo_parent_project_id = api_repo.namespace["id"]
 
     included_explicitly = bool(config.git_include_repos) and api_repo.id in config.git_include_repos
-    included_implicitly = bool(config.git_include_all_repos_inside_projects) \
+    included_implicitly = (
+        bool(config.git_include_all_repos_inside_projects)
         and api_repo_parent_project_id in config.git_include_all_repos_inside_projects
+    )
 
     included = included_explicitly or included_implicitly
 
     excluded_explicitly = bool(config.git_exclude_repos) and api_repo.id in config.git_exclude_repos
-    excluded_implicitly = bool(config.git_exclude_all_repos_inside_projects) \
+    excluded_implicitly = (
+        bool(config.git_exclude_all_repos_inside_projects)
         and api_repo_parent_project_id in config.git_exclude_all_repos_inside_projects
+    )
 
     excluded = excluded_explicitly or excluded_implicitly
 

@@ -147,7 +147,6 @@ def main():
             )
 
             if config.run_mode_is_print_apparently_missing_git_repos:
-
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
                     config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
@@ -406,7 +405,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 def _download_git_data(
     git_config, config, creds, endpoint_git_instances_info, is_multi_git_config
 ) -> dict:
-
     if is_multi_git_config:
         instance_slug = git_config.git_instance_slug
         instance_info = endpoint_git_instances_info.get(instance_slug)

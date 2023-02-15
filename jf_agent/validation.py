@@ -128,7 +128,7 @@ def validate_git(config, creds):
                     " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
                 )
                 continue
-                 
+
             print("  All projects and repositories available to agent:")
             for project_name, repo_list in project_repo_dict.items():
                 print(f"  -- {project_name}")

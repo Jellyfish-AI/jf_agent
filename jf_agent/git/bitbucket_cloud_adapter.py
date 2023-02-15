@@ -389,7 +389,6 @@ def _normalize_user(api_user):
 def _normalize_pr(
     client, repo, api_pr, strip_text_content: bool, redact_names_and_urls: bool,
 ):
-
     # Process the PR's diff to get additions, deletions, changed_files
     additions, deletions, changed_files = None, None, None
     try:

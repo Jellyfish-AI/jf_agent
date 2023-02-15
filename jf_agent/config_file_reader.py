@@ -259,7 +259,7 @@ def obtain_config(args) -> ValidatedConfig:
         jellyfish_api_base,
         skip_ssl_verification,
         send_agent_config,
-        git_max_concurrent, 
+        git_max_concurrent,
     )
 
 

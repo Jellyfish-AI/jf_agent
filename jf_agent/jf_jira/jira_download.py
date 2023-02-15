@@ -83,7 +83,6 @@ def download_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_fields(jira_connection, include_fields, exclude_fields):
-
     print('downloading jira fields... ', end='', flush=True)
 
     filters = []
@@ -156,7 +155,6 @@ def download_priorities(jira_connection):
 def download_projects_and_versions(
     jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
-
     print('downloading jira projects... ', end='', flush=True)
 
     filters = []
@@ -343,7 +341,6 @@ def download_all_issue_metadata(
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
     for project_ids in project_ids_array:
-
         issue_jql = (
             f'project in ({",".join(project_ids)}) and updatedDate > '
             f'{"0" if not earliest_issue_dt else earliest_issue_dt.strftime("%Y-%m-%d")}'
@@ -805,7 +802,6 @@ def _search_all_users(jira_connection, gdpr_active):
 
     # different jira versions / different times, the way to list all users has changed. Try a few.
     for q in [None, '', '%', '@']:
-
         # iterate through pages of results
         while True:
             users = _search_users(
@@ -902,7 +898,6 @@ def _search_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
-
     from jf_agent.jf_jira import get_basic_jira_connection
     from jf_agent.git import get_git_client
 
@@ -936,7 +931,6 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
 
 
 def _get_repos_list_in_jira(issues_to_scan, jira_connection):
-
     print('Scanning Jira issues for Git repos...')
     missing_repositories = {}
 
@@ -984,7 +978,6 @@ def _remove_repos_present_in_git_instance(git_connection, git_config, missing_re
 
 
 def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
-
     params = {
         'issueId': issue_id,
         'dataType': 'repository',
@@ -1040,7 +1033,6 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
 
     ignore_repos = []
     for repo in list(repos_found_by_jira.values()):
-
         repo_name = repo['name']
         repo_url = repo['url']
 

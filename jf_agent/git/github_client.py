@@ -43,7 +43,10 @@ class GithubClient:
                     raise
 
                 agent_logging.log_and_print_error_or_warning(
-                    logger, logging.WARNING, msg_args=[m["url"], e.response.status_code], error_code=3061,
+                    logger,
+                    logging.WARNING,
+                    msg_args=[m["url"], e.response.status_code],
+                    error_code=3061,
                 )
 
     def get_all_repos(self, org):
@@ -159,7 +162,7 @@ class GithubClient:
                 agent_logging.log_and_print_error_or_warning(
                     logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
-                # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added. 
+                # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added.
                 time.sleep(reset_wait_in_seconds + 2)
                 continue  # retry
 
