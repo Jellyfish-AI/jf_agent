@@ -1,9 +1,10 @@
 
 name: Snyk monitor workflow for tracking third-party dependencies
-push:
-  branches: [ "master" ]
-pull_request:
-  branches: [ "master" ]
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
 jobs:
   snyk-monitor:
     runs-on: ubuntu-latest
