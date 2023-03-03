@@ -48,20 +48,19 @@ def download_and_write_streaming(
     generator_func_args,
     item_id_dict_key,
     addl_info_dict_key=None,
-    batch_size=None
+    batch_size=None   # batch size implies that we are being given a list of list (e.g. jira issue, nothing else)
 ):
-    if not batch_size:
-        batch_size = sys.maxsize
     batch_num = 0
     item_infos = set()
-    # generator function downloads in even batches
-    # chain those together and group into larger batches
-    try:
-        generator = chain.from_iterable(generator_func(*generator_func_args))
-    except TypeError:  # not returning a list of lists
-        generator = generator_func(*generator_func_args)
+    if batch_size:
+        # generator function downloads in even batches that can be small
+        # chain those together and group into larger batches
+        generator = batched(chain.from_iterable(generator_func(*generator_func_args)), batch_size)
+    else:
+        # we have a simple list of items coming to us that we don't need to batch
+        generator = [generator_func(*generator_func_args)]
 
-    for batch in batched(generator, batch_size):
+    for batch in generator:
         filepath = f'{outdir}/{filename_prefix}{batch_num if batch_num else ""}'
         if compress:
             outfile = gzip.open(f'{filepath}.json.gz', 'wt')
