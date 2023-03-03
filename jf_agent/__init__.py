@@ -3,6 +3,7 @@ import json
 import jsonstreams
 import dataclasses
 import logging
+from itertools import chain
 from jf_agent.util import batched
 
 logger = logging.getLogger(__name__)
@@ -50,28 +51,17 @@ def download_and_write_streaming(
 ):
     batch_num = 0
     item_infos = set()
-    for batch in batched(generator_func(*generator_func_args), batch_size):
+    # generator function downloads in even batches
+    # chain those together and group into larger batches
+    for batch in batched(chain.from_iterable(generator_func(*generator_func_args)), batch_size):
         filepath = f'{outdir}/{filename_prefix}{batch_num if batch_num else ""}'
         if compress:
             outfile = gzip.open(f'{filepath}.json.gz', 'wt')
         else:
             outfile = open(f'{filepath}.json', 'w')
 
-        s = jsonstreams.Stream(jsonstreams.Type.array, fd=outfile, encoder=StrDefaultEncoder)
-        for item in batch:
-            if isinstance(item, list):
-                for i in item:
-                    s.write(i)
-                    if not addl_info_dict_key:
-                        item_infos.add(_get_item_by_key(i, item_id_dict_key))
-                    else:
-                        item_infos.add(
-                            (
-                                _get_item_by_key(i, item_id_dict_key),
-                                _get_item_by_key(i, addl_info_dict_key),
-                            )
-                        )
-            else:
+        with jsonstreams.Stream(jsonstreams.Type.array, fd=outfile, encoder=StrDefaultEncoder) as s:
+            for item in batch:
                 s.write(item)
                 if not addl_info_dict_key:
                     item_infos.add(_get_item_by_key(item, item_id_dict_key))
@@ -82,7 +72,8 @@ def download_and_write_streaming(
                             _get_item_by_key(item, addl_info_dict_key),
                         )
                     )
-        logger.info(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
+            logger.info(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
+
         outfile.close()
         batch_num += 1
     return item_infos
