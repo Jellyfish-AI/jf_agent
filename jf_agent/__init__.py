@@ -3,6 +3,7 @@ import json
 import jsonstreams
 import dataclasses
 import logging
+from jf_agent.util import batched
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +38,6 @@ class StrDefaultEncoder(json.JSONEncoder):
         return str(o)
 
 
-def _batched(iterable, n):
-    "Batch data into tuples of length n. The last batch may be shorter."
-    # batched('ABCDEFG', 3) --> ABC DEF G
-    if n < 1:
-        raise ValueError('n must be at least one')
-    it = iter(iterable)
-    while (batch := tuple(islice(it, n))):
-        yield batch
-
 def download_and_write_streaming(
     outdir,
     filename_prefix,
@@ -58,7 +50,7 @@ def download_and_write_streaming(
 ):
     batch_num = 0
     item_infos = set()
-    for batch in _batched(generator_func(*generator_func_args), batch_size):
+    for batch in batched(generator_func(*generator_func_args), batch_size):
         filepath = f'{outdir}/{filename_prefix}{batch_num if batch_num else ""}'
         if compress:
             outfile = gzip.open(f'{filepath}.json.gz', 'wt')
