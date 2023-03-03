@@ -2,6 +2,9 @@ import gzip
 import json
 import jsonstreams
 import dataclasses
+import logging
+
+logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://app.jellyfish.co'
 VALID_RUN_MODES = (
@@ -34,6 +37,15 @@ class StrDefaultEncoder(json.JSONEncoder):
         return str(o)
 
 
+def _batched(iterable, n):
+    "Batch data into tuples of length n. The last batch may be shorter."
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if n < 1:
+        raise ValueError('n must be at least one')
+    it = iter(iterable)
+    while (batch := tuple(islice(it, n))):
+        yield batch
+
 def download_and_write_streaming(
     outdir,
     filename_prefix,
@@ -42,15 +54,19 @@ def download_and_write_streaming(
     generator_func_args,
     item_id_dict_key,
     addl_info_dict_key=None,
+    batch_size=2000
 ):
-    if compress:
-        outfile = gzip.open(f'{outdir}/{filename_prefix}.json.gz', 'wt')
-    else:
-        outfile = open(f'{outdir}/{filename_prefix}.json', 'w')
-
+    batch_num = 0
     item_infos = set()
-    with jsonstreams.Stream(jsonstreams.Type.array, fd=outfile, encoder=StrDefaultEncoder) as s:
-        for item in generator_func(*generator_func_args):
+    for batch in _batched(generator_func(*generator_func_args), batch_size):
+        filepath = f'{outdir}/{filename_prefix}{batch_num if batch_num else ""}'
+        if compress:
+            outfile = gzip.open(f'{filepath}.json.gz', 'wt')
+        else:
+            outfile = open(f'{filepath}.json', 'w')
+
+        s = jsonstreams.Stream(jsonstreams.Type.array, fd=outfile, encoder=StrDefaultEncoder)
+        for item in batch:
             if isinstance(item, list):
                 for i in item:
                     s.write(i)
@@ -74,8 +90,9 @@ def download_and_write_streaming(
                             _get_item_by_key(item, addl_info_dict_key),
                         )
                     )
-
-    outfile.close()
+        logger.info(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
+        outfile.close()
+        batch_num += 1
     return item_infos
 
 
