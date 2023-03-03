@@ -1,4 +1,5 @@
 from typing import Any, List
+from itertools import islice
 
 
 def split(lst: List[Any], n: int) -> List[List[Any]]:
