@@ -1,3 +1,4 @@
+import sys
 import gzip
 import json
 import jsonstreams
@@ -47,13 +48,20 @@ def download_and_write_streaming(
     generator_func_args,
     item_id_dict_key,
     addl_info_dict_key=None,
-    batch_size=2000
+    batch_size=None
 ):
+    if not batch_size:
+        batch_size = sys.maxsize
     batch_num = 0
     item_infos = set()
     # generator function downloads in even batches
     # chain those together and group into larger batches
-    for batch in batched(chain.from_iterable(generator_func(*generator_func_args)), batch_size):
+    try:
+        generator = chain.from_iterable(generator_func(*generator_func_args))
+    except TypeError:  # not returning a list of lists
+        generator = generator_func(*generator_func_args)
+
+    for batch in batched(generator, batch_size):
         filepath = f'{outdir}/{filename_prefix}{batch_num if batch_num else ""}'
         if compress:
             outfile = gzip.open(f'{filepath}.json.gz', 'wt')
