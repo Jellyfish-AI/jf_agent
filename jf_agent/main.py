@@ -267,9 +267,9 @@ def obtain_creds(config):
         git_instance_to_creds
     ):
         print(
-            'ERROR: Token for each git instance must be unique even if they are for the same provider.'
+            'WARNING: Tokens for each git instance provided are not unique. You will see better performance by configuring '
+            'git instances for the same provider with separate tokens that have independent rate-limits.' 
         )
-        raise BadConfigException()
 
     jira_username_pass_missing = bool(not (jira_username and jira_password))
     jira_bearer_token_missing = bool(not jira_bearer_token)
