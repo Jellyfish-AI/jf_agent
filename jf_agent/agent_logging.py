@@ -89,7 +89,7 @@ ERROR_MESSAGES = {
     3141: 'Got {} {} when {}',
     3151: 'Getting HTTP 429s for over an hour; giving up!',
     3002: 'Failed to download jira data:\n{}',
-    3012: 'Caught KeyError from search_issues(), reducing batch size to {}',
+    3012: 'Caught KeyError from search_issues(), reducing batch size to {} and waiting for 1 minute',
     3022: 'Caught KeyError from search_issues(), batch size is already 0, bailing out',
     3032: 'Exception encountered in thread {}\n{}',
     3042: '[Thread {}] Jira issue downloader FAILED',

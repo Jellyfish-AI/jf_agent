@@ -5,6 +5,7 @@ import math
 import random
 import re
 import traceback
+from datetime import time
 from typing import Dict
 
 from dateutil import parser
@@ -382,6 +383,7 @@ def download_all_issue_metadata(
                             agent_logging.log_and_print_error_or_warning(
                                 logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
                             )
+                            time.sleep(60)
                             continue
                         else:
                             agent_logging.log_and_print_error_or_warning(
