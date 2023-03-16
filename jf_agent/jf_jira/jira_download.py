@@ -310,6 +310,47 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
 
 
+def get_issues(jira_connection, issue_jql, start_at, batch_size):
+    try:
+        api_response = jira_connection.search_issues(
+            f'{issue_jql} order by id asc',
+            fields=['updated'],
+            startAt=start_at,
+            maxResults=batch_size,
+        )
+    except (JIRAError, KeyError) as e:
+        if hasattr(e, 'status_code') and e.status_code < 500:
+            # something wrong with our request; re-raise
+            raise
+
+        # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
+        # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
+        # object instead of a JSON object with an "issues" key, which results in the
+        # `search_issues()` function in the Jira library throwing a KeyError.
+        #
+        # Sometimes both cloud and server will return a 5xx.
+        #
+        # In either case, reduce the maxResults parameter and try again, on the theory that
+        # a smaller ask will prevent the server from choking.
+        new_batch_size = int(batch_size / 2)
+        if batch_size > 0:
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
+            )
+            get_issues(jira_connection, issue_jql, start_at, new_batch_size)
+        else:
+            # copied logic from jellyfish direct connect
+            # don't bail, just skip
+            # khardy 2023-03-16
+            agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
+            f"Caught {type(e)} from search_issues(), batch size is already 0, giving up on "
+            "fetching this issue's metadata", error_code=3092
+                                                         )
+            get_issues(jira_connection, issue_jql, start_at=(start_at + 1), batch_size=1000)
+
+    return api_response
+
+
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_all_issue_metadata(
@@ -356,42 +397,7 @@ def download_all_issue_metadata(
             batch_size = 1000
             try:
                 while start_at < min(end_at, total_num_issues):
-                    try:
-                        api_resp = jira_connection.search_issues(
-                            f'{issue_jql} order by id asc',
-                            fields=['updated'],
-                            startAt=start_at,
-                            maxResults=batch_size,
-                        )
-                    except (JIRAError, KeyError) as e:
-                        if hasattr(e, 'status_code') and e.status_code < 500:
-                            # something wrong with our request; re-raise
-                            raise
-
-                        # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
-                        # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
-                        # object instead of a JSON object with an "issues" key, which results in the
-                        # `search_issues()` function in the Jira library throwing a KeyError.
-                        #
-                        # Sometimes both cloud and server will return a 5xx.
-                        #
-                        # In either case, reduce the maxResults parameter and try again, on the theory that
-                        # a smaller ask will prevent the server from choking.
-                        batch_size = int(batch_size / 2)
-                        if batch_size > 0:
-                            agent_logging.log_and_print_error_or_warning(
-                                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
-                            )
-                            continue
-                        else:
-                            # copied logic from jellyfish direct connect
-                            # don't bail, just skip
-                            # khardy 2023-03-16
-                            agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
-                                f"Caught {type(e)} from search_issues(), batch size is already 0, giving up on "
-                                "fetching this issue's metadata", error_code=3092
-                            )
-                            start_at += 1
+                    api_resp = get_issues(jira_connection, issue_jql, start_at, batch_size)
 
                     issue_metadata = {
                         int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
