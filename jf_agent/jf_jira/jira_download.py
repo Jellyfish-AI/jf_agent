@@ -5,7 +5,6 @@ import math
 import random
 import re
 import traceback
-import time
 from typing import Dict
 
 from dateutil import parser
@@ -383,13 +382,16 @@ def download_all_issue_metadata(
                             agent_logging.log_and_print_error_or_warning(
                                 logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
                             )
-                            time.sleep(60)
                             continue
                         else:
-                            agent_logging.log_and_print_error_or_warning(
-                                logger, logging.ERROR, error_code=3022,
+                            # copied logic from jellyfish direct connect
+                            # don't bail, just skip
+                            # khardy 2023-03-16
+                            agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
+                                f"Caught {type(e)} from search_issues(), batch size is already 0, giving up on "
+                                "fetching this issue's metadata", error_code=3092
                             )
-                            raise
+                            start_at += 1
 
                     issue_metadata = {
                         int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
