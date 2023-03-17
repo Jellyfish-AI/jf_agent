@@ -97,7 +97,10 @@ ERROR_MESSAGES = {
     3062: 'Apparently unable to fetch issue based on search_params {}',
     3072: 'Error calling createmeta JIRA endpoint',
     3082: 'OJ-9084: Changelog history item with no \'fieldId\' or \'field\' key: {}',
-    3092: 'OJ-225511: server side 500, no other information, skipping issue',
+    3092: (
+        'OJ-22511: server side 500, batch size reduced to 0, '
+        'last error was: {} with jql: {}, start_at: {}, and batch_size: {}. Skipping one issue ahead...'
+    ),
     2101: 'Failed to connect to {}:\n{}',
     2102: 'Unable to access project {}, may be a Jira misconfiguration. Skipping...',
     2112: 'Failed to connect to Jira for project ID \n{}',
