@@ -346,7 +346,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
     # don't bail, just skip
     # khardy 2023-03-16
     agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
-        [f"{type(error)}", issue_jql, start_at, original_batch_size], error_code=3092)
+    [f"{type(error)}", issue_jql, start_at, original_batch_size], error_code=3092)
 
     return {}
 
@@ -405,7 +405,7 @@ def download_all_issue_metadata(
                     }
                     all_issue_metadata.update(issue_metadata)
                     if len(issue_metadata) == 0:
-                        start_at += 1
+                        start_at += 1  # nothing came back, so jump 1 issue ahead and hopefully skip the problem
                     else:
                         start_at += len(issue_metadata)
 
