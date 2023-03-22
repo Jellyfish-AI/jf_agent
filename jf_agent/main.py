@@ -9,6 +9,7 @@ from collections import namedtuple
 from glob import glob
 from pathlib import Path
 import sys
+from time import sleep
 
 import requests
 import json
