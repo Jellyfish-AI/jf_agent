@@ -71,6 +71,7 @@ def log_loop_iters(
 ERROR_MESSAGES = {
     0000: 'An unknown error has occurred. Error message: {}',
     3000: 'Failed to upload file {} to S3 bucket',
+    3001: 'Connection to bucket was disconnected while uploading: {}. Retrying...',
     3010: 'Rate limiter: thought we were operating within our limit (made {}/{} calls for {}), but got HTTP 429 anyway!',
     3020: 'Next available time to make call is after the timeout of {} seconds. Giving up.',
     3030: 'ERROR: Could not parse response with status code {}. Contact an administrator for help.',
