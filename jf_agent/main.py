@@ -491,7 +491,7 @@ def send_data(config, creds):
                 # Back off logic
                 sleep(1 * retry_count)
 
-        # If we make it out of the while loop without breaking, that means
+        # If we make it out of the while loop without returning, that means
         # we failed to upload the file.
         agent_logging.log_and_print_error_or_warning(
             logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
