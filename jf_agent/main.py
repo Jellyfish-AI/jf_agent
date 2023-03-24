@@ -471,18 +471,31 @@ def send_data(config, creds):
                         files={'file': (path_to_obj, f)},
                     )
                     upload_resp.raise_for_status()
-                    break
+                    agent_logging.log_and_print(
+                        logger, logging.INFO, msg=f'Successfully uploaded {filename}',
+                    )
+                    return
             # For large file uploads, we run into intermittent 104 errors where the 'peer' (jellyfish)
             # will appear to shut down the session connection.
             # These exceptions ARE NOT handled by the above retry_session retry logic, which handles 500 level errors.
             # Attempt to catch and retry the 104 type error here
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError as e:
                 agent_logging.log_and_print_error_or_warning(
-                    logger, logging.WARNING, msg_args=[filename], error_code=3001, exc_info=True,
+                    logger,
+                    logging.WARNING,
+                    msg_args=[filename, repr(e)],
+                    error_code=3001,
+                    exc_info=True,
                 )
                 retry_count += 1
                 # Back off logic
                 sleep(1 * retry_count)
+
+        # If we make it out of the while loop without returning, that means
+        # we failed to upload the file.
+        agent_logging.log_and_print_error_or_warning(
+            logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+        )
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
