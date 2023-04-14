@@ -1,5 +1,5 @@
 # jf_agent
-API_KEY = 'Test'
+
 An agent that can run on-premise to download and send data to [Jellyfish](https://jellyfish.co/).
 
 See the documentation [here](https://jf-public.s3.amazonaws.com/Jellyfish+Agent+Guide.pdf)
