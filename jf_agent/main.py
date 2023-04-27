@@ -489,9 +489,6 @@ def send_data(config, creds):
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         payload = {'files': files}
 
-        print(base_url)
-        print(headers)
-        print(payload)
         r = requests.post(
             f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}',
             headers=headers,
@@ -499,7 +496,6 @@ def send_data(config, creds):
         )
         r.raise_for_status()
 
-        print(r.json())
         return r.json()['signed_urls']
 
     thread_exceptions = []
@@ -518,7 +514,6 @@ def send_data(config, creds):
 
         total_retries = 5
         retry_count = 0
-        print(f'uploading: {filename}, {path_to_obj}, {signed_url["url"]}')
         while total_retries >= retry_count:
             try:
                 with open(filepath, 'rb') as f:
@@ -579,7 +574,6 @@ def send_data(config, creds):
     for directory in directories:
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
-            print(f'{directory}/{file_name}')
             filenames.append(f'{directory}/{file_name}')
 
     signed_urls = get_signed_url(filenames)

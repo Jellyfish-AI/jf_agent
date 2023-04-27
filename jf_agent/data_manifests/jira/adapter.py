@@ -102,8 +102,5 @@ class JiraCloudManifestAdapter:
         result = self._get_jql_search(jql_search="", max_results=0)
         return result['total']
 
-    # I believe that there should be a one to one relationship with
-    # Jira Issues and Jira Issue Data...
-
     def get_issues_data_count(self) -> int:
         return self.get_issues_count()
