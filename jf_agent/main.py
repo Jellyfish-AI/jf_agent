@@ -22,6 +22,9 @@ from jf_agent import (
     JELLYFISH_API_BASE,
     BadConfigException,
 )
+from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
+from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
+from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.config_file_reader import obtain_config
 from jf_agent.jf_jira import (
@@ -129,7 +132,6 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
 
@@ -146,6 +148,14 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
+            try:
+                generate_manifests(config=config, creds=creds)
+            except Exception as e:
+                agent_logging.log_and_print(
+                    logger,
+                    logging.ERROR,
+                    f'Exception encountered when trying to generate manifests. Exception: {e}',
+                )
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
@@ -358,6 +368,68 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 raise BadConfigException()
 
     return JellyfishEndpointInfo(jira_info, git_instance_info)
+
+
+@diagnostics.capture_timing()
+@agent_logging.log_entry_exit(logger)
+def generate_manifests(config, creds):
+    manifests: list[Manifest] = []
+    base_url = config.jellyfish_api_base
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/company',
+        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+    )
+
+    if not resp.ok:
+        print(
+            f"ERROR: Couldn't get company info from {base_url}/agent/company "
+            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
+        )
+        raise BadConfigException()
+
+    company_info = resp.json()
+    company_slug = company_info.get('company_slug')
+    # Create and add Jira Manifest
+    if config.jira_url:
+        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
+        jira_manifest = create_jira_manifest(company_slug=company_slug, config=config, creds=creds)
+        if jira_manifest:
+            agent_logging.log_and_print(logger, logging.INFO, 'Successfully created Jira Manifest')
+            manifests.append(jira_manifest)
+        else:
+            agent_logging.log_and_print(
+                logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+            )
+    else:
+        agent_logging.log_and_print(
+            logger, logging.INFO, 'No Jira config detected, skipping Jira manifest generation'
+        )
+
+    if config.git_configs:
+        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Git Manifests...')
+        # Create and add Git Manifests
+        manifests += create_git_manifests(company_slug=company_slug, creds=creds, config=config)
+    else:
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
+
+    agent_logging.log_and_print(
+        logger, logging.INFO, f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...'
+    )
+
+    for manifest in manifests:
+        # Always send Manifest data to S3
+        manifest.upload_to_s3(
+            jellyfish_api_base=config.jellyfish_api_base,
+            jellyfish_api_token=creds.jellyfish_api_token,
+        )
+
+    agent_logging.log_and_print(
+        logger, logging.INFO, f'Successfully uploaded {len(manifests)} manifest(s) to Jellyfish!'
+    )
 
 
 @diagnostics.capture_timing()
