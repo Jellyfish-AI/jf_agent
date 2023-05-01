@@ -39,6 +39,15 @@ def create_manifests(
                     logging.INFO,
                     f'Processing git instance {git_config.git_instance_slug} for company {company_slug} under github org {org}',
                 )
+
+                if not git_config.git_instance_slug:
+                    agent_logging.log_and_print(
+                        logger,
+                        logging.ERROR,
+                        f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded',
+                    )
+                    continue
+
                 instance_creds = creds.git_instance_to_creds.get(git_config.git_instance_slug)
                 manifest_adapter: ManifestAdapter = get_manifest_adapter(
                     company_slug=company_slug,
