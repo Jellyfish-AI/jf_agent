@@ -12,6 +12,7 @@ from jf_agent.data_manifests.git.manifest import (
 )
 from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
 from jf_agent.data_manifests.manifest import ManifestSource
+from jf_agent.git import get_git_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,10 @@ class UnsupportedGitProvider(Exception):
 
 
 def create_manifests(
-    company_slug: str, creds: dict, git_configs: list[GitConfig], verbose: bool = False
+    company_slug: str, creds: dict, config: dict, verbose: bool = False
 ) -> list[GitDataManifest]:
     manifests: list[GitDataManifest] = []
+    git_configs: list[GitConfig] = config.git_configs
     for git_config in git_configs:
         try:
             users_count = 0
@@ -37,14 +39,12 @@ def create_manifests(
                     logging.INFO,
                     f'Processing git instance {git_config.git_instance_slug} for company {company_slug} under github org {org}',
                 )
-
                 instance_creds = creds.git_instance_to_creds.get(git_config.git_instance_slug)
                 manifest_adapter: ManifestAdapter = get_manifest_adapter(
-                    company=company_slug,
+                    company_slug=company_slug,
                     git_creds=instance_creds,
-                    instance=git_config.git_instance_slug,
+                    git_config=git_config,
                     org=org,
-                    manifest_source=ManifestSource.remote,
                 )
 
                 repos_count = manifest_adapter.get_repos_count()
@@ -118,11 +118,13 @@ def create_manifests(
 
 
 def get_manifest_adapter(
-    company_slug: str, git_creds: dict, instance: str, org: str, git_provider: str
+    company_slug: str, git_creds: dict, git_config: GitConfig, org: str,
 ):
-    if git_provider != 'github':
+    instance = git_config.git_instance_slug
+    if git_config.git_provider != 'github':
         raise UnsupportedGitProvider(
             f'Currently only instances of source github are supported, cannot process instance {instance}'
         )
-    token = (git_creds['github_token'],)
-    return GithubManifestGenerator(token, company=company_slug, instance=instance, org=org)
+    return GithubManifestGenerator(
+        token=git_creds['github_token'], company=company_slug, instance=instance, org=org
+    )

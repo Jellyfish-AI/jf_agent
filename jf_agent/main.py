@@ -389,25 +389,35 @@ def generate_manifests(config, creds):
 
     company_info = resp.json()
     company_slug = company_info.get('company_slug')
-    agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
     # Create and add Jira Manifest
-    jira_manifest = create_jira_manifest(company_slug=company_slug, config=config, creds=creds)
-    if jira_manifest:
-        agent_logging.log_and_print(logger, logging.INFO, 'Successfully created Jira Manifest')
-        manifests.append(jira_manifest)
+    if config.jira_url:
+        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
+        jira_manifest = create_jira_manifest(company_slug=company_slug, config=config, creds=creds)
+        if jira_manifest:
+            agent_logging.log_and_print(logger, logging.INFO, 'Successfully created Jira Manifest')
+            manifests.append(jira_manifest)
+        else:
+            agent_logging.log_and_print(
+                logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+            )
     else:
         agent_logging.log_and_print(
-            logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+            logger, logging.INFO, 'No Jira config detected, skipping Jira manifest generation'
         )
 
-    agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Git Manifests...')
-    # Create and add Git Manifests
-    manifests += create_git_manifests(
-        company_slug=company_slug, creds=creds, git_configs=config.git_configs
-    )
+    if config.git_configs:
+        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Git Manifests...')
+        # Create and add Git Manifests
+        manifests += create_git_manifests(company_slug=company_slug, creds=creds, config=config)
+    else:
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
 
     agent_logging.log_and_print(
-        logger, logging.INFO, f'Attempting upload of {len(manifests)} to Jellyfish...'
+        logger, logging.INFO, f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...'
     )
 
     for manifest in manifests:
@@ -418,7 +428,7 @@ def generate_manifests(config, creds):
         )
 
     agent_logging.log_and_print(
-        logger, logging.INFO, f'Successfully uploaded {len(manifests)} to Jellyfish!'
+        logger, logging.INFO, f'Successfully uploaded {len(manifests)} manifest(s) to Jellyfish!'
     )
 
 

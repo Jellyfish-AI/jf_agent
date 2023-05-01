@@ -12,7 +12,6 @@ from jf_agent.data_manifests.git.manifest import (
 )
 from jf_agent.data_manifests.manifest import ManifestSource
 from jf_agent.session import retry_session
-from requests.utils import default_user_agent
 
 
 # TODO: Expand or generalize this to work with things other than github (BBCloud, Gitlab, etc)
@@ -30,16 +29,12 @@ class GithubManifestGenerator(ManifestAdapter):
         self.instance = instance
         # Session fields
         self.token = token
-        self.base_url = 'https://api.github.com'
+        self.base_url = 'https://api.github.com/graphql'
 
         self.session = retry_session(**kwargs)
         self.session.verify = verify
         self.session.headers.update(
-            {
-                'Accept': 'application/json',
-                'User-Agent': f'jellyfish/1.0 ({default_user_agent()})',
-                'Authorization': f'token {token}',
-            }
+            {'Authorization': f'token {token}', "Accept": "application/vnd.github+json",}
         )
 
     def get_users_count(self) -> int:
@@ -334,7 +329,6 @@ class GithubManifestGenerator(ManifestAdapter):
             hasNextPage = page_info['hasNextPage']
 
     def _get_raw_result(self, query_body: str) -> dict:
-        # print(query_body)
         response = self.session.post(url=self.base_url, json={'query': query_body})
         response.raise_for_status()
         json_str = response.content.decode()
