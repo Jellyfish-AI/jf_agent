@@ -391,7 +391,15 @@ def generate_manifests(config, creds):
     company_slug = company_info.get('company_slug')
     agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
     # Create and add Jira Manifest
-    manifests.append(create_jira_manifest(company_slug=company_slug, config=config, creds=creds))
+    jira_manifest = create_jira_manifest(company_slug=company_slug, config=config, creds=creds)
+    if jira_manifest:
+        agent_logging.log_and_print(logger, logging.INFO, 'Successfully created Jira Manifest')
+        manifests.append(jira_manifest)
+    else:
+        agent_logging.log_and_print(
+            logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+        )
+
     agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Git Manifests...')
     # Create and add Git Manifests
     manifests += create_git_manifests(
