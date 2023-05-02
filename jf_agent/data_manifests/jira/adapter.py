@@ -103,7 +103,15 @@ class JiraCloudManifestAdapter:
             except JIRAError as e:
                 # From what I can tell, there isn't an easy way to tell
                 # from the 'board' object if sprints are enabled or not
-                if e.status_code == 400 and e.text == 'The board does not support sprints':
+                if e.status_code == 400 and (
+                    e.text == 'The board does not support sprints'
+                    or e.text == 'The board doesn\'t support sprints.'
+                ):
+                    continue
+                elif (
+                    e.status_code == 500
+                    and e.text == 'This board has no columns with a mapped status.'
+                ):
                     continue
                 else:
                     raise
