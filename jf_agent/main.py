@@ -149,7 +149,9 @@ def main():
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
             try:
-                generate_manifests(config=config, creds=creds)
+                generate_manifests(
+                    config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
+                )
             except Exception as e:
                 agent_logging.log_and_print(
                     logger,
@@ -372,7 +374,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def generate_manifests(config, creds):
+def generate_manifests(config, creds, jellyfish_endpoint_info):
+
     manifests: list[Manifest] = []
     base_url = config.jellyfish_api_base
     resp = requests.get(
@@ -392,13 +395,24 @@ def generate_manifests(config, creds):
     # Create and add Jira Manifest
     if config.jira_url:
         agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
-        jira_manifest = create_jira_manifest(company_slug=company_slug, config=config, creds=creds)
-        if jira_manifest:
-            agent_logging.log_and_print(logger, logging.INFO, 'Successfully created Jira Manifest')
-            manifests.append(jira_manifest)
-        else:
+        try:
+            jira_manifest = create_jira_manifest(
+                company_slug=company_slug, config=config, creds=creds
+            )
+            if jira_manifest:
+                agent_logging.log_and_print(
+                    logger, logging.INFO, 'Successfully created Jira Manifest'
+                )
+                manifests.append(jira_manifest)
+            else:
+                agent_logging.log_and_print(
+                    logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+                )
+        except Exception as e:
             agent_logging.log_and_print(
-                logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+                logger,
+                logging.ERROR,
+                f'Error encountered when generating jira manifest. Error: {e}',
             )
     else:
         agent_logging.log_and_print(
@@ -406,9 +420,23 @@ def generate_manifests(config, creds):
         )
 
     if config.git_configs:
-        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Git Manifests...')
-        # Create and add Git Manifests
-        manifests += create_git_manifests(company_slug=company_slug, creds=creds, config=config)
+        try:
+            agent_logging.log_and_print(
+                logger, logging.INFO, 'Attempting to generate Git Manifests...'
+            )
+            # Create and add Git Manifests
+            manifests += create_git_manifests(
+                company_slug=company_slug,
+                creds=creds,
+                config=config,
+                endpoint_git_instances_info=jellyfish_endpoint_info.git_instance_info,
+            )
+        except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'Error encountered when generating git manifests. Error: {e}',
+            )
     else:
         agent_logging.log_and_print(
             logger,
