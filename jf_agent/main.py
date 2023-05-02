@@ -10,6 +10,7 @@ from glob import glob
 from pathlib import Path
 import sys
 from time import sleep
+import traceback
 
 import requests
 import json
@@ -411,7 +412,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             agent_logging.log_and_print(
                 logger,
                 logging.ERROR,
-                f'Error encountered when generating jira manifest. Error: {e}',
+                f'Error encountered when generating jira manifest. Error: {traceback.format_exc()}',
             )
     else:
         agent_logging.log_and_print(
@@ -434,7 +435,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             agent_logging.log_and_print(
                 logger,
                 logging.ERROR,
-                f'Error encountered when generating git manifests. Error: {e}',
+                f'Error encountered when generating git manifests. Error: {traceback.format_exc()}',
             )
     else:
         agent_logging.log_and_print(

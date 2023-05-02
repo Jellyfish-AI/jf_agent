@@ -1,4 +1,5 @@
 import logging
+import traceback
 from jf_agent import agent_logging
 from jf_agent.config_file_reader import GitConfig
 
@@ -41,9 +42,9 @@ def create_manifests(
             # support legacy single-git support, which assumes only one available git instance
             instance_info = list(endpoint_git_instances_info.values())[0]
             instance_creds = list(creds.git_instance_to_creds.values())[0]
+            instance_slug: str = instance_info['slug']
 
         try:
-            instance_slug: str = instance_info['slug']
             # If the git config doesn't have a git instance, do not generate a manifest
             if not instance_slug:
                 agent_logging.log_and_print(
@@ -139,7 +140,13 @@ def create_manifests(
                 )
         except UnsupportedGitProvider as e:
             agent_logging.log_and_print(
-                logger, logging.ERROR, f'An exception happened when creating manifest. Err: {e}'
+                logger, logging.ERROR, f'Unsupported Git Provider exception encountered. {e}'
+            )
+        except Exception:
+            agent_logging.log_and_print(
+                logger,
+                logging.ERROR,
+                f'An exception happened when creating manifest. Err: {traceback.format_exc()}',
             )
 
     return manifests
@@ -150,7 +157,7 @@ def get_manifest_adapter(
 ):
     if git_config.git_provider != 'github':
         raise UnsupportedGitProvider(
-            f'Currently only instances of source github are supported, cannot process instance {instance}'
+            f'Currently only instances of source github are supported, cannot process instance {instance} which has git_provider type {git_config.git_provider}'
         )
     return GithubManifestGenerator(
         token=git_creds['github_token'], company=company_slug, instance=instance, org=org
