@@ -17,25 +17,37 @@ class UnsupportedJiraProvider(Exception):
 def create_manifest(company_slug, config, creds):
     manifest_adapter = JiraCloudManifestAdapter(config=config, creds=creds)
 
-    agent_logging.log_and_print(
-        logger, logging.INFO, f'Generating Jira Manifest data for {company_slug}...'
-    )
+    def _agent_log(msg: str):
+        agent_logging.log_and_print(logger, logging.INFO, msg)
 
+    _agent_log(f'Generating Jira Manifest data for {company_slug}...')
+
+    _agent_log('Processing Users...')
     users_count = manifest_adapter.get_users_count()
+    _agent_log('Processing Fields...')
     fields_count = manifest_adapter.get_fields_count()
+    _agent_log('Processing Resolutions...')
     resolutions_count = manifest_adapter.get_resolutions_count()
+    _agent_log('Processing Issue Types...')
     issue_types_count = manifest_adapter.get_issue_types_count()
+    _agent_log('Processing Issue Link Types...')
     issue_link_types_count = manifest_adapter.get_issue_link_types_count()
+    _agent_log('Processing Priorities...')
     priorities_count = manifest_adapter.get_priorities_count()
+    _agent_log('Processing Projects...')
     projects_count = manifest_adapter.get_projects_count()
+    _agent_log('Processing Project Versions...')
     project_versions_count = manifest_adapter.get_project_versions_count()
+    _agent_log('Processing Boards...')
     boards_count = manifest_adapter.get_boards_count()
+    _agent_log('Processing Sprints...')
     sprints_count = manifest_adapter.get_sprints_count()
+    _agent_log('Processing Issues...')
     issues_count = manifest_adapter.get_issues_count()
+    _agent_log('Processing Issue Data...')
     issues_count = manifest_adapter.get_issues_data_count()
 
-    agent_logging.log_and_print(logger, logging.INFO, 'Done generating manifest data!')
-
+    _agent_log('Done generating manifest data!')
     jira_manifest = JiraDataManifest(
         company=company_slug,
         data_source=ManifestSource.remote,

@@ -3,6 +3,7 @@ from functools import partial
 import logging
 from typing import Callable, Generator
 from jf_agent.jf_jira import get_basic_jira_connection
+from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
 
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 class JiraCloudManifestAdapter:
     def __init__(self, config, creds) -> None:
         self.jira_connection = get_basic_jira_connection(config, creds)
+        self.config = config
 
     def _get_all_pages(self, url_path: str, page_size: int = 50) -> list:
         curr = 0
@@ -49,7 +51,19 @@ class JiraCloudManifestAdapter:
             curs += page_length
 
     def get_users_count(self) -> int:
-        return len(self._get_all_pages(url_path='users/search'))
+        # Getting user data is complicated. For this use case,
+        # run the specialized jira_downloader logic and grab the count
+        try:
+            jira_users = download_users(
+                self.jira_connection,
+                self.config.jira_gdpr_active,
+                required_email_domains=self.config.jira_required_email_domains,
+                is_email_required=self.config.jira_is_email_required,
+                quiet=True,
+            )
+            return len(jira_users)
+        except RuntimeError as e:
+            return 0
 
     def get_fields_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
@@ -89,7 +103,15 @@ class JiraCloudManifestAdapter:
             except JIRAError as e:
                 # From what I can tell, there isn't an easy way to tell
                 # from the 'board' object if sprints are enabled or not
-                if e.status_code == 400 and e.text == 'The board does not support sprints':
+                if e.status_code == 400 and (
+                    e.text == 'The board does not support sprints'
+                    or e.text == 'The board doesn\'t support sprints.'
+                ):
+                    continue
+                elif (
+                    e.status_code == 500
+                    and e.text == 'This board has no columns with a mapped status.'
+                ):
                     continue
                 else:
                     raise
