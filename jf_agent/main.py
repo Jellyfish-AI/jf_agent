@@ -375,7 +375,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def generate_manifests(config, creds, jellyfish_endpoint_info):
-
     manifests: list[Manifest] = []
     base_url = config.jellyfish_api_base
     resp = requests.get(

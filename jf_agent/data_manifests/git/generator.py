@@ -67,7 +67,6 @@ def create_manifests(
                     logging.INFO,
                     f'Processing git instance {instance_slug} for company {company_slug} under github org {org}',
                 )
-
                 manifest_adapter: ManifestAdapter = get_manifest_adapter(
                     company_slug=company_slug,
                     git_creds=instance_creds,
