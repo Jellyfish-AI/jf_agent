@@ -57,11 +57,6 @@ def create_manifests(
             agent_logging.log_and_print(
                 logger, logging.INFO, f'Generating manifest for instance {instance_slug}'
             )
-            users_count = 0
-            teams_count = 0
-            repo_manifests: list[GitRepoManifest] = []
-            user_manifests: list[GitUserManifest] = []
-            team_manifests: list[GitTeamManifest] = []
             for org in git_config.git_include_projects:
                 agent_logging.log_and_print(
                     logger,
@@ -76,6 +71,11 @@ def create_manifests(
                     org=org,
                 )
 
+                repo_manifests: list[GitRepoManifest] = []
+                user_manifests: list[GitUserManifest] = []
+                team_manifests: list[GitTeamManifest] = []
+
+                # Process Repos
                 repos_count = manifest_adapter.get_repos_count()
                 agent_logging.log_and_print(
                     logger,
@@ -107,22 +107,21 @@ def create_manifests(
 
                 agent_logging.log_and_print(logger, logging.INFO, 'Done processing Repos')
 
-                user_count = manifest_adapter.get_users_count()
-                agent_logging.log_and_print(logger, logging.INFO, f'Processing {user_count} users')
+                # Process Users
+                users_count = manifest_adapter.get_users_count()
+                agent_logging.log_and_print(logger, logging.INFO, f'Processing {users_count} users')
                 user_manifests += [
                     user_manifest for user_manifest in manifest_adapter.get_all_user_data()
                 ]
                 agent_logging.log_and_print(logger, logging.INFO, 'Done processing Users')
 
-                team_count = manifest_adapter.get_teams_count()
-                agent_logging.log_and_print(logger, logging.INFO, f'Processing {team_count} teams')
+                # Process Teams
+                teams_count = manifest_adapter.get_teams_count()
+                agent_logging.log_and_print(logger, logging.INFO, f'Processing {teams_count} teams')
                 team_manifests += [
                     team_manifest for team_manifest in manifest_adapter.get_all_team_data()
                 ]
                 agent_logging.log_and_print(logger, logging.INFO, 'Done processing Teams')
-
-                users_count += user_count
-                teams_count += team_count
 
                 manifests.append(
                     GitDataManifest(
@@ -132,7 +131,7 @@ def create_manifests(
                         org=org,
                         users_count=users_count,
                         teams_count=teams_count,
-                        repos_count=len(repo_manifests),
+                        repos_count=repos_count,
                         repo_manifests=repo_manifests,
                         user_manifests=user_manifests,
                         team_manifests=team_manifests,
