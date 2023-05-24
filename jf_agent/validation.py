@@ -18,8 +18,10 @@ def validate_jira(config, creds):
     print('\nJira details:')
     print(f'  URL:      {config.jira_url}')
     print(f'  Username: {creds.jira_username}')
-    pw_len = len(creds.jira_password) - 2
-    print(f'  Password: {creds.jira_password[:2]:*<{pw_len}}')
+    if creds.jira_username and creds.jira_password:
+        print('  Password: **********')
+    elif creds.jira_bearer_token:
+        print('  Token: **********')
     # test Jira connection
     try:
         print('==> Testing Jira connection...')
@@ -126,7 +128,7 @@ def validate_git(config, creds):
                     " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
                 )
                 continue
-                 
+
             print("  All projects and repositories available to agent:")
             for project_name, repo_list in project_repo_dict.items():
                 print(f"  -- {project_name}")

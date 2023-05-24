@@ -66,6 +66,7 @@ ValidatedConfig = namedtuple(
         'jellyfish_api_base',
         'skip_ssl_verification',
         'send_agent_config',
+        'git_max_concurrent',
     ],
 )
 
@@ -164,6 +165,7 @@ def obtain_config(args) -> ValidatedConfig:
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
+    git_max_concurrent = yaml_conf_global.get("git_max_concurrent", len(git_configs))
 
     now = datetime.utcnow()
 
@@ -257,6 +259,7 @@ def obtain_config(args) -> ValidatedConfig:
         jellyfish_api_base,
         skip_ssl_verification,
         send_agent_config,
+        git_max_concurrent,
     )
 
 

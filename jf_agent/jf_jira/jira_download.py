@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_users(
-    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
+        jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
 ):
     if not quiet:
         print('downloading jira users... ', end='', flush=True)
@@ -42,7 +42,7 @@ def download_users(
             logger=logger,
             level=logging.INFO,
             msg=f'Page limit reached with {len(jira_users)} users, '
-            'falling back to search by letter method.',
+                'falling back to search by letter method.',
         )
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
@@ -83,7 +83,6 @@ def download_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_fields(jira_connection, include_fields, exclude_fields):
-
     print('downloading jira fields... ', end='', flush=True)
 
     filters = []
@@ -154,9 +153,8 @@ def download_priorities(jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_projects_and_versions(
-    jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
+        jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
-
     print('downloading jira projects... ', end='', flush=True)
 
     filters = []
@@ -196,9 +194,9 @@ def download_projects_and_versions(
             # but are not actually accessible.  I don't know wtf Black
             # is doing with this formatting, but whatever.
             if (
-                e.status_code == 400
-                and e.text
-                == f"A value with ID '{project_id}' does not exist for the field 'project'."
+                    e.status_code == 400
+                    and e.text
+                    == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
                 agent_logging.log_and_print_error_or_warning(
                     logger, logging.ERROR, msg_args=[project_id], error_code=2112,
@@ -312,10 +310,51 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
 
 
+def get_issues(jira_connection, issue_jql, start_at, batch_size):
+    original_batch_size = batch_size
+    error = None
+    while batch_size > 0:
+        try:
+            api_response = jira_connection.search_issues(
+                f'{issue_jql} order by id asc',
+                fields=['updated'],
+                startAt=start_at,
+                maxResults=batch_size,
+            )
+            return api_response
+        except (JIRAError, KeyError) as e:
+            if hasattr(e, 'status_code') and e.status_code < 500:
+                # something wrong with our request; re-raise
+                raise
+
+            # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
+            # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
+            # object instead of a JSON object with an "issues" key, which results in the
+            # `search_issues()` function in the Jira library throwing a KeyError.
+            #
+            # Sometimes both cloud and server will return a 5xx.
+            #
+            # In either case, reduce the maxResults parameter and try again, on the theory that
+            # a smaller ask will prevent the server from choking.
+            batch_size = int(batch_size / 2)
+            error = e
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
+            )
+
+    # copied logic from jellyfish direct connect
+    # don't bail, just skip
+    # khardy 2023-03-16
+    agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
+    [f"{type(error)}", issue_jql, start_at, original_batch_size], error_code=3092)
+
+    return {}
+
+
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_all_issue_metadata(
-    jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
+        jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
 ) -> Dict[int, IssueMetadata]:
     print('downloading issue metadata... ', end='', flush=True)
 
@@ -339,11 +378,10 @@ def download_all_issue_metadata(
     else:
         # Over 20K characters - break up project_ids evenly based on num_pulls
         n = len(all_project_ids) // num_pulls
-        project_ids_array = [all_project_ids[i : i + n] for i in range(0, len(all_project_ids), n)]
+        project_ids_array = [all_project_ids[i: i + n] for i in range(0, len(all_project_ids), n)]
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
     for project_ids in project_ids_array:
-
         issue_jql = (
             f'project in ({",".join(project_ids)}) and updatedDate > '
             f'{"0" if not earliest_issue_dt else earliest_issue_dt.strftime("%Y-%m-%d")}'
@@ -359,45 +397,17 @@ def download_all_issue_metadata(
             batch_size = 1000
             try:
                 while start_at < min(end_at, total_num_issues):
-                    try:
-                        api_resp = jira_connection.search_issues(
-                            f'{issue_jql} order by id asc',
-                            fields=['updated'],
-                            startAt=start_at,
-                            maxResults=batch_size,
-                        )
-                    except (JIRAError, KeyError) as e:
-                        if hasattr(e, 'status_code') and e.status_code < 500:
-                            # something wrong with our request; re-raise
-                            raise
-
-                        # We have seen sporadic server-side flakiness here. Sometimes Jira Server (but not
-                        # Jira Cloud as far as we've seen) will return a 200 response with an empty JSON
-                        # object instead of a JSON object with an "issues" key, which results in the
-                        # `search_issues()` function in the Jira library throwing a KeyError.
-                        #
-                        # Sometimes both cloud and server will return a 5xx.
-                        #
-                        # In either case, reduce the maxResults parameter and try again, on the theory that
-                        # a smaller ask will prevent the server from choking.
-                        batch_size = int(batch_size / 2)
-                        if batch_size > 0:
-                            agent_logging.log_and_print_error_or_warning(
-                                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
-                            )
-                            continue
-                        else:
-                            agent_logging.log_and_print_error_or_warning(
-                                logger, logging.ERROR, error_code=3022,
-                            )
-                            raise
+                    api_resp = get_issues(jira_connection, issue_jql, start_at, batch_size)
 
                     issue_metadata = {
                         int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
                         for iss in api_resp
                     }
                     all_issue_metadata.update(issue_metadata)
-                    start_at += len(issue_metadata)
+                    if len(issue_metadata) == 0:
+                        start_at += 1  # nothing came back, so jump 1 issue ahead and hopefully skip the problem
+                    else:
+                        start_at += len(issue_metadata)
 
             except Exception as e:
                 thread_exceptions[thread_num] = e
@@ -432,8 +442,8 @@ def download_all_issue_metadata(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def detect_issues_needing_sync(
-    issue_metadata_from_jira: Dict[int, IssueMetadata],
-    issue_metadata_from_jellyfish: Dict[int, IssueMetadata],
+        issue_metadata_from_jira: Dict[int, IssueMetadata],
+        issue_metadata_from_jellyfish: Dict[int, IssueMetadata],
 ):
     missing_issue_ids = set()
     already_up_to_date_issue_ids = set()
@@ -455,7 +465,7 @@ def detect_issues_needing_sync(
 
 
 def detect_issues_needing_re_download(
-    downloaded_issue_info, issue_metadata_from_jellyfish, issue_metadata_addl_from_jellyfish
+        downloaded_issue_info, issue_metadata_from_jellyfish, issue_metadata_addl_from_jellyfish
 ):
     issue_keys_changed = []
     for issue_id_str, issue_key in downloaded_issue_info:
@@ -486,12 +496,12 @@ def detect_issues_needing_re_download(
 
 
 def download_necessary_issues(
-    jira_connection,
-    issue_ids_to_download,
-    include_fields,
-    exclude_fields,
-    suggested_batch_size,
-    num_parallel_threads,
+        jira_connection,
+        issue_ids_to_download,
+        include_fields,
+        exclude_fields,
+        suggested_batch_size,
+        num_parallel_threads,
 ):
     '''
     A generator that yields batches of issues, until we've downloaded all of the issues given by
@@ -538,7 +548,7 @@ def download_necessary_issues(
 
     encountered_issue_ids = set()
     with tqdm(
-        desc='downloading jira issues', total=len(issue_ids_to_download), file=sys.stdout
+            desc='downloading jira issues', total=len(issue_ids_to_download), file=sys.stdout
     ) as prog_bar:
         # Read batches from queue
         finished = 0
@@ -605,7 +615,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
 
 @agent_logging.log_entry_exit(logger)
 def _download_jira_issues_segment(
-    thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
+        thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
 ):
     '''
     Each thread's target function.  Downloads 1/nth of the issues necessary, where
@@ -640,7 +650,7 @@ def _download_jira_issues_segment(
 
 
 def _download_jira_issues_page(
-    jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
 ):
     '''
     Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
@@ -790,7 +800,7 @@ def download_statuses(jira_connection):
 def _is_option_field(field_meta):
     schema = field_meta['schema']
     is_option_field = schema['type'] == 'option' or (
-        'items' in schema and schema['items'] == 'option'
+            'items' in schema and schema['items'] == 'option'
     )
     return is_option_field
 
@@ -805,7 +815,6 @@ def _search_all_users(jira_connection, gdpr_active):
 
     # different jira versions / different times, the way to list all users has changed. Try a few.
     for q in [None, '', '%', '@']:
-
         # iterate through pages of results
         while True:
             users = _search_users(
@@ -834,37 +843,37 @@ def _users_by_letter(jira_connection, gdpr_active):
             {
                 _jira_user_key(u): u
                 for u in _search_users(
-                    jira_connection,
-                    gdpr_active,
-                    query=f'{letter}.',
-                    include_inactive=True,
-                    include_active=False,
-                )
+                jira_connection,
+                gdpr_active,
+                query=f'{letter}.',
+                include_inactive=True,
+                include_active=False,
+            )
             }
         )
         jira_users.update(
             {
                 _jira_user_key(u): u
                 for u in _search_users(
-                    jira_connection,
-                    gdpr_active,
-                    query=f'{letter}.',
-                    include_inactive=False,
-                    include_active=True,
-                )
+                jira_connection,
+                gdpr_active,
+                query=f'{letter}.',
+                include_inactive=False,
+                include_active=True,
+            )
             }
         )
     return list(jira_users.values())
 
 
 def _search_users(
-    jira_connection,
-    gdpr_active,
-    query,
-    start_at=0,
-    max_results=1000,
-    include_active=True,
-    include_inactive=False,
+        jira_connection,
+        gdpr_active,
+        query,
+        start_at=0,
+        max_results=1000,
+        include_active=True,
+        include_inactive=False,
 ):
     if query is None:
         # use new endpoint that doesn't take a query.  This may not exist in some instances.
@@ -902,7 +911,6 @@ def _search_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
-
     from jf_agent.jf_jira import get_basic_jira_connection
     from jf_agent.git import get_git_client
 
@@ -936,7 +944,6 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
 
 
 def _get_repos_list_in_jira(issues_to_scan, jira_connection):
-
     print('Scanning Jira issues for Git repos...')
     missing_repositories = {}
 
@@ -984,7 +991,6 @@ def _remove_repos_present_in_git_instance(git_connection, git_config, missing_re
 
 
 def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
-
     params = {
         'issueId': issue_id,
         'dataType': 'repository',
@@ -1040,7 +1046,6 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
 
     ignore_repos = []
     for repo in list(repos_found_by_jira.values()):
-
         repo_name = repo['name']
         repo_url = repo['url']
 

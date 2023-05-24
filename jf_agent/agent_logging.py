@@ -24,13 +24,15 @@ Since we generally want errors/warnings to go to BOTH stdout and the logger, we
 should generally use log_and_print() instead of logger.whatever().
 '''
 
+LOG_FILE_NAME = 'jf_agent.log'
+
 
 def configure(outdir):
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        filename=os.path.join(outdir, 'jf_agent.log'),
+        filename=os.path.join(outdir, LOG_FILE_NAME),
         filemode='a',  # May be adding to a file created in a previous run
     )
 
@@ -67,7 +69,9 @@ def log_loop_iters(
 # Mapping of error/warning codes to templated error messages to be called by
 # log_and_print_error_or_warning(). This allows for Jellyfish to better categorize errors/warnings.
 ERROR_MESSAGES = {
+    0000: 'An unknown error has occurred. Error message: {}',
     3000: 'Failed to upload file {} to S3 bucket',
+    3001: 'Connection to bucket was disconnected while uploading: {} with the following error: {}. Retrying...',
     3010: 'Rate limiter: thought we were operating within our limit (made {}/{} calls for {}), but got HTTP 429 anyway!',
     3020: 'Next available time to make call is after the timeout of {} seconds. Giving up.',
     3030: 'ERROR: Could not parse response with status code {}. Contact an administrator for help.',
@@ -94,6 +98,10 @@ ERROR_MESSAGES = {
     3062: 'Apparently unable to fetch issue based on search_params {}',
     3072: 'Error calling createmeta JIRA endpoint',
     3082: 'OJ-9084: Changelog history item with no \'fieldId\' or \'field\' key: {}',
+    3092: (
+        'OJ-22511: server side 500, batch size reduced to 0, '
+        'last error was: {} with jql: {}, start_at: {}, and batch_size: {}. Skipping one issue ahead...'
+    ),
     2101: 'Failed to connect to {}:\n{}',
     2102: 'Unable to access project {}, may be a Jira misconfiguration. Skipping...',
     2112: 'Failed to connect to Jira for project ID \n{}',

@@ -227,6 +227,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
+                batch_size=2000
             )
 
         downloaded_issue_info = download_and_write_issues()
@@ -255,6 +256,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
+                batch_size=2000
             )
 
         re_downloaded_issue_info = download_and_write_issues_needing_re_download()
