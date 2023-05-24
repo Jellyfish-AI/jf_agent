@@ -4,7 +4,7 @@ RUN pip install -U pip setuptools pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
 
 # When upgrading Python versions, please update '.python-version' to match
-FROM python:3.9.14-slim
+FROM python:3.12.0b1-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
