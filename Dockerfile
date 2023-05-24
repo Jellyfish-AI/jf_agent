@@ -1,10 +1,10 @@
-FROM python:3.9.14 AS py-deps
+FROM python:3.9.16 AS py-deps
 COPY ./Pipfile ./Pipfile.lock ./
 RUN pip install -U pip setuptools pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
 
 # When upgrading Python versions, please update '.python-version' to match
-FROM python:3.9.14-slim
+FROM python:3.9.16-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
