@@ -1,4 +1,4 @@
-FROM python:3.9.14 AS py-deps
+FROM python:3.9.16 AS py-deps
 COPY ./Pipfile ./Pipfile.lock ./
 RUN pip install -U pip setuptools pipenv && \
     pipenv install --deploy --system --ignore-pipfile --clear
