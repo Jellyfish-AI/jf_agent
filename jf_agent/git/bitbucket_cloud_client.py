@@ -13,19 +13,6 @@ from jf_agent.ratelimit import RateLimiter, RateLimitRealmConfig
 logger = logging.getLogger(__name__)
 
 
-def get_wait_time(e: Optional[Exception], retries: int) -> int:
-    """
-    see jira download logic in main jellyfish repo
-    """
-    response = getattr(e, 'response', None)
-    headers = getattr(response, 'headers', {})
-    retry_after = headers.get('Retry-After')
-    if retry_after is not None:
-        return int(retry_after)
-    else:
-        return 5 ** retries
-
-
 class BitbucketCloudClient:
     def __init__(self, server_base_uri, username, app_password, session):
         self.server_base_uri = server_base_uri or 'https://api.bitbucket.org'
