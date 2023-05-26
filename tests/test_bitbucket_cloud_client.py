@@ -17,11 +17,10 @@ def get_connection():
     mock_server_info_resp = '{"baseUrl":"' + URI + '","version":"1001.0.0-SNAPSHOT",' \
                             '"versionNumbers":[1001,0,0],"deploymentType":"Cloud","buildNumber":100218,' \
                             '"buildDate":"2023-03-16T08:21:48.000-0400","serverTime":"2023-03-17T16:32:45.255-0400",' \
-                            '"scmInfo":"9826a048a245f608f01466bdff7c83ae3899b12d","serverTitle":"BBC",' \
                             '"defaultLocale":{"locale":"en_US"}} '
 
     username = 'username'
-    password = 'password'
+    password = 'password'  #pragma: allowlist secret
 
     # https://test-co.atlassian.net/rest/api/2/serverInfo
     with requests_mock.Mocker() as m:
