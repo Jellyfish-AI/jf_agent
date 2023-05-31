@@ -2,6 +2,7 @@ from collections import deque
 from datetime import datetime, timedelta
 import logging
 import time
+from typing import Optional
 
 import requests
 from requests.utils import default_user_agent
@@ -104,7 +105,7 @@ class BitbucketCloudClient:
                 return None
             raise
 
-    def get_raw_result(self, url, rate_limit_realm=None):
+    def get_raw_result(self, url, rate_limit_realm=None, wait_extra=3):
         start = datetime.utcnow()
         while True:
             try:
@@ -114,11 +115,19 @@ class BitbucketCloudClient:
                     return result
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
+                    if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
+                        wait_time = int(e.response.headers["Retry-After"]) + wait_extra
+                        agent_logging.log_and_print(
+                            logger, logging.INFO, f'Retrying in {wait_time} seconds...'
+                        )
+                        time.sleep(wait_time)
+                        continue
                     # rate-limited in spite of trying to throttle
-                    # requests.  We don't know how long we need to wait,
+                    # requests. No `Retry-After` returned, so
+                    # We don't know how long we need to wait,
                     # so just try in 30 seconds, unless it's already
                     # been too long
-                    if (datetime.utcnow() - start) < timedelta(hours=1):
+                    elif (datetime.utcnow() - start) < timedelta(hours=1):
                         agent_logging.log_and_print(
                             logger, logging.INFO, 'Retrying in 30 seconds...',
                         )
