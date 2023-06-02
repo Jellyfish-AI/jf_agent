@@ -25,6 +25,7 @@ class JiraDataManifest(Manifest):
     boards_count: int
     sprints_count: int
     issues_count: int
+    project_keys: list[str]
 
     def get_manifest_full_name(self):
         return _get_jira_manifest_full_name(self)

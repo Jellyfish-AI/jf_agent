@@ -34,8 +34,10 @@ def create_manifest(company_slug, config, creds):
     issue_link_types_count = manifest_adapter.get_issue_link_types_count()
     _agent_log('Processing Priorities...')
     priorities_count = manifest_adapter.get_priorities_count()
-    _agent_log('Processing Projects...')
+    _agent_log('Processing Projects count...')
     projects_count = manifest_adapter.get_projects_count()
+    _agent_log('Processing Jira Project Key names...')
+    project_keys = manifest_adapter.get_project_keys()
     _agent_log('Processing Project Versions...')
     project_versions_count = manifest_adapter.get_project_versions_count()
     _agent_log('Processing Boards...')
@@ -62,6 +64,7 @@ def create_manifest(company_slug, config, creds):
         boards_count=boards_count,
         sprints_count=sprints_count,
         issues_count=issues_count,
+        project_keys=project_keys,
     )
 
     return jira_manifest
