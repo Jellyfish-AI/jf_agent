@@ -1,7 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 
 from dataclasses import dataclass
 from functools import partial
+import traceback
 from typing import Callable, Generator
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
@@ -10,15 +12,18 @@ from jira import JIRAError
 
 @dataclass
 class JiraCloudManifestAdapter:
-    def __init__(self, config, creds) -> None:
+    def __init__(self, company_slug, config, creds) -> None:
+        self.company_slug = company_slug
         self.jira_connection = get_basic_jira_connection(config, creds)
         self.config = config
         self.jira_url = config.jira_url
 
-    def _get_jql_search(self, jql_search: str, max_results: int = 0):
-        return self.jira_connection._get_json(
-            'search', {'jql': jql_search, "maxResults": max_results}
-        )
+        self._boards_cache = []
+        self._projects_cache = []
+
+        # Set up caches
+        self._get_all_boards()
+        self._get_all_projects()
 
     def _func_paginator(
         self, func_endpoint: Callable, page_size: int = 50
@@ -68,23 +73,76 @@ class JiraCloudManifestAdapter:
     def get_priorities_count(self) -> int:
         return len(self.jira_connection.priorities())
 
-    def _get_projects(self) -> Generator[dict, None, None]:
-        for project in self._page_get_results(
-            url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
-        ):
-            yield project
+    def _get_all_projects(self) -> list[dict]:
+        if not self._projects_cache:
+            self._projects_cache = [
+                project
+                for project in self._page_get_results(
+                    url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
+                )
+            ]
+
+        return self._projects_cache
+
+    def get_project_data_dicts(self) -> list[dict]:
+        return [
+            {"key": project['key'], "id": project['id']} for project in self._get_all_projects()
+        ]
+
+    def get_project_versions_count_for_project(self, project_id: int) -> int:
+        return self._get_raw_result(
+            url=f'{self.jira_url}/rest/api/latest/project/{project_id}/version?startAt=0&maxResults=0&state=future,active,closed'
+        )['total']
+
+    def get_issues_count(self) -> int:
+        # Query for all issues via JQL, but ask for 0 results.
+        # Meta data is returned that will give us the total number of
+        # (unpulled) results
+        result = self._get_jql_search(jql_search="", max_results=0)
+        return result['total']
+
+    def get_boards_count_for_project(self, project_id: int) -> int:
+        return sum(
+            [
+                1
+                for board in self._get_all_boards()
+                # Boards can come from a ew different places and thus
+                # a few different formats. We only care about project
+                # boards, though, which have the 'location' dict
+                # and the 'projectId' key within that dict
+                if (
+                    'location' in board
+                    and 'projectId' in board['location']
+                    and board['location']['projectId'] == project_id
+                )
+            ]
+        )
+
+    def get_board_ids(self, project_id: int):
+        result = self._get_raw_result(
+            url=f'{self.jira_url}/rest/agile/1.0/board?projectKeyOrId={project_id}&startAt=0&maxResults=100'
+        )
+        return [value['id'] for value in result['values']]
+
+    def _get_all_boards(self):
+        if not self._boards_cache:
+            self._boards_cache = [
+                board
+                for board in self._page_get_results(
+                    url=f'{self.jira_url}/rest/agile/1.0/board?startAt=%s&maxResults=100'
+                )
+            ]
+
+        return self._boards_cache
 
     def get_projects_count(self) -> int:
         url = f'{self.jira_url}/rest/api/latest/project/search?startAt=0&maxResults=0&status=archived&status=live'
         result = self._get_raw_result(url=url)
         return result['total']
 
-    def get_project_keys(self) -> list[str]:
-        return [project['key'] for project in self._get_projects()]
-
     def get_project_versions_count(self) -> int:
         total_project_versions = 0
-        for project in self._get_projects():
+        for project in self._get_all_projects():
             total_project_versions += self._get_raw_result(
                 url=f'{self.jira_url}/rest/api/latest/project/{project["id"]}/version?startAt=0&maxResults=0&state=future,active,closed'
             )['total']
@@ -107,40 +165,51 @@ class JiraCloudManifestAdapter:
                     ]
                 )
             except JIRAError as e:
-                # From what I can tell, there isn't an easy way to tell
-                # from the 'board' object if sprints are enabled or not
-                if e.status_code == 400 and (
-                    e.text == 'The board does not support sprints'
-                    or e.text == 'The board doesn\'t support sprints.'
-                ):
-                    print(f"Couldn't get sprints for board {board_id}")
-                elif (
-                    e.status_code == 500
-                    and e.text == 'This board has no columns with a mapped status.'
-                ):
-                    print(f"Board {board_id} doesn't support sprints -- skipping")
+                # JIRA returns 500 errors for various reasons: board is
+                # misconfigured; "failed to execute search"; etc.  Just
+                # skip and move on
+                if e.status_code == 500 or e.status_code == 400:
+                    pass
                 else:
                     raise
 
             return total_sprints_for_board
 
-        total_sprints_across_all_boards = 0
-        for board in self._page_get_results(
-            url=f'{self.jira_url}/rest/agile/1.0/board?startAt=%s&maxResults=100'
-        ):
-            total_sprints_across_all_boards += _get_sprints_for_board(board["id"])
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = []
+            for board in self._page_get_results(
+                url=f'{self.jira_url}/rest/agile/1.0/board?startAt=%s&maxResults=100'
+            ):
+                futures.append(executor.submit(_get_sprints_for_board, board["id"]))
+            futures = [
+                executor.submit(_get_sprints_for_board, board["id"])
+                for board in self._get_all_boards()
+            ]
 
-        return total_sprints_across_all_boards
+            return sum([future.result() for future in futures if future])
 
-    def get_issues_count(self) -> int:
-        # Query for all issues via JQL, but ask for 0 results.
-        # Meta data is returned that will give us the total number of
-        # (unpulled) results
-        result = self._get_jql_search(jql_search="", max_results=0)
-        return result['total']
+    def test_basic_auth_for_project(self, project_id: int) -> bool:
+        # Doing a basic query for issues is the best way to test auth.
+        # Catch and error, if it happens, and bubble up more specific error
+        try:
+            self.get_issues_count_for_project(project_id=project_id)
+            return True
+        except JIRAError:
+            return False
+        except Exception:
+            # This is unexpected behavior and it should never happen, log the error
+            # before returning
+            print(
+                'Unusual exception encountered when testing auth. '
+                f'JIRAError was expected but the following error was raised: {traceback.format_exc()}'
+            )
+            return False
 
-    def get_issues_data_count(self) -> int:
-        return self.get_issues_count()
+    def get_issues_count_for_project(self, project_id: int) -> int:
+        return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
+
+    def get_issues_data_count_for_project(self, project_id: int) -> int:
+        return self.get_issues_count_for_project(project_id=project_id)
 
     def _get_raw_result(self, url) -> dict:
         response = self.jira_connection._session.get(url)
@@ -159,3 +228,8 @@ class JiraCloudManifestAdapter:
                 break
             else:
                 start_at += len(page_result['values'])
+
+    def _get_jql_search(self, jql_search: str, max_results: int = 0):
+        return self.jira_connection._get_json(
+            'search', {'jql': jql_search, "maxResults": max_results}
+        )
