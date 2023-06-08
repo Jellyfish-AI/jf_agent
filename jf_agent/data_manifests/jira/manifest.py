@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from jf_agent.data_manifests.manifest import Manifest, ManifestSource
-
+from jf_agent.data_manifests.manifest import Manifest
 
 IJiraDataManifest = TypeVar('IJiraDataManifest', bound='JiraDataManifest')
+IJiraProjectManifest = TypeVar('IJiraProjectManifest', bound='JiraProjectManifest')
 
 
 def _get_jira_manifest_full_name(manifest: Manifest):
@@ -25,10 +25,27 @@ class JiraDataManifest(Manifest):
     boards_count: int
     sprints_count: int
     issues_count: int
-    project_keys: list[str]
+
+    # Drill down into each project with ProjectManifests
+    project_manifests: list[IJiraProjectManifest]
+
+    # For debug purposes. We may want to optionally exclude this when serializing
+    encountered_errors_for_projects: Any
 
     def get_manifest_full_name(self):
         return _get_jira_manifest_full_name(self)
 
-    def __eq__(self, __o: Manifest) -> bool:
-        return super().__eq__(__o)
+
+@dataclass
+class JiraProjectManifest(Manifest):
+    project_id: str
+    project_key: str
+    issues_count: int
+    board_count: int
+    version_count: int
+
+    def get_manifest_full_name(self):
+        return f'{_get_jira_manifest_full_name(self)}_{self.project_key}'
+
+    def __hash__(self):
+        return hash(self.get_manifest_full_name())
