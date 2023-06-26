@@ -75,9 +75,27 @@ class JiraCloudManifestAdapter:
 
     def _get_all_projects(self) -> list[dict]:
         if not self._projects_cache:
+            if self.config.jira_gdpr_active:
+                all_projects = [
+                    project
+                    for project in self._page_get_results(
+                        url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
+                    )
+                ]
+            # Different endpoint for Jira Server
+            else:
+                all_projects = [
+                    project
+                    for project in self._get_raw_result(
+                        url=f'{self.jira_url}/rest/api/latest/project?includedArchived=True'
+                    )
+                ]
+
+            # Filter for only projects that are included in the config
             self._projects_cache = [
-                self._get_raw_result(url=f'{self.jira_url}/rest/api/latest/project/{project}')
-                for project in self.config.jira_include_projects
+                project
+                for project in all_projects
+                if project['key'] in self.config.jira_include_projects
             ]
 
         return self._projects_cache
