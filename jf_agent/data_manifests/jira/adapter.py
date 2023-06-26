@@ -75,11 +75,27 @@ class JiraCloudManifestAdapter:
 
     def _get_all_projects(self) -> list[dict]:
         if not self._projects_cache:
+            if self.config.jira_gdpr_active:
+                all_projects = [
+                    project
+                    for project in self._page_get_results(
+                        url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
+                    )
+                ]
+            # Different endpoint for Jira Server
+            else:
+                all_projects = [
+                    project
+                    for project in self._get_raw_result(
+                        url=f'{self.jira_url}/rest/api/latest/project?includedArchived=True'
+                    )
+                ]
+
+            # Filter for only projects that are included in the config
             self._projects_cache = [
                 project
-                for project in self._page_get_results(
-                    url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
-                )
+                for project in all_projects
+                if project['key'] in self.config.jira_include_projects
             ]
 
         return self._projects_cache
@@ -118,12 +134,6 @@ class JiraCloudManifestAdapter:
             ]
         )
 
-    def get_board_ids(self, project_id: int):
-        result = self._get_raw_result(
-            url=f'{self.jira_url}/rest/agile/1.0/board?projectKeyOrId={project_id}&startAt=0&maxResults=100'
-        )
-        return [value['id'] for value in result['values']]
-
     def _get_all_boards(self):
         if not self._boards_cache:
             self._boards_cache = [
@@ -134,11 +144,6 @@ class JiraCloudManifestAdapter:
             ]
 
         return self._boards_cache
-
-    def get_projects_count(self) -> int:
-        url = f'{self.jira_url}/rest/api/latest/project/search?startAt=0&maxResults=0&status=archived&status=live'
-        result = self._get_raw_result(url=url)
-        return result['total']
 
     def get_project_versions_count(self) -> int:
         total_project_versions = 0
@@ -207,9 +212,6 @@ class JiraCloudManifestAdapter:
 
     def get_issues_count_for_project(self, project_id: int) -> int:
         return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
-
-    def get_issues_data_count_for_project(self, project_id: int) -> int:
-        return self.get_issues_count_for_project(project_id=project_id)
 
     def _get_raw_result(self, url) -> dict:
         response = self.jira_connection._session.get(url)
