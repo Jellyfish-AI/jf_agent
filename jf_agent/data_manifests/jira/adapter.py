@@ -76,10 +76,8 @@ class JiraCloudManifestAdapter:
     def _get_all_projects(self) -> list[dict]:
         if not self._projects_cache:
             self._projects_cache = [
-                project
-                for project in self._page_get_results(
-                    url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
-                )
+                self._get_raw_result(url=f'{self.jira_url}/rest/api/latest/project/{project}')
+                for project in self.config.jira_include_projects
             ]
 
         return self._projects_cache
@@ -118,12 +116,6 @@ class JiraCloudManifestAdapter:
             ]
         )
 
-    def get_board_ids(self, project_id: int):
-        result = self._get_raw_result(
-            url=f'{self.jira_url}/rest/agile/1.0/board?projectKeyOrId={project_id}&startAt=0&maxResults=100'
-        )
-        return [value['id'] for value in result['values']]
-
     def _get_all_boards(self):
         if not self._boards_cache:
             self._boards_cache = [
@@ -134,11 +126,6 @@ class JiraCloudManifestAdapter:
             ]
 
         return self._boards_cache
-
-    def get_projects_count(self) -> int:
-        url = f'{self.jira_url}/rest/api/latest/project/search?startAt=0&maxResults=0&status=archived&status=live'
-        result = self._get_raw_result(url=url)
-        return result['total']
 
     def get_project_versions_count(self) -> int:
         total_project_versions = 0
