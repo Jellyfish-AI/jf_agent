@@ -213,9 +213,6 @@ class JiraCloudManifestAdapter:
     def get_issues_count_for_project(self, project_id: int) -> int:
         return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
 
-    def get_issues_data_count_for_project(self, project_id: int) -> int:
-        return self.get_issues_count_for_project(project_id=project_id)
-
     def _get_raw_result(self, url) -> dict:
         response = self.jira_connection._session.get(url)
         response.raise_for_status()
