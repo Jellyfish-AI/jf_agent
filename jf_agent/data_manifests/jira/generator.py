@@ -127,7 +127,6 @@ def generate_project_manifest(
                 f'Exception encountered when trying to do basic auth test against Jira Project {project_key}. It is very likely that we do not have permissions to this Project.'
             )
 
-        board_count = manifest_adapter.get_boards_count_for_project(project_id=project_id)
         issues_count = manifest_adapter.get_issues_count_for_project(project_id=project_id)
         version_count = manifest_adapter.get_project_versions_count_for_project(
             project_id=project_id
@@ -139,7 +138,6 @@ def generate_project_manifest(
             project_id=project_id,
             project_key=project_key,
             issues_count=issues_count,
-            board_count=board_count,
             version_count=version_count,
         )
     except JIRAError as e:
