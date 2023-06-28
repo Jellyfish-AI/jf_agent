@@ -41,7 +41,6 @@ class JiraProjectManifest(Manifest):
     project_id: str
     project_key: str
     issues_count: int
-    board_count: int
     version_count: int
 
     def get_manifest_full_name(self):

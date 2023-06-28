@@ -117,23 +117,6 @@ class JiraCloudManifestAdapter:
         result = self._get_jql_search(jql_search="", max_results=0)
         return result['total']
 
-    def get_boards_count_for_project(self, project_id: int) -> int:
-        return sum(
-            [
-                1
-                for board in self._get_all_boards()
-                # Boards can come from a ew different places and thus
-                # a few different formats. We only care about project
-                # boards, though, which have the 'location' dict
-                # and the 'projectId' key within that dict
-                if (
-                    'location' in board
-                    and 'projectId' in board['location']
-                    and board['location']['projectId'] == project_id
-                )
-            ]
-        )
-
     def _get_all_boards(self):
         if not self._boards_cache:
             self._boards_cache = [
