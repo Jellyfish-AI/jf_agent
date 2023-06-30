@@ -293,6 +293,9 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                     # skip and move on
                     if e.status_code == 500 or e.status_code == 404:
                         print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
+                    elif e.status_code == 400:
+                        agent_logging.log_and_print_error_or_warning(
+                            logger, logging.ERROR, msg_args=[b['id'], str(e)], error_code=2203, exc_info=True)
                     else:
                         raise
 
