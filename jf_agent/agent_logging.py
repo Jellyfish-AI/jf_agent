@@ -121,6 +121,7 @@ ERROR_MESSAGES = {
         'Please check that the appropriate permissions are set for the following repos... ({})'
     ),
     2202: "You do not have the required permissions in jira required to fetch boards for the project {}",
+    2203: "ERROR: Failed downloading sprints for Jira board: {} with s_start_at={}.\nReceived 400 response:\n{}",
 }
 
 
