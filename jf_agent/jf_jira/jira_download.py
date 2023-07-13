@@ -290,15 +290,6 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 else:
                     sprints_for_board.extend(batch)
                     s_start_at += len(batch)
-                """
-                batch = jira_connection.sprints(
-                    # ignore future sprints
-                    board_id=b['id'],
-                    startAt=s_start_at,
-                    maxResults=50,
-                    state='active,closed',
-                )
-                """
 
             links.append({'board_id': b['id'], 'sprint_ids': [s.id for s in sprints_for_board]})
             sprints.update({s.id: s for s in sprints_for_board})
