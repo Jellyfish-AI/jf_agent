@@ -277,33 +277,28 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
         for b in tqdm(boards_by_id.values(), desc='downloading jira sprints', file=sys.stdout):
             s_start_at = 0
             sprints_for_board = []
-            while True:
-                batch = None
-                try:
-                    batch = jira_connection.sprints(
-                        # ignore future sprints
-                        board_id=b['id'],
-                        startAt=s_start_at,
-                        maxResults=50,
-                        state='active,closed',
-                    )
-                except JIRAError as e:
-                    # JIRA returns 500 errors for various reasons: board is
-                    # misconfigured; "falied to execute search"; etc.  Just
-                    # skip and move on
-                    if e.status_code == 500 or e.status_code == 404:
-                        print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
-                    elif e.status_code == 400:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, msg_args=[str(b), str(s_start_at), str(e)],
-                            error_code=2203, exc_info=True)
-                    else:
-                        raise
-
-                if not batch:
-                    break
-                s_start_at += len(batch)
-                sprints_for_board.extend(batch)
+            done = False
+            while not done:
+                batch, done = get_sprints(
+                    jira_connection=jira_connection,
+                    board_id=b['id'],
+                    start_at=s_start_at,
+                    batch_size=50
+                )
+                if not done and not batch:  # skip error loop says we're not done but returned nothing
+                    s_start_at += 1         # jump ahead one and hopefully we'll skip the problem
+                else:
+                    sprints_for_board.extend(batch)
+                    s_start_at += len(batch)
+                """
+                batch = jira_connection.sprints(
+                    # ignore future sprints
+                    board_id=b['id'],
+                    startAt=s_start_at,
+                    maxResults=50,
+                    state='active,closed',
+                )
+                """
 
             links.append({'board_id': b['id'], 'sprint_ids': [s.id for s in sprints_for_board]})
             sprints.update({s.id: s for s in sprints_for_board})
@@ -312,6 +307,41 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
 
 
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
+
+
+def get_sprints(jira_connection, board_id, start_at, batch_size):
+    error = None
+    original_batch_size = batch_size
+    while batch_size > 0:
+        try:
+            api_resp = jira_connection.sprints(
+                # ignore future sprints
+                board_id=board_id,
+                startAt=start_at,
+                maxResults=batch_size,
+                state='active,closed',
+            )
+            if api_resp:
+                return api_resp, False
+            else:
+                # sprints() returns an empty list to indicate there's nothing left
+                # so now done = True
+                return api_resp, True
+        except JIRAError as e:
+            error = e
+            # recoverable (ish) error codes, keep going
+            if e.status_code == 500 or e.status_code == 404 or e.status_code == 400:
+                agent_logging.log_and_print_error_or_warning(
+                    logger, logging.WARNING, msg_args=[batch_size], error_code=3013,
+                )
+                batch_size = int(batch_size/2)
+            else:
+                # unrecoverable errors
+                raise
+    # batch_size has fallen to 0 and we still never got a response
+    agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
+    [f"{type(error)}", board_id, start_at, original_batch_size], error_code=3092)
+    return None, False
 
 
 def get_issues(jira_connection, issue_jql, start_at, batch_size):
