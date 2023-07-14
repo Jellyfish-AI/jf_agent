@@ -91,7 +91,6 @@ ERROR_MESSAGES = {
     3151: 'Getting HTTP 429s for over an hour; giving up!',
     3002: 'Failed to download jira data:\n{}',
     3012: 'Caught KeyError from search_issues(), reducing batch size to {}',
-    3013: 'Caught error from fetching sprints(), reducing batch size to {}',
     3022: 'Caught KeyError from search_issues(), batch size is already 0, bailing out',
     3032: 'Exception encountered in thread {}\n{}',
     3042: '[Thread {}] Jira issue downloader FAILED',
@@ -102,10 +101,6 @@ ERROR_MESSAGES = {
     3092: (
         'OJ-22511: server side 500, batch size reduced to 0, '
         'last error was: {} with jql: {}, start_at: {}, and batch_size: {}. Skipping one issue ahead...'
-    ),
-    30923: (
-        'OJ-22511: server side error, batch size reduced to 0, '
-        'last error was: {} with board_id: {}, start_at: {}, and batch_size: {}. Skipping one issue ahead...'
     ),
     2101: 'Failed to connect to {}:\n{}',
     2102: 'Unable to access project {}, may be a Jira misconfiguration. Skipping...',
