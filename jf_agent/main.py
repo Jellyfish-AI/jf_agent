@@ -656,6 +656,9 @@ def send_data(config, creds):
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
+    # Log this information before we upload the log file.
+    agent_logging.log_and_print(logger, logging.INFO, msg=f'Agent run succeeded: {success}',)
+
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
     upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
