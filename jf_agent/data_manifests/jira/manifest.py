@@ -23,7 +23,6 @@ class JiraDataManifest(Manifest):
     projects_count: int
     project_versions_count: int
     boards_count: int
-    sprints_count: int
     issues_count: int
 
     # Drill down into each project with ProjectManifests

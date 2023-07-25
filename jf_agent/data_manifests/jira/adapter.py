@@ -140,42 +140,6 @@ class JiraCloudManifestAdapter:
     def get_boards_count(self) -> int:
         return len([b for b in self._func_paginator(func_endpoint=self.jira_connection.boards)])
 
-    def get_sprints_count(self) -> int:
-        def _get_sprints_for_board(board_id: int):
-            total_sprints_for_board = 0
-            try:
-                total_sprints_for_board += len(
-                    [
-                        sprint
-                        for sprint in self._page_get_results(
-                            url=f'{self.jira_url}/rest/agile/1.0/board/{board_id}/sprint?startAt=%s&maxResults=100'
-                        )
-                    ]
-                )
-            except JIRAError as e:
-                # JIRA returns 500 errors for various reasons: board is
-                # misconfigured; "failed to execute search"; etc.  Just
-                # skip and move on
-                if e.status_code == 500 or e.status_code == 400:
-                    pass
-                else:
-                    raise
-
-            return total_sprints_for_board
-
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = []
-            for board in self._page_get_results(
-                url=f'{self.jira_url}/rest/agile/1.0/board?startAt=%s&maxResults=100'
-            ):
-                futures.append(executor.submit(_get_sprints_for_board, board["id"]))
-            futures = [
-                executor.submit(_get_sprints_for_board, board["id"])
-                for board in self._get_all_boards()
-            ]
-
-            return sum([future.result() for future in futures if future])
-
     def test_basic_auth_for_project(self, project_id: int) -> bool:
         # Doing a basic query for issues is the best way to test auth.
         # Catch and error, if it happens, and bubble up more specific error

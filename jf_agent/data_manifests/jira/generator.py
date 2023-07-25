@@ -86,7 +86,6 @@ def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> Jira
     total_issue_link_types_count = manifest_adapter.get_issue_link_types_count()
     total_priorities_count = manifest_adapter.get_priorities_count()
     total_boards_count = manifest_adapter.get_boards_count()
-    total_sprints_count = manifest_adapter.get_sprints_count()
     project_data_dicts = manifest_adapter.get_project_data_dicts()
     project_versions_count = manifest_adapter.get_project_versions_count()
     issues_count = manifest_adapter.get_issues_count()
@@ -102,7 +101,6 @@ def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> Jira
         priorities_count=total_priorities_count,
         projects_count=len(project_data_dicts),
         boards_count=total_boards_count,
-        sprints_count=total_sprints_count,
         project_versions_count=project_versions_count,
         issues_count=issues_count,
         # The following fields must be filled out after processing
