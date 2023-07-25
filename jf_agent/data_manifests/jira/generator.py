@@ -64,8 +64,6 @@ def create_manifest(company_slug, config, creds):
 
         _agent_log(f'Done processing {len(project_data_dicts)} Jira Projects!')
 
-        _agent_log('Processing Jira Global Values (this make take up to 15 more minutes)')
-
         # Load base Jira Manifest object from globals generator
         jira_manifest = generate_base_manifest_future.result()
         # Append additional manifests (only project manifests, for now)
