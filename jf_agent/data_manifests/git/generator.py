@@ -144,11 +144,12 @@ def create_manifests(
                 'Unsupported Git Provider exception encountered. '
                 f'This shouldn\'t affect your agent upload. Error: {e}',
             )
-        except Exception:
+        except Exception as e:
             agent_logging.log_and_print(
                 logger,
                 logging.WARNING,
-                f'An exception happened when creating manifest. This shouldn\'t affect your agent upload',
+                'An exception happened when creating manifest. This shouldn\'t affect your agent upload. '
+                f'Exception: {e}',
             )
 
     return manifests
