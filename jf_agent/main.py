@@ -10,7 +10,6 @@ from glob import glob
 from pathlib import Path
 import sys
 from time import sleep
-import traceback
 
 import requests
 import json
@@ -156,8 +155,9 @@ def main():
             except Exception as e:
                 agent_logging.log_and_print(
                     logger,
-                    logging.ERROR,
-                    f'Exception encountered when trying to generate manifests. Exception: {e}',
+                    logging.WARNING,
+                    'Exception encountered when trying to generate manifests. '
+                    f'This should not affect your agent upload. Exception: {e}',
                 )
 
             if config.run_mode_is_print_apparently_missing_git_repos:
@@ -406,13 +406,13 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
                 manifests.append(jira_manifest)
             else:
                 agent_logging.log_and_print(
-                    logger, logging.ERROR, 'create_jira_manifest returned a None Type.'
+                    logger, logging.WARNING, 'create_jira_manifest returned a None Type.'
                 )
         except Exception as e:
             agent_logging.log_and_print(
                 logger,
-                logging.ERROR,
-                f'Error encountered when generating jira manifest. Error: {traceback.format_exc()}',
+                logging.WARNING,
+                f'Error encountered when generating jira manifest. This should NOT affect your agent upload. Error: {e}',
             )
     else:
         agent_logging.log_and_print(
@@ -434,8 +434,11 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
         except Exception as e:
             agent_logging.log_and_print(
                 logger,
-                logging.ERROR,
-                f'Error encountered when generating git manifests. Error: {traceback.format_exc()}',
+                logging.WARNING,
+                (
+                    f'Error encountered when generating git manifests. '
+                    f'This should NOT affect your agent upload. Error: {e}'
+                ),
             )
     else:
         agent_logging.log_and_print(
@@ -657,7 +660,9 @@ def send_data(config, creds):
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # Log this information before we upload the log file.
-    agent_logging.log_and_print(logger, logging.INFO, msg=f'Agent run succeeded: {success}',)
+    agent_logging.log_and_print(
+        logger, logging.INFO, msg=f'Agent run succeeded: {success}',
+    )
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]

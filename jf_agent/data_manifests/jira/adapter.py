@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import partial
 import traceback
 from typing import Callable, Generator
+from jf_agent import agent_logging
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
@@ -148,12 +149,13 @@ class JiraCloudManifestAdapter:
             return True
         except JIRAError:
             return False
-        except Exception:
+        except Exception as e:
             # This is unexpected behavior and it should never happen, log the error
             # before returning
-            print(
+            agent_logging.log_and_print(
                 'Unusual exception encountered when testing auth. '
-                f'JIRAError was expected but the following error was raised: {traceback.format_exc()}'
+                'This should not affect agent uploading. '
+                f'JIRAError was expected but the following error was raised: {e}'
             )
             return False
 

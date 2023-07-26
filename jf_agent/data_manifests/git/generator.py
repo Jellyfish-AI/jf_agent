@@ -49,8 +49,8 @@ def create_manifests(
             if not instance_slug:
                 agent_logging.log_and_print(
                     logger,
-                    logging.ERROR,
-                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded',
+                    logging.WARNING,
+                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded. This should NOT affect your agent upload',
                 )
                 continue
 
@@ -139,13 +139,16 @@ def create_manifests(
                 )
         except UnsupportedGitProvider as e:
             agent_logging.log_and_print(
-                logger, logging.ERROR, f'Unsupported Git Provider exception encountered. {e}'
+                logger,
+                logging.WARNING,
+                'Unsupported Git Provider exception encountered. '
+                f'This shouldn\'t affect your agent upload. Error: {e}',
             )
         except Exception:
             agent_logging.log_and_print(
                 logger,
-                logging.ERROR,
-                f'An exception happened when creating manifest. Err: {traceback.format_exc()}',
+                logging.WARNING,
+                f'An exception happened when creating manifest. This shouldn\'t affect your agent upload',
             )
 
     return manifests
