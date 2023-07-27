@@ -17,7 +17,10 @@ class JiraCloudManifestAdapter:
         self.company_slug = company_slug
         self.jira_connection = get_basic_jira_connection(config, creds)
         self.config = config
-        self.jira_url = config.jira_url
+
+        # Sanity check: remove trailing slash because
+        # it doesn't play nice with JIRA API endpoints
+        self.jira_url = config.jira_url[:-1] if config.jira_url.endswith('/') else config.jira_url
 
         self._boards_cache = []
         self._projects_cache = []
