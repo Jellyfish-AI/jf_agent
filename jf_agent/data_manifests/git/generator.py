@@ -163,5 +163,9 @@ def get_manifest_adapter(
             f'Currently only instances of source github are supported, cannot process instance {instance} which has git_provider type {git_config.git_provider}'
         )
     return GithubManifestGenerator(
-        token=git_creds['github_token'], company=company_slug, instance=instance, org=org
+        token=git_creds['github_token'],
+        base_url=git_config.git_url,
+        company=company_slug,
+        instance=instance,
+        org=org,
     )

@@ -21,7 +21,14 @@ class GithubManifestGenerator(ManifestAdapter):
     '''
 
     def __init__(
-        self, token: str, company: str, org: str, instance: str, verify=True, **kwargs
+        self,
+        token: str,
+        base_url: str,
+        company: str,
+        org: str,
+        instance: str,
+        verify=True,
+        **kwargs,
     ) -> None:
         # Super class fields
         self.company = company
@@ -29,7 +36,13 @@ class GithubManifestGenerator(ManifestAdapter):
         self.instance = instance
         # Session fields
         self.token = token
-        self.base_url = 'https://api.github.com/graphql'
+
+        # potentially cleanup base url
+        base_url[:-1] if base_url and base_url.endswith('/') else base_url
+        if 'api/v3' in base_url:
+            self.base_url = base_url.replace('api/v3', 'graphql')
+        else:
+            self.base_url = f'{base_url}/graphql' or 'https://api.github.com/graphql'
 
         self.session = retry_session(**kwargs)
         self.session.verify = verify
