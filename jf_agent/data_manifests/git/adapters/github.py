@@ -21,7 +21,14 @@ class GithubManifestGenerator(ManifestAdapter):
     '''
 
     def __init__(
-        self, token: str, company: str, org: str, instance: str, verify=True, **kwargs
+        self,
+        token: str,
+        base_url: str,
+        company: str,
+        org: str,
+        instance: str,
+        verify=True,
+        **kwargs,
     ) -> None:
         # Super class fields
         self.company = company
@@ -29,7 +36,17 @@ class GithubManifestGenerator(ManifestAdapter):
         self.instance = instance
         # Session fields
         self.token = token
-        self.base_url = 'https://api.github.com/graphql'
+
+        if not base_url:
+            self.base_url = 'https://api.github.com/graphql'
+        elif 'api/v3' in base_url:
+            # Github server can provide an API with a trailing '/api/v3'
+            # replace this with the graphql endpoint
+            self.base_url = base_url.replace('api/v3', 'graphql')
+        else:
+            # Assume all other cases we have a base_url like this:
+            #  https://api.github.com
+            self.base_url = f'{base_url}/graphql'
 
         self.session = retry_session(**kwargs)
         self.session.verify = verify
