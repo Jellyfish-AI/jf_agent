@@ -42,11 +42,11 @@ class GithubManifestGenerator(ManifestAdapter):
         elif 'api/v3' in base_url:
             # Github server can provide an API with a trailing '/api/v3'
             # replace this with the graphql endpoint
-            self.base_url = base_url.replace('api/v3', 'graphql')
+            self.base_url = base_url.replace('api/v3', 'api/graphql')
         else:
             # Assume all other cases we have a base_url like this:
             #  https://api.github.com
-            self.base_url = f'{base_url}/graphql'
+            self.base_url = f'{base_url}/api/graphql'
 
         self.session = retry_session(**kwargs)
         self.session.verify = verify
