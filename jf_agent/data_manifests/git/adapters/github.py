@@ -37,16 +37,14 @@ class GithubManifestGenerator(ManifestAdapter):
         # Session fields
         self.token = token
 
-        if not base_url:
-            self.base_url = 'https://api.github.com/graphql'
-        elif 'api/v3' in base_url:
-            # Github server can provide an API with a trailing '/api/v3'
+        if base_url and 'api/v3' in base_url:
+            # Github server clients provide an API with a trailing '/api/v3'
             # replace this with the graphql endpoint
             self.base_url = base_url.replace('api/v3', 'api/graphql')
         else:
-            # Assume all other cases we have a base_url like this:
-            #  https://api.github.com
-            self.base_url = f'{base_url}/api/graphql'
+            # All non github enterprise server users should use the same
+            # github cloud API endpoint
+            self.base_url = 'https://api.github.com/graphql'
 
         self.session = retry_session(**kwargs)
         self.session.verify = verify
