@@ -7,7 +7,6 @@ from jf_agent.data_manifests.git.manifest import (
     GitBranchManifest,
     GitPullRequestManifest,
     GitRepoManifest,
-    GitTeamManifest,
     GitUserManifest,
 )
 from jf_agent.data_manifests.manifest import ManifestSource
@@ -42,8 +41,6 @@ class GithubManifestGenerator(ManifestAdapter):
             # replace this with the graphql endpoint
             self.base_url = base_url.replace('api/v3', 'api/graphql')
         else:
-            # All non github enterprise server users should use the same
-            # github cloud API endpoint
             self.base_url = 'https://api.github.com/graphql'
 
         self.session = retry_session(**kwargs)
@@ -66,20 +63,6 @@ class GithubManifestGenerator(ManifestAdapter):
             'totalCount'
         ]
 
-    def get_teams_count(self) -> int:
-        query_body = f"""{{
-            organization(login: "{self.org}"){{
-                    teams {{
-                        totalCount
-                    }}
-                }}
-            }}
-        """
-        # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
-        return self._get_raw_result(query_body=query_body)['data']['organization']['teams'][
-            'totalCount'
-        ]
-
     def get_repos_count(self) -> int:
         query_body = f"""{{
             organization(login: "{self.org}"){{
@@ -97,7 +80,6 @@ class GithubManifestGenerator(ManifestAdapter):
     def get_all_repo_data(self, page_size: int = 10) -> Generator[GitRepoManifest, None, None]:
         query_body = f"""{{
             organization(login: "{self.org}") {{
-                    name
                     repositories(first: {page_size}, after: %s) {{
                         pageInfo {{
                             endCursor
@@ -162,7 +144,6 @@ class GithubManifestGenerator(ManifestAdapter):
     def get_all_user_data(self, page_size: int = 10) -> Generator[GitUserManifest, None, None]:
         query_body = f"""{{
             organization(login: "{self.org}") {{
-                    name
                     users: membersWithRole(first: {page_size}, after: %s) {{
                         pageInfo {{
                             endCursor
@@ -197,50 +178,11 @@ class GithubManifestGenerator(ManifestAdapter):
                     email=user['email'],
                 )
 
-    def get_all_team_data(self, page_size=100) -> Generator[GitTeamManifest, None, None]:
-        query_body = f"""{{
-                organization(login: "{self.org}") {{
-                    name
-                    teams(first: {page_size}, after: %s) {{
-                        pageInfo {{
-                            endCursor
-                            hasNextPage
-                        }}
-                        team_details: nodes {{
-                            id: databaseId
-                            name
-                            slug
-                            members {{
-                                totalCount
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        """
-
-        path_to_page_info = 'data.organization.teams'
-        for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info
-        ):
-            for team in result['data']['organization']['teams']['team_details']:
-                yield GitTeamManifest(
-                    company=self.company,
-                    data_source=ManifestSource.remote,
-                    org=self.org,
-                    instance=self.instance,
-                    team_id=team['id'],
-                    slug=team['slug'],
-                    name=team['name'],
-                    member_count=team['members']['totalCount'],
-                )
-
     def get_all_branch_data(
         self, repo_name: str, page_size=100
     ) -> Generator[GitBranchManifest, None, None]:
         query_body = f"""{{
                 organization(login: "{self.org}") {{
-                        name
                         repository(name: "{repo_name}") {{
                             name
                             id: databaseId
@@ -280,7 +222,6 @@ class GithubManifestGenerator(ManifestAdapter):
     ) -> Generator[GitPullRequestManifest, None, None]:
         query_body = f"""{{
                 organization(login: "{self.org}") {{
-                        name
                         repository(name: "{repo_name}") {{
                             name
                             id: databaseId
