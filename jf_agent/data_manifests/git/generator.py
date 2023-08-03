@@ -8,7 +8,6 @@ from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapte
 from jf_agent.data_manifests.git.manifest import (
     GitDataManifest,
     GitRepoManifest,
-    GitTeamManifest,
     GitUserManifest,
 )
 from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
@@ -73,7 +72,6 @@ def create_manifests(
 
                 repo_manifests: list[GitRepoManifest] = []
                 user_manifests: list[GitUserManifest] = []
-                team_manifests: list[GitTeamManifest] = []
 
                 # Process Repos
                 repos_count = manifest_adapter.get_repos_count()
@@ -115,14 +113,6 @@ def create_manifests(
                 ]
                 agent_logging.log_and_print(logger, logging.INFO, 'Done processing Users')
 
-                # Process Teams
-                teams_count = manifest_adapter.get_teams_count()
-                agent_logging.log_and_print(logger, logging.INFO, f'Processing {teams_count} teams')
-                team_manifests += [
-                    team_manifest for team_manifest in manifest_adapter.get_all_team_data()
-                ]
-                agent_logging.log_and_print(logger, logging.INFO, 'Done processing Teams')
-
                 manifests.append(
                     GitDataManifest(
                         data_source=ManifestSource.remote,
@@ -130,11 +120,9 @@ def create_manifests(
                         instance=instance_slug,
                         org=org,
                         users_count=users_count,
-                        teams_count=teams_count,
                         repos_count=repos_count,
                         repo_manifests=repo_manifests,
                         user_manifests=user_manifests,
-                        team_manifests=team_manifests,
                     )
                 )
         except UnsupportedGitProvider as e:
