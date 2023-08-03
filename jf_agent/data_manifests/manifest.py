@@ -1,3 +1,4 @@
+import gzip
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -102,7 +103,7 @@ class Manifest(ABC):
             f.write(self.to_json_str())
 
     def upload_to_s3(self, jellyfish_api_base: str, jellyfish_api_token: str) -> None:
-        headers = {'Jellyfish-API-Token': jellyfish_api_token}
+        headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
 
         agent_logging.log_and_print(
             logger, logging.INFO, f'Attempting to upload {self.get_unique_key()} manifest to s3...'
@@ -111,7 +112,7 @@ class Manifest(ABC):
         r = requests.post(
             f'{jellyfish_api_base}/endpoints/agent/upload_manifest',
             headers=headers,
-            json={'manifest': self.to_json_str()},
+            data=gzip.compress(bytes(self.to_json_str(), encoding='utf-8')),
         )
         r.raise_for_status()
 

@@ -37,7 +37,7 @@ class GithubManifestGenerator(ManifestAdapter):
         self.token = token
 
         if base_url and 'api/v3' in base_url:
-            # Github server provides an API with a trailing '/api/v3'
+            # Github server clients provide an API with a trailing '/api/v3'
             # replace this with the graphql endpoint
             self.base_url = base_url.replace('api/v3', 'api/graphql')
         else:
