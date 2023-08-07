@@ -43,6 +43,8 @@ class GithubGqlAdapter(GitAdapter):
         super().__init__(config, outdir, compress_output_files)
         self.client = client
 
+        self.repo_id_to_name_lookup: dict = {}
+
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[NormalizedProject]:
@@ -100,15 +102,18 @@ class GithubGqlAdapter(GitAdapter):
                 not in set([r.lower() for r in self.config.git_exclude_repos])
             )
 
-        nrm_repos = [
-            _normalize_repo(api_repo, nrm_project, self.config.git_redact_names_and_urls)
-            for nrm_project in normalized_projects
+        for nrm_project in normalized_projects:
             for api_repo in tqdm(
                 self.client.get_repos(nrm_project.login, repo_filters=filters),
                 desc=f'downloading repos for {nrm_project.login}',
                 unit='repos',
-            )
-        ]
+            ):
+                # Enter the repo to the ID to Name look up, incase the repo name gets
+                # scrubbed by our git_redact_names_and_urls logic
+                self.repo_id_to_name_lookup[api_repo['id']] = api_repo['name']
+                nrm_repos.append(
+                    _normalize_repo(api_repo, nrm_project, self.config.git_redact_names_and_urls)
+                )
 
         print('✓')
         if not nrm_repos:
@@ -140,7 +145,7 @@ class GithubGqlAdapter(GitAdapter):
                             tqdm(
                                 self.client.get_commits(
                                     login=nrm_repo.project.login,
-                                    repo_name=nrm_repo.name,
+                                    repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
                                     branch_name=branch_name,
                                     since=pull_since,
                                 ),
@@ -186,7 +191,7 @@ class GithubGqlAdapter(GitAdapter):
                     def _get_pagesize_for_prs() -> int:
                         api_prs_updated_at_only = self.client.get_pr_last_update_dates(
                             login=nrm_repo.project.login,
-                            repo_name=nrm_repo.name,
+                            repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
                             page_size=GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY,
                         )
                         updated_at_values = [
@@ -199,7 +204,9 @@ class GithubGqlAdapter(GitAdapter):
                     page_size = _get_pagesize_for_prs()
 
                     api_prs = self.client.get_prs(
-                        login=nrm_repo.project.login, repo_name=nrm_repo.name, page_size=page_size
+                        login=nrm_repo.project.login,
+                        repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
+                        page_size=page_size,
                     )
 
                     for api_pr in tqdm(
@@ -256,18 +263,19 @@ def _normalize_user(api_user) -> NormalizedUser:
     if not api_user:
         return None
 
+    # Backwards compatability paranoia.
+    # rest returns blank emails as null, vs ""
+    if api_user['email'] == '':
+        email = None
+    else:
+        email = api_user['email']
     # raw user, just have email (e.g. from a commit)
     if 'id' not in api_user:
-        return NormalizedUser(
-            id=api_user['email'],
-            login=api_user['email'],
-            name=api_user['name'],
-            email=api_user['email'],
-        )
+        return NormalizedUser(id=email, login=email, name=api_user['name'], email=email,)
 
     # API user, where github matched to a known account
     return NormalizedUser(
-        id=api_user['id'], login=api_user['login'], name=api_user['name'], email=api_user['email']
+        id=api_user['id'], login=api_user['login'], name=api_user['name'], email=email
     )
 
 

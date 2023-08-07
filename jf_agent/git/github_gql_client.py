@@ -70,9 +70,10 @@ class GithubGqlClient:
     # the nested user object
     @staticmethod
     def _process_git_actor_author_gql_object(author: dict) -> dict:
+        user = author['user']
         return {
-            'id': author['user']['id'],
-            'login': author['user']['login'],
+            'id': author['user']['id'] if author['user'] else None,
+            'login': author['user']['login'] if author['user'] else None,
             'email': author['email'],
             'name': author['name'],
         }
