@@ -207,55 +207,61 @@ class GithubGqlClient:
     #
     # PR Queries are HUGE, so pull out reusable blocks (comments, reviews, commits, etc)
     #
-    GITHUB_GQL_PR_COMMENTS_QUERY_BLOCK = f"""
-        commentsQuery: comments(first: 50) {{
-            {GITHUB_GQL_PAGE_INFO_BLOCK}
-            
-            comments: nodes {{
-                ... on IssueComment {{
-                    author {{
-                        {GITHUB_GQL_USER_FRAGMENT}
-                    }}
-                    body
-                    createdAt
-                }}
-            }}
-        }}
-    """
-    GITHUB_GQL_PR_REVIEWS_QUERY_BLOCK = f"""
-        reviewsQuery: reviews(first: 50) {{
-            {GITHUB_GQL_PAGE_INFO_BLOCK}
-            
-            reviews: nodes {{
-                ... on PullRequestReview {{
-                    author {{
-                        {GITHUB_GQL_USER_FRAGMENT}
-                    }}
-                    id
-                    state
-                }}
-            }}
-        }}
-    """
-    GITHUB_GQL_PR_COMMITS_QUERY_BLOCK = f"""
-        commitsQuery: commits(first: 50) {{
-            {GITHUB_GQL_PAGE_INFO_BLOCK}
-            
-            commits: nodes {{
-                ... on PullRequestCommit {{
-                    commit {{
-                        {GITHUB_GQL_COMMIT_FRAGMENT}
+    def _get_pr_comments_query_block(self, enable_paging: bool = False):
+        return f"""
+            commentsQuery: comments(first: 50{', after: %s' if enable_paging else ''}) {{
+                {self.GITHUB_GQL_PAGE_INFO_BLOCK}
+                
+                comments: nodes {{
+                    ... on IssueComment {{
+                        author {{
+                            {self.GITHUB_GQL_USER_FRAGMENT}
+                        }}
+                        body
+                        createdAt
                     }}
                 }}
             }}
-        }}
-    """
+        """
+
+    def _get_pr_reviews_query_block(self, enable_paging: bool = False):
+        return f"""
+            reviewsQuery: reviews(first: 50{', after: %s' if enable_paging else ''}) {{
+                {self.GITHUB_GQL_PAGE_INFO_BLOCK}
+                
+                reviews: nodes {{
+                    ... on PullRequestReview {{
+                        author {{
+                            {self.GITHUB_GQL_USER_FRAGMENT}
+                        }}
+                        id
+                        state
+                    }}
+                }}
+            }}
+        """
+
+    def _get_pr_commits_query_block(self, enable_paging: bool = False):
+        return f"""
+            commitsQuery: commits(first: 50{', after: %s' if enable_paging else ''}) {{
+                {self.GITHUB_GQL_PAGE_INFO_BLOCK}
+                
+                commits: nodes {{
+                    ... on PullRequestCommit {{
+                        commit {{
+                            {self.GITHUB_GQL_COMMIT_FRAGMENT}
+                        }}
+                    }}
+                }}
+            }}
+        """
+
     # PR query is HUGE, see above GITHUB_GQL_PR_* blocks for reused code
     def get_prs(self, login: str, repo_name: str,) -> Generator[dict, None, None]:
         query_body = f"""{{
             organization(login: "{login}") {{
                 repo: repository(name: "{repo_name}") {{
-                    prQuery: pullRequests(first: 50, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: %s) {{
+                    prQuery: pullRequests(first: 25, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: %s) {{
                         {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                         prs: nodes {{
                             ... on PullRequest {{
@@ -291,9 +297,9 @@ class GithubGqlClient:
                                 mergeCommit {{
                                     {self.GITHUB_GQL_COMMIT_FRAGMENT}
                                 }}
-                                {self.GITHUB_GQL_PR_COMMENTS_QUERY_BLOCK}
-                                {self.GITHUB_GQL_PR_REVIEWS_QUERY_BLOCK}
-                                {self.GITHUB_GQL_PR_COMMITS_QUERY_BLOCK}
+                                {self._get_pr_comments_query_block(enable_paging=False)}
+                                {self._get_pr_reviews_query_block(enable_paging=False)}
+                                {self._get_pr_commits_query_block(enable_paging=False)}
                             }}
                         }}
                     }}
@@ -334,7 +340,7 @@ class GithubGqlClient:
                 repo: repository(name: "{repo_name}") {{
                     pr: pullRequest(number: {pr_number}) {{
                         ... on PullRequest {{
-                            {self.GITHUB_GQL_PR_COMMENTS_QUERY_BLOCK}
+                            {self._get_pr_comments_query_block(enable_paging=True)}
                         }}
                     }}
                 }}
@@ -358,7 +364,7 @@ class GithubGqlClient:
                 repo: repository(name: "{repo_name}") {{
                     pr: pullRequest(number: {pr_number}) {{
                         ... on PullRequest {{
-                            {self.GITHUB_GQL_PR_REVIEWS_QUERY_BLOCK}
+                            {self._get_pr_reviews_query_block(enable_paging=True)}
                         }}
                     }}
                 }}
@@ -382,7 +388,7 @@ class GithubGqlClient:
                 repo: repository(name: "{repo_name}") {{
                     pr: pullRequest(number: {pr_number}) {{
                         ... on PullRequest {{
-                            {self.GITHUB_GQL_PR_COMMITS_QUERY_BLOCK}
+                            {self._get_pr_commits_query_block(enable_paging=True)}
                         }}
                     }}
                 }}
