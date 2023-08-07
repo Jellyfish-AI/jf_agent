@@ -36,6 +36,9 @@ class GithubGqlClient:
     """
     GITHUB_GQL_SHORT_REPO_FRAGMENT = "... on Repository {name, id, url}"
 
+    # The PR query is HUGE, we shouldn't query more than about 25 at a time
+    MAX_PAGE_SIZE_FOR_PR_QUERY = 25
+
     def __init__(self, base_url: str, token: str, verify: bool, session: Session) -> None:
         self.token = token
         self.base_url = get_github_gql_base_url(base_url=base_url)
@@ -93,14 +96,16 @@ class GithubGqlClient:
             for user in page['data']['organization']['userQuery']['users']:
                 yield user
 
-    def get_repos(self, login: str) -> Generator[dict, None, None]:
+    def get_repos(
+        self, login: str, repo_filters: list[filter] = None
+    ) -> Generator[dict, None, None]:
         query_body = f"""{{
             organization(login: "{login}") {{
                 # THIS IS NEEDED BY NORMALIZE_PROJECT
                 id
                 login
                 url
-                repoQuery: repositories(first: 100, after: null) {{
+                repoQuery: repositories(first: 50, after: %s) {{
                     {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                     repos: nodes {{
                         ... on Repository {{
@@ -114,8 +119,7 @@ class GithubGqlClient:
                             }}
                             # This should be broken out into a separate query if 
                             # hasNextPage is True.
-                            # We should cache all branch names and sha's, too
-                            branchQuery: refs(refPrefix:"refs/heads/", first: 100, after: %s) {{
+                            branchQuery: refs(refPrefix:"refs/heads/", first: 50) {{
                                 {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                                 branches: nodes {{
                                     ... on Ref {{
@@ -134,18 +138,18 @@ class GithubGqlClient:
             query_body=query_body, path_to_page_info='data.organization.repoQuery'
         ):
             for api_repo in page['data']['organization']['repoQuery']['repos']:
-                if api_repo['branchQuery']['pageInfo']['hasNextPage']:
-                    # Page for all branches
-                    branches = [
-                        branch
-                        for branch in self.get_branches(login=login, repo_name=api_repo['name'])
-                    ]
+                # Skip over excluded or ignore non-included
+                if not all(filt(api_repo) for filt in repo_filters):
+                    continue
                 else:
-                    branches = api_repo['branchQuery']['branches']
-
-                # Add new dict entry for branches
-                api_repo['branches'] = branches
-                yield api_repo
+                    # Potentially process more branches
+                    if api_repo['branchQuery']['pageInfo']['hasNextPage']:
+                        api_repo['branches'] = self.get_branches(
+                            login=login, repo_name=api_repo['name']
+                        )
+                    else:
+                        api_repo['branches'] = api_repo['branchQuery']['branches']
+                    yield api_repo
 
     def get_branches(self, login: str, repo_name: str) -> Generator[dict, None, None]:
         query_body = f"""{{
@@ -256,18 +260,48 @@ class GithubGqlClient:
             }}
         """
 
-    # PR query is HUGE, see above GITHUB_GQL_PR_* blocks for reused code
-    def get_prs(self, login: str, repo_name: str,) -> Generator[dict, None, None]:
+    # Generally, if we are running agent ingest daily, there aren't that many PRs
+    # day to day (for most repos). This function takes this assumption into account and
+    # is a cheap test to see if we should make a big query against PRs.
+    # I.e. it helps with determining the page size for get_prs(),
+    # as well as IF we should call get PRs at all!
+    def get_pr_last_update_dates(
+        self, login: str, repo_name: str, page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY
+    ) -> list[dict]:
         query_body = f"""{{
             organization(login: "{login}") {{
                 repo: repository(name: "{repo_name}") {{
-                    prQuery: pullRequests(first: 25, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: %s) {{
+                    prQuery: pullRequests(first: {page_size}, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: null) {{
+                        {self.GITHUB_GQL_PAGE_INFO_BLOCK}
+                        prs: nodes {{
+                            ... on PullRequest {{
+                                updatedAt
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }}
+        """
+        return self._get_raw_result(query_body=query_body)['data']['organization']['repo'][
+            'prQuery'
+        ]['prs']
+
+    # PR query is HUGE, see above GITHUB_GQL_PR_* blocks for reused code
+    # page_size is optimally variable. Most companies only have a few PRs day to day,
+    # but if we are back populating we may want the page size to be higher
+    def get_prs(
+        self, login: str, repo_name: str, page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY
+    ) -> Generator[dict, None, None]:
+        query_body = f"""{{
+            organization(login: "{login}") {{
+                repo: repository(name: "{repo_name}") {{
+                    prQuery: pullRequests(first: {page_size}, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: %s) {{
                         {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                         prs: nodes {{
                             ... on PullRequest {{
                                 id: databaseId
                                 number
-                                updated_at: updatedAt
                                 additions
                                 deletions
                                 changedFiles
@@ -334,7 +368,6 @@ class GithubGqlClient:
     def get_pr_comments(
         self, login: str, repo_name: str, pr_number: int
     ) -> Generator[dict, None, None]:
-        print(f'{inspect.stack()[0][3]} for {login} {repo_name} {pr_number}')
         query_body = f"""{{
             organization(login: "{login}") {{
                 repo: repository(name: "{repo_name}") {{
@@ -358,7 +391,6 @@ class GithubGqlClient:
     def get_pr_reviews(
         self, login: str, repo_name: str, pr_number: int
     ) -> Generator[dict, None, None]:
-        print(f'{inspect.stack()[0][3]} for {login} {repo_name} {pr_number}')
         query_body = f"""{{
             organization(login: "{login}") {{
                 repo: repository(name: "{repo_name}") {{
@@ -382,7 +414,6 @@ class GithubGqlClient:
     def get_pr_commits(
         self, login: str, repo_name: str, pr_number: int
     ) -> Generator[dict, None, None]:
-        print(f'{inspect.stack()[0][3]} for {login} {repo_name} {pr_number}')
         query_body = f"""{{
             organization(login: "{login}") {{
                 repo: repository(name: "{repo_name}") {{

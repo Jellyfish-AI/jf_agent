@@ -104,11 +104,10 @@ class GithubGqlAdapter(GitAdapter):
             _normalize_repo(api_repo, nrm_project, self.config.git_redact_names_and_urls)
             for nrm_project in normalized_projects
             for api_repo in tqdm(
-                self.client.get_repos(nrm_project.login),
+                self.client.get_repos(nrm_project.login, repo_filters=filters),
                 desc=f'downloading repos for {nrm_project.login}',
                 unit='repos',
             )
-            if all(filt(api_repo) for filt in filters)
         ]
 
         print('✓')
@@ -183,8 +182,24 @@ class GithubGqlAdapter(GitAdapter):
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
 
+                    # This will return a page size between 0 and 25 (upper bound set by GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY)
+                    def _get_pagesize_for_prs() -> int:
+                        api_prs_updated_at_only = self.client.get_pr_last_update_dates(
+                            login=nrm_repo.project.login,
+                            repo_name=nrm_repo.name,
+                            page_size=GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY,
+                        )
+                        updated_at_values = [
+                            1
+                            for api_pr in api_prs_updated_at_only
+                            if pull_since and parser.parse(api_pr['updatedAt']) >= pull_since
+                        ]
+                        return len(updated_at_values)
+
+                    page_size = _get_pagesize_for_prs()
+
                     api_prs = self.client.get_prs(
-                        login=nrm_repo.project.login, repo_name=nrm_repo.name
+                        login=nrm_repo.project.login, repo_name=nrm_repo.name, page_size=page_size
                     )
 
                     for api_pr in tqdm(

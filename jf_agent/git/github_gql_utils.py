@@ -48,8 +48,9 @@ def page_results(
         page_info = result['pageInfo']
         # Need to grab the cursor and wrap it in quotes
         _cursor = page_info['endCursor']
+        # If endCursor returns null (None), break out of loop
+        hasNextPage = page_info['hasNextPage'] and _cursor
         cursor = f'"{_cursor}"'
-        hasNextPage = page_info['hasNextPage']
 
 
 def get_raw_result(query_body: str, base_url: str, session: Session) -> dict:
