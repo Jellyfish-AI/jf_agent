@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
+from jf_agent.git.github_gql_client import GithubGqlClient
 from stashy.client import Stash
 
 from jf_agent.session import retry_session
@@ -242,12 +243,21 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             )
 
         if config.git_provider == GH_PROVIDER:
-            return GithubClient(
-                base_url=config.git_url,
-                token=git_creds['github_token'],
-                verify=not skip_ssl_verification,
-                session=retry_session(),
-            )
+            # TODO: Change this to hide behind new supports_graphql_endpoints flag
+            if True:
+                return GithubGqlClient(
+                    base_url=config.git_url,
+                    token=git_creds['github_token'],
+                    verify=not skip_ssl_verification,
+                    session=retry_session(),
+                )
+            else:
+                return GithubClient(
+                    base_url=config.git_url,
+                    token=git_creds['github_token'],
+                    verify=not skip_ssl_verification,
+                    session=retry_session(),
+                )
         if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
@@ -306,6 +316,12 @@ def load_and_dump_git(
                 config, outdir, compress_output_files, git_connection
             ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
+            from jf_agent.git.github_gql_adapter import GithubGqlAdapter
+
+            GithubGqlAdapter(
+                config, outdir, compress_output_files, git_connection
+            ).load_and_dump_git(endpoint_git_instance_info)
+            """
             # using old func method, todo: refactor to use GitAdapter
             from jf_agent.git.github import load_and_dump as load_and_dump_gh
 
@@ -316,6 +332,7 @@ def load_and_dump_git(
                 endpoint_git_instance_info=endpoint_git_instance_info,
                 git_conn=git_connection,
             )
+            """
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
