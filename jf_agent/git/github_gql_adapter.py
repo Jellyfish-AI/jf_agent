@@ -337,7 +337,7 @@ def _normalize_commit(
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
-    author = _normalize_user(api_commit['author']['user'])
+    author = _normalize_user(api_commit['author'])
     commit_url = api_commit['url'] if not redact_names_and_urls else None
     return NormalizedCommit(
         hash=api_commit['sha'],
@@ -371,7 +371,7 @@ def _get_normalized_reviews(api_reviews: list[dict]):
     return [
         NormalizedPullRequestReview(
             user=_normalize_user(api_review['author']),
-            foreign_id=api_review['author']['id'],
+            foreign_id=api_review['id'],
             review_state=api_review['state'],
         )
         for api_review in api_reviews

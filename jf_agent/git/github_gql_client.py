@@ -17,15 +17,19 @@ logger = logging.getLogger(__name__)
 
 class GithubGqlClient:
 
-    GITHUB_GQL_USER_FRAGMENT = "... on User {id, login, email, name }"
+    GITHUB_GQL_USER_FRAGMENT = "... on User {login, id: databaseId, email, name }"
     GITHUB_GQL_PAGE_INFO_BLOCK = "pageInfo {hasNextPage, endCursor}"
     GITHUB_GQL_COMMIT_FRAGMENT = f"""
         ... on Commit {{
             sha: oid
             url
             author {{
+                email
+                name
                 user {{
-                    {GITHUB_GQL_USER_FRAGMENT}
+                    id: databaseId
+                    login
+                    email
                 }}
             }}
             message
@@ -34,7 +38,7 @@ class GithubGqlClient:
             parents {{totalCount}}
         }}
     """
-    GITHUB_GQL_SHORT_REPO_FRAGMENT = "... on Repository {name, id, url}"
+    GITHUB_GQL_SHORT_REPO_FRAGMENT = "... on Repository {name, id:databaseId, url}"
 
     # The PR query is HUGE, we shouldn't query more than about 25 at a time
     MAX_PAGE_SIZE_FOR_PR_QUERY = 25
@@ -60,10 +64,23 @@ class GithubGqlClient:
     def _to_git_timestamp(timestamp: datetime):
         return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    # This is for commits, specifically merge commits I believe.
+    # There is some weird stuff going on here where our system
+    # expects email and name to come from author object, but ID and login to come from
+    # the nested user object
+    @staticmethod
+    def _process_git_actor_author_gql_object(author: dict) -> dict:
+        return {
+            'id': author['user']['id'],
+            'login': author['user']['login'],
+            'email': author['email'],
+            'name': author['name'],
+        }
+
     def get_organization_by_login(self, login: str):
         query_body = f"""{{
             organization(login: \"{login}\") {{
-                id
+                id: databaseId
                 login
                 name
                 url
@@ -101,10 +118,6 @@ class GithubGqlClient:
     ) -> Generator[dict, None, None]:
         query_body = f"""{{
             organization(login: "{login}") {{
-                # THIS IS NEEDED BY NORMALIZE_PROJECT
-                id
-                login
-                url
                 repoQuery: repositories(first: 50, after: %s) {{
                     {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                     repos: nodes {{
@@ -206,6 +219,10 @@ class GithubGqlClient:
             for api_commit in page['data']['organization']['repo']['branch']['target']['history'][
                 'commits'
             ]:
+                # Overwrite Author block for backwards compatibility
+                api_commit['author'] = self._process_git_actor_author_gql_object(
+                    api_commit['author']
+                )
                 yield api_commit
 
     #
@@ -238,7 +255,7 @@ class GithubGqlClient:
                         author {{
                             {self.GITHUB_GQL_USER_FRAGMENT}
                         }}
-                        id
+                        id: databaseId
                         state
                     }}
                 }}
@@ -288,8 +305,8 @@ class GithubGqlClient:
         ]['prs']
 
     # PR query is HUGE, see above GITHUB_GQL_PR_* blocks for reused code
-    # page_size is optimally variable. Most companies only have a few PRs day to day,
-    # but if we are back populating we may want the page size to be higher
+    # page_size is optimally variable. Most repos only have a 0 to a few PRs day to day,
+    # so sometimes the optimal page_size is 0. Generally, we should never go over 25
     def get_prs(
         self, login: str, repo_name: str, page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY
     ) -> Generator[dict, None, None]:
@@ -300,7 +317,7 @@ class GithubGqlClient:
                         {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                         prs: nodes {{
                             ... on PullRequest {{
-                                id: databaseId
+                                id: number
                                 number
                                 additions
                                 deletions
@@ -358,11 +375,21 @@ class GithubGqlClient:
                     if api_pr['reviewsQuery']['pageInfo']['hasNextPage']
                     else api_pr['reviewsQuery']['reviews']
                 )
+
                 api_pr['commits'] = (
                     self.get_pr_commits(login, repo_name, pr_number=pr_number)
                     if api_pr['commitsQuery']['pageInfo']['hasNextPage']
                     else [commit['commit'] for commit in api_pr['commitsQuery']['commits']]
                 )
+                # Do some extra processing on commits to clean up their weird author block
+                for commit in api_pr['commits']:
+                    commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
+
+                if api_pr['mergeCommit'] and api_pr['mergeCommit']['author']:
+                    api_pr['mergeCommit']['author'] = self._process_git_actor_author_gql_object(
+                        api_pr['mergeCommit']['author']
+                    )
+
                 yield api_pr
 
     def get_pr_comments(
@@ -433,4 +460,6 @@ class GithubGqlClient:
                 'commits'
             ]:
                 # Commit blocks are nested within the 'commits' block
-                yield api_pr_commit['commit']
+                commit = api_pr_commit['commit']
+                commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
+                yield commit
