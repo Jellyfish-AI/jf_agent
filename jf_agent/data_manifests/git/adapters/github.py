@@ -105,7 +105,7 @@ class GithubManifestGenerator(ManifestAdapter):
         """
         path_to_page_info = 'data.organization.repositories'
         for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info,
+            query_body=query_body, path_to_page_info=path_to_page_info
         ):
             for repo in result['data']['organization']['repositories']['repos']:
                 yield GitRepoManifest(
@@ -152,7 +152,7 @@ class GithubManifestGenerator(ManifestAdapter):
 
         path_to_page_info = 'data.organization.users'
         for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info,
+            query_body=query_body, path_to_page_info=path_to_page_info
         ):
             for user in result['data']['organization']['users']['user_details']:
                 yield GitUserManifest(
@@ -191,7 +191,7 @@ class GithubManifestGenerator(ManifestAdapter):
 
         path_to_page_info = 'data.organization.repository.branches_query'
         for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info,
+            query_body=query_body, path_to_page_info=path_to_page_info
         ):
             for branch in result['data']['organization']['repository']['branches_query'][
                 'branches'
@@ -234,7 +234,7 @@ class GithubManifestGenerator(ManifestAdapter):
 
         path_to_page_info = 'data.organization.repository.prs_query'
         for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info,
+            query_body=query_body, path_to_page_info=path_to_page_info
         ):
             for pr in result['data']['organization']['repository']['prs_query']['prs']:
                 yield GitPullRequestManifest(
