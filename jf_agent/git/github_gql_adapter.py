@@ -137,10 +137,8 @@ class GithubGqlAdapter(GitAdapter):
                     server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
                 )
 
-                try:
-                    for branch_name in get_branches_for_normalized_repo(
-                        nrm_repo, included_branches
-                    ):
+                for branch_name in get_branches_for_normalized_repo(nrm_repo, included_branches):
+                    try:
                         for j, api_commit in enumerate(
                             tqdm(
                                 self.client.get_commits(
@@ -165,9 +163,9 @@ class GithubGqlAdapter(GitAdapter):
                                     self.config.git_redact_names_and_urls,
                                 )
 
-                except Exception as e:
-                    print(traceback.format_exc())
-                    print(f':WARN: Got exception for branch {branch_name}: {e}. Skipping...')
+                    except Exception as e:
+                        print(traceback.format_exc())
+                        print(f':WARN: Got exception for branch {branch_name}: {e}. Skipping...')
         print('✓')
 
     @diagnostics.capture_timing()
