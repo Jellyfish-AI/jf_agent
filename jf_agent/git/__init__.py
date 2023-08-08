@@ -245,7 +245,6 @@ def get_git_client(
             )
 
         if config.git_provider == GH_PROVIDER:
-            # TODO: Change this to hide behind new supports_graphql_endpoints flag
             if instance_info.get('supports_graphql_endpoints', False):
                 return GithubGqlClient(
                     base_url=config.git_url,
@@ -326,6 +325,7 @@ def load_and_dump_git(
                 ).load_and_dump_git(endpoint_git_instance_info)
             else:
                 # using old func method, todo: refactor to use GitAdapter
+                # NOTE: We can hopefully do this with the above githubGqlAdapter!
                 from jf_agent.git.github import load_and_dump as load_and_dump_gh
 
                 load_and_dump_gh(
