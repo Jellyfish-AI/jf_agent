@@ -223,7 +223,9 @@ class GitAdapter(ABC):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bool):
+def get_git_client(
+    config: GitConfig, git_creds: dict, skip_ssl_verification: bool, instance_info: dict = {}
+):
     try:
         if config.git_provider == BBS_PROVIDER:
             return Stash(
@@ -244,7 +246,7 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
 
         if config.git_provider == GH_PROVIDER:
             # TODO: Change this to hide behind new supports_graphql_endpoints flag
-            if True:
+            if instance_info.get('supports_graphql_endpoints', False):
                 return GithubGqlClient(
                     base_url=config.git_url,
                     token=git_creds['github_token'],
@@ -318,8 +320,7 @@ def load_and_dump_git(
         elif config.git_provider == 'github':
             from jf_agent.git.github_gql_adapter import GithubGqlAdapter
 
-            # TODO: replace this with the supports_graphql_endpoints flag
-            if True:
+            if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
                 GithubGqlAdapter(
                     config, outdir, compress_output_files, git_connection
                 ).load_and_dump_git(endpoint_git_instance_info)
