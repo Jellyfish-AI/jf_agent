@@ -1,6 +1,5 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 import gzip
 import logging
 import os
@@ -510,7 +509,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 def _download_git_data(
     git_config, config, creds, endpoint_git_instances_info, is_multi_git_config
 ) -> dict:
-    start_time = datetime.utcnow()
     if is_multi_git_config:
         instance_slug = git_config.git_instance_slug
         instance_info = endpoint_git_instances_info.get(instance_slug)
@@ -523,16 +521,13 @@ def _download_git_data(
     git_connection = get_git_client(
         git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
     )
-    data = load_and_dump_git(
+    return load_and_dump_git(
         config=git_config,
         endpoint_git_instance_info=instance_info,
         outdir=config.outdir,
         compress_output_files=config.compress_output_files,
         git_connection=git_connection,
     )
-    end_time = datetime.utcnow()
-    print(f'GIT PULL ELAPSED TIME: {end_time - start_time}')
-    return data
 
 
 def send_data(config, creds):

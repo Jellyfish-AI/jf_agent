@@ -15,7 +15,6 @@ from jf_agent.git.github_gql_utils import (
     get_raw_result,
     page_results,
 )
-from jf_agent.session import retry_session
 
 
 # TODO: Expand or generalize this to work with things other than github (BBCloud, Gitlab, etc)
@@ -40,7 +39,7 @@ class GithubManifestGenerator(ManifestAdapter):
         self.session = get_github_gql_session(token=token, verify=verify)
 
     def get_users_count(self) -> int:
-        body = f"""{{
+        query_body = f"""{{
             organization(login: "{self.org}"){{
                     users: membersWithRole {{
                         totalCount
@@ -49,9 +48,9 @@ class GithubManifestGenerator(ManifestAdapter):
             }}
         """
         # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
-        return get_raw_result(query_body=body, base_url=self.base_url, session=self.session)[
-            'data'
-        ]['organization']['users']['totalCount']
+        return self._get_raw_result(query_body=query_body)['data']['organization']['users'][
+            'totalCount'
+        ]
 
     def get_repos_count(self) -> int:
         query_body = f"""{{
@@ -63,9 +62,9 @@ class GithubManifestGenerator(ManifestAdapter):
             }}
         """
         # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
-        return get_raw_result(query_body=query_body, base_url=self.base_url, session=self.session)[
-            'data'
-        ]['organization']['repos']['totalCount']
+        return self._get_raw_result(query_body=query_body)['data']['organization']['repos'][
+            'totalCount'
+        ]
 
     def get_all_repo_data(self, page_size: int = 10) -> Generator[GitRepoManifest, None, None]:
         query_body = f"""{{
@@ -105,11 +104,8 @@ class GithubManifestGenerator(ManifestAdapter):
             }}
         """
         path_to_page_info = 'data.organization.repositories'
-        for result in page_results(
-            query_body=query_body,
-            path_to_page_info=path_to_page_info,
-            session=self.session,
-            base_url=self.base_url,
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info,
         ):
             for repo in result['data']['organization']['repositories']['repos']:
                 yield GitRepoManifest(
@@ -155,11 +151,8 @@ class GithubManifestGenerator(ManifestAdapter):
         """
 
         path_to_page_info = 'data.organization.users'
-        for result in page_results(
-            query_body=query_body,
-            path_to_page_info=path_to_page_info,
-            session=self.session,
-            base_url=self.base_url,
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info,
         ):
             for user in result['data']['organization']['users']['user_details']:
                 yield GitUserManifest(
@@ -197,11 +190,8 @@ class GithubManifestGenerator(ManifestAdapter):
         """
 
         path_to_page_info = 'data.organization.repository.branches_query'
-        for result in page_results(
-            query_body=query_body,
-            path_to_page_info=path_to_page_info,
-            session=self.session,
-            base_url=self.base_url,
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info,
         ):
             for branch in result['data']['organization']['repository']['branches_query'][
                 'branches'
@@ -243,11 +233,8 @@ class GithubManifestGenerator(ManifestAdapter):
         """
 
         path_to_page_info = 'data.organization.repository.prs_query'
-        for result in page_results(
-            query_body=query_body,
-            path_to_page_info=path_to_page_info,
-            session=self.session,
-            base_url=self.base_url,
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info,
         ):
             for pr in result['data']['organization']['repository']['prs_query']['prs']:
                 yield GitPullRequestManifest(
@@ -262,3 +249,16 @@ class GithubManifestGenerator(ManifestAdapter):
                     pull_request_number=int(pr['number']),
                     last_update=datetime_parser.parse(pr['updatedAt']),
                 )
+
+    def _get_raw_result(self, query_body: str):
+        return get_raw_result(query_body=query_body, base_url=self.base_url, session=self.session)
+
+    def _page_results(
+        self, query_body: str, path_to_page_info: str,
+    ):
+        return page_results(
+            query_body=query_body,
+            path_to_page_info=path_to_page_info,
+            session=self.session,
+            base_url=self.base_url,
+        )

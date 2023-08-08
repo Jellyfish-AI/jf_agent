@@ -318,21 +318,22 @@ def load_and_dump_git(
         elif config.git_provider == 'github':
             from jf_agent.git.github_gql_adapter import GithubGqlAdapter
 
-            GithubGqlAdapter(
-                config, outdir, compress_output_files, git_connection
-            ).load_and_dump_git(endpoint_git_instance_info)
-            """
-            # using old func method, todo: refactor to use GitAdapter
-            from jf_agent.git.github import load_and_dump as load_and_dump_gh
+            # TODO: replace this with the supports_graphql_endpoints flag
+            if True:
+                GithubGqlAdapter(
+                    config, outdir, compress_output_files, git_connection
+                ).load_and_dump_git(endpoint_git_instance_info)
+            else:
+                # using old func method, todo: refactor to use GitAdapter
+                from jf_agent.git.github import load_and_dump as load_and_dump_gh
 
-            load_and_dump_gh(
-                config=config,
-                outdir=outdir,
-                compress_output_files=compress_output_files,
-                endpoint_git_instance_info=endpoint_git_instance_info,
-                git_conn=git_connection,
-            )
-            """
+                load_and_dump_gh(
+                    config=config,
+                    outdir=outdir,
+                    compress_output_files=compress_output_files,
+                    endpoint_git_instance_info=endpoint_git_instance_info,
+                    git_conn=git_connection,
+                )
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 
