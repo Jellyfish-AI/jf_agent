@@ -1,5 +1,4 @@
 from dateutil import parser as datetime_parser
-import json
 from typing import Generator
 
 from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
@@ -10,7 +9,12 @@ from jf_agent.data_manifests.git.manifest import (
     GitUserManifest,
 )
 from jf_agent.data_manifests.manifest import ManifestSource
-from jf_agent.session import retry_session
+from jf_agent.git.github_gql_utils import (
+    get_github_gql_base_url,
+    get_github_gql_session,
+    get_raw_result,
+    page_results,
+)
 
 
 # TODO: Expand or generalize this to work with things other than github (BBCloud, Gitlab, etc)
@@ -20,14 +24,7 @@ class GithubManifestGenerator(ManifestAdapter):
     '''
 
     def __init__(
-        self,
-        token: str,
-        base_url: str,
-        company: str,
-        org: str,
-        instance: str,
-        verify=True,
-        **kwargs,
+        self, token: str, base_url: str, company: str, org: str, instance: str, verify=True,
     ) -> None:
         # Super class fields
         self.company = company
@@ -36,18 +33,10 @@ class GithubManifestGenerator(ManifestAdapter):
         # Session fields
         self.token = token
 
-        if base_url and 'api/v3' in base_url:
-            # Github server clients provide an API with a trailing '/api/v3'
-            # replace this with the graphql endpoint
-            self.base_url = base_url.replace('api/v3', 'api/graphql')
-        else:
-            self.base_url = 'https://api.github.com/graphql'
+        # Translate base URL if we are using cloud or server
+        self.base_url = get_github_gql_base_url(base_url=base_url)
 
-        self.session = retry_session(**kwargs)
-        self.session.verify = verify
-        self.session.headers.update(
-            {'Authorization': f'token {token}', "Accept": "application/vnd.github+json",}
-        )
+        self.session = get_github_gql_session(token=token, verify=verify)
 
     def get_users_count(self) -> int:
         query_body = f"""{{
@@ -261,36 +250,15 @@ class GithubManifestGenerator(ManifestAdapter):
                     last_update=datetime_parser.parse(pr['updatedAt']),
                 )
 
+    def _get_raw_result(self, query_body: str):
+        return get_raw_result(query_body=query_body, base_url=self.base_url, session=self.session)
+
     def _page_results(
-        self, query_body: str, path_to_page_info: str, cursor: str = 'null'
-    ) -> Generator[dict, None, None]:
-
-        # TODO: Write generalized paginator
-        hasNextPage = True
-        while hasNextPage:
-            # Fetch results
-            result = self._get_raw_result(query_body=(query_body % cursor))
-
-            yield result
-
-            # Get relevant data and yield it
-            path_tokens = path_to_page_info.split('.')
-            for token in path_tokens:
-                result = result[token]
-
-            page_info = result['pageInfo']
-            # Need to grab the cursor and wrap it in quotes
-            _cursor = page_info['endCursor']
-            cursor = f'"{_cursor}"'
-            hasNextPage = page_info['hasNextPage']
-
-    def _get_raw_result(self, query_body: str) -> dict:
-        response = self.session.post(url=self.base_url, json={'query': query_body})
-        response.raise_for_status()
-        json_str = response.content.decode()
-        json_data = json.loads(json_str)
-        if 'errors' in json_data:
-            raise Exception(
-                f'Exception encountered when trying to query: {query_body}. Error: {json_data["errors"]}'
-            )
-        return json_data
+        self, query_body: str, path_to_page_info: str,
+    ):
+        return page_results(
+            query_body=query_body,
+            path_to_page_info=path_to_page_info,
+            session=self.session,
+            base_url=self.base_url,
+        )
