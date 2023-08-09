@@ -135,7 +135,7 @@ def main():
         if jellyfish_endpoint_info.jf_options:
             validate_num_repos_go_for = jellyfish_endpoint_info.jf_options.get('validate_num_repos', False)
         else:
-            validate_num_repos_go_for =  False
+            validate_num_repos_go_for = False
         if validate_num_repos_go_for:
             try:
                 validate_num_repos(config.git_configs, creds)
