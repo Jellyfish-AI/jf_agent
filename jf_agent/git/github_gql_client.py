@@ -158,9 +158,10 @@ class GithubGqlClient:
                 else:
                     # Potentially process more branches
                     if api_repo['branchQuery']['pageInfo']['hasNextPage']:
-                        api_repo['branches'] = self.get_branches(
-                            login=login, repo_name=api_repo['name']
-                        )
+                        api_repo['branches'] = [
+                            branch
+                            for branch in self.get_branches(login=login, repo_name=api_repo['name'])
+                        ]
                     else:
                         api_repo['branches'] = api_repo['branchQuery']['branches']
                     yield api_repo
@@ -235,20 +236,19 @@ class GithubGqlClient:
                 {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                 
                 comments: nodes {{
-                    ... on IssueComment {{
-                        author {{
-                            {self.GITHUB_GQL_USER_FRAGMENT}
-                        }}
-                        body
-                        createdAt
+                    author {{
+                        {self.GITHUB_GQL_USER_FRAGMENT}
                     }}
+                    body
+                    createdAt
                 }}
             }}
         """
 
+    # NOTE: There are comments associated with reviews that we need to fetch as well
     def _get_pr_reviews_query_block(self, enable_paging: bool = False):
         return f"""
-            reviewsQuery: reviews(first: 50{', after: %s' if enable_paging else ''}) {{
+            reviewsQuery: reviews(first: 25{', after: %s' if enable_paging else ''}) {{
                 {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                 
                 reviews: nodes {{
@@ -258,6 +258,8 @@ class GithubGqlClient:
                         }}
                         id: databaseId
                         state
+                        # NOTE! We are paging for comments here as well!
+                        {self._get_pr_comments_query_block()}
                     }}
                 }}
             }}
@@ -366,22 +368,45 @@ class GithubGqlClient:
                 # Process and add related PR data (comments, reviews, commits)
                 # This may require additional API calls
                 pr_number = api_pr['number']
-                api_pr['comments'] = (
-                    self.get_pr_comments(login, repo_name, pr_number=pr_number)
-                    if api_pr['commentsQuery']['pageInfo']['hasNextPage']
-                    else api_pr['commentsQuery']['comments']
-                )
-                api_pr['reviews'] = (
-                    self.get_pr_reviews(login, repo_name, pr_number=pr_number)
+
+                # Load reviews first because we use them in both reviews and comments
+                reviews = (
+                    [r for r in self.get_pr_reviews(login, repo_name, pr_number=pr_number)]
                     if api_pr['reviewsQuery']['pageInfo']['hasNextPage']
                     else api_pr['reviewsQuery']['reviews']
                 )
 
+                # NOTE: COMMENTS ARE WEIRD! They exist in there own API endpoint (these
+                # are typically top level comments in a PR, considered an IssueComment)
+                # but there are also comments associated with each review (typically only one)
+                # Grab top level comments
+                top_level_comments = (
+                    [
+                        comment
+                        for comment in self.get_pr_comments(login, repo_name, pr_number=pr_number)
+                    ]
+                    if api_pr['commentsQuery']['pageInfo']['hasNextPage']
+                    else api_pr['commentsQuery']['comments']
+                )
+
+                # Grab review level comments
+                review_level_comments = [
+                    comment for review in reviews for comment in review['commentsQuery']['comments']
+                ]
+
+                api_pr['comments'] = review_level_comments + top_level_comments
+
+                api_pr['reviews'] = reviews
+
                 api_pr['commits'] = (
-                    self.get_pr_commits(login, repo_name, pr_number=pr_number)
+                    [
+                        commit
+                        for commit in self.get_pr_commits(login, repo_name, pr_number=pr_number)
+                    ]
                     if api_pr['commitsQuery']['pageInfo']['hasNextPage']
                     else [commit['commit'] for commit in api_pr['commitsQuery']['commits']]
                 )
+
                 # Do some extra processing on commits to clean up their weird author block
                 for commit in api_pr['commits']:
                     commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
