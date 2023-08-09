@@ -132,19 +132,10 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-        try:
-            if (
-                jellyfish_endpoint_info.jf_options and
-                'validate_num_repos' in jellyfish_endpoint_info.jf_options.keys() and
-                jellyfish_endpoint_info.jf_options['validate_num_repos']
-            ):
-                validate_num_repos_go_for = True
-            else:
-                validate_num_repos_go_for = False
-        except Exception as e:
-            agent_logging.log_and_print(logger, logging.WARNING, msg=f"Could not get `jf_options` instead got {e}."
-                                                                     f"not critical, continuing.")
-            validate_num_repos_go_for = False
+        if jellyfish_endpoint_info.jf_options:
+            validate_num_repos_go_for = jellyfish_endpoint_info.jf_options.get('validate_num_repos', False)
+        else:
+            validate_num_repos_go_for =  False
         if validate_num_repos_go_for:
             try:
                 validate_num_repos(config.git_configs, creds)
