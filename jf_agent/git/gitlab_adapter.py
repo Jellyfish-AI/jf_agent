@@ -21,9 +21,9 @@ from jf_agent.git import (
 )
 from jf_agent.git.gitlab_client import (
     GitLabClient,
-    log_and_print_request_error,
     MissingSourceProjectException,
 )
+from jf_agent.git.utils import log_and_print_request_error
 from jf_agent import diagnostics, agent_logging
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent.config_file_reader import GitConfig

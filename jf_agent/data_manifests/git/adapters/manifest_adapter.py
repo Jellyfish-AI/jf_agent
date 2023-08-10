@@ -6,7 +6,6 @@ from jf_agent.data_manifests.git.manifest import (
     GitBranchManifest,
     GitPullRequestManifest,
     GitRepoManifest,
-    GitTeamManifest,
     GitUserManifest,
 )
 
@@ -26,10 +25,6 @@ class ManifestAdapter(ABC):
         pass
 
     @abstractmethod
-    def get_teams_count(self) -> int:
-        pass
-
-    @abstractmethod
     def get_repos_count(self) -> int:
         pass
 
@@ -39,10 +34,6 @@ class ManifestAdapter(ABC):
 
     @abstractmethod
     def get_all_user_data(self) -> Generator[GitUserManifest, None, None]:
-        pass
-
-    @abstractmethod
-    def get_all_team_data(self) -> Generator[GitTeamManifest, None, None]:
         pass
 
     @abstractmethod

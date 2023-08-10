@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
+from jf_agent.git.github_gql_client import GithubGqlClient
 from stashy.client import Stash
 
 from jf_agent.session import retry_session
@@ -222,7 +223,9 @@ class GitAdapter(ABC):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bool):
+def get_git_client(
+    config: GitConfig, git_creds: dict, skip_ssl_verification: bool, instance_info: dict = {}
+):
     try:
         if config.git_provider == BBS_PROVIDER:
             return Stash(
@@ -242,12 +245,20 @@ def get_git_client(config: GitConfig, git_creds: dict, skip_ssl_verification: bo
             )
 
         if config.git_provider == GH_PROVIDER:
-            return GithubClient(
-                base_url=config.git_url,
-                token=git_creds['github_token'],
-                verify=not skip_ssl_verification,
-                session=retry_session(),
-            )
+            if instance_info.get('supports_graphql_endpoints', False):
+                return GithubGqlClient(
+                    base_url=config.git_url,
+                    token=git_creds['github_token'],
+                    verify=not skip_ssl_verification,
+                    session=retry_session(),
+                )
+            else:
+                return GithubClient(
+                    base_url=config.git_url,
+                    token=git_creds['github_token'],
+                    verify=not skip_ssl_verification,
+                    session=retry_session(),
+                )
         if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
@@ -306,16 +317,24 @@ def load_and_dump_git(
                 config, outdir, compress_output_files, git_connection
             ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
-            # using old func method, todo: refactor to use GitAdapter
-            from jf_agent.git.github import load_and_dump as load_and_dump_gh
+            from jf_agent.git.github_gql_adapter import GithubGqlAdapter
 
-            load_and_dump_gh(
-                config=config,
-                outdir=outdir,
-                compress_output_files=compress_output_files,
-                endpoint_git_instance_info=endpoint_git_instance_info,
-                git_conn=git_connection,
-            )
+            if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
+                GithubGqlAdapter(
+                    config, outdir, compress_output_files, git_connection
+                ).load_and_dump_git(endpoint_git_instance_info)
+            else:
+                # using old func method, todo: refactor to use GitAdapter
+                # NOTE: We can hopefully do this with the above githubGqlAdapter!
+                from jf_agent.git.github import load_and_dump as load_and_dump_gh
+
+                load_and_dump_gh(
+                    config=config,
+                    outdir=outdir,
+                    compress_output_files=compress_output_files,
+                    endpoint_git_instance_info=endpoint_git_instance_info,
+                    git_conn=git_connection,
+                )
         elif config.git_provider == 'gitlab':
             from jf_agent.git.gitlab_adapter import GitLabAdapter
 

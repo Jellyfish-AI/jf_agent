@@ -535,7 +535,10 @@ def _download_git_data(
         instance_creds = list(creds.git_instance_to_creds.values())[0]
 
     git_connection = get_git_client(
-        git_config, instance_creds, skip_ssl_verification=config.skip_ssl_verification
+        git_config,
+        instance_creds,
+        skip_ssl_verification=config.skip_ssl_verification,
+        instance_info=instance_info,
     )
     return load_and_dump_git(
         config=git_config,
