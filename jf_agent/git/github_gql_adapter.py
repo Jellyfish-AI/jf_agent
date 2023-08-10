@@ -268,7 +268,7 @@ def _normalize_user(api_user) -> NormalizedUser:
     else:
         email = api_user['email']
     # raw user, just have email (e.g. from a commit)
-    if 'id' not in api_user:
+    if not api_user.get('id', None):
         return NormalizedUser(id=email, login=email, name=api_user['name'], email=email,)
 
     # API user, where github matched to a known account
@@ -311,12 +311,16 @@ def _normalize_repo(
         _normalize_branch(branch, redact_names_and_urls) for branch in api_repo['branches']
     ]
 
+    # If a repsotiroy is completely empty, than there will be no default branch
+    # this can mess with our ingestion due to the 'name' field being nested
+    # on a None object
+    default_branch_name = api_repo['defaultBranch']['name'] if api_repo['defaultBranch'] else None
     return NormalizedRepository(
         id=api_repo['id'],
         name=repo_name,
         full_name=repo_name,
         url=url,
-        default_branch_name=api_repo['defaultBranch']['name'],
+        default_branch_name=default_branch_name,
         is_fork=api_repo['isFork'],
         branches=normalized_branches,
         project=normalized_project,
@@ -390,8 +394,8 @@ def _normalize_pr(
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
-    base_branch_name = api_pr['baseRef']['name'] if api_pr['baseRef'] else None
-    head_branch_name = api_pr['headRef']['name'] if api_pr['headRef'] else None
+    base_branch_name = api_pr['baseRefName']
+    head_branch_name = api_pr['headRefName']
     normalized_merge_commit = (
         _normalize_commit(
             api_pr['mergeCommit'],
