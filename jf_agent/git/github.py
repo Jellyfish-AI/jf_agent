@@ -214,7 +214,7 @@ def get_repos(
     repos = [
         (r, _normalize_repo(client, org, r, redact_names_and_urls))
         for org in include_orgs
-        for r in client.get_all_repos(org)
+        for r in tqdm(client.get_all_repos(org), desc=f'downloading repos', unit='repos',)
         if all(filt(r) for filt in filters)
     ]
     print('✓')

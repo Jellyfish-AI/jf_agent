@@ -334,12 +334,8 @@ class GithubGqlClient:
                                 title
                                 body
                                 url
-                                baseRef {{
-                                    name
-                                }}
-                                headRef {{
-                                    name
-                                }}
+                                baseRefName
+                                headRefName
                                 baseRepository {{ {self.GITHUB_GQL_SHORT_REPO_FRAGMENT} }}
                                 headRepository {{ {self.GITHUB_GQL_SHORT_REPO_FRAGMENT} }}
                                 author {{
