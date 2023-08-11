@@ -11,13 +11,14 @@ from jf_agent.git.github_gql_utils import (
     page_results,
 )
 from jf_agent.git.utils import log_and_print_request_error
+from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
 
 
 class GithubGqlClient:
 
-    GITHUB_GQL_USER_FRAGMENT = "... on User {login, id: databaseId, email, name }"
+    GITHUB_GQL_USER_FRAGMENT = "... on User {login, id: databaseId, email, name, url}"
     GITHUB_GQL_PAGE_INFO_BLOCK = "pageInfo {hasNextPage, endCursor}"
     GITHUB_GQL_COMMIT_FRAGMENT = f"""
         ... on Commit {{
@@ -43,9 +44,14 @@ class GithubGqlClient:
     # The PR query is HUGE, we shouldn't query more than about 25 at a time
     MAX_PAGE_SIZE_FOR_PR_QUERY = 25
 
-    def __init__(self, base_url: str, token: str, verify: bool, session: Session) -> None:
+    def __init__(
+        self, base_url: str, token: str, verify: bool = True, session: Session = None
+    ) -> None:
         self.token = token
         self.base_url = get_github_gql_base_url(base_url=base_url)
+
+        if not session:
+            session = retry_session()
 
         self.session = get_github_gql_session(token=token, verify=verify, session=session)
 
@@ -485,3 +491,111 @@ class GithubGqlClient:
                 commit = api_pr_commit['commit']
                 commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
                 yield commit
+
+    def get_users_count(self, login: str) -> int:
+        query_body = f"""{{
+            organization(login: "{login}"){{
+                    users: membersWithRole {{
+                        totalCount
+                    }}
+                }}
+            }}
+        """
+        # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
+        return self._get_raw_result(query_body=query_body)['data']['organization']['users'][
+            'totalCount'
+        ]
+
+    def get_repos_count(self, login: str) -> int:
+        query_body = f"""{{
+            organization(login: "{login}"){{
+                    repos: repositories {{
+                        totalCount
+                    }}
+                }}
+            }}
+        """
+        # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
+        return self._get_raw_result(query_body=query_body)['data']['organization']['repos'][
+            'totalCount'
+        ]
+
+    def get_repo_manifest_data(
+        self, login: str, page_size: int = 10
+    ) -> Generator[dict, None, None]:
+        query_body = f"""{{
+            organization(login: "{login}") {{
+                    repositories(first: {page_size}, after: %s) {{
+                        pageInfo {{
+                            endCursor
+                            hasNextPage
+                            
+                        }}
+                        repos: nodes {{
+                            id: databaseId
+                            name
+                            url
+                            defaultBranch: defaultBranchRef {{
+                                name
+                                target {{
+                                    ... on Commit {{
+                                        history {{
+                                            totalCount
+                                        }}
+                                    }}
+                                }}
+                            }}
+                            users: assignableUsers{{
+                                totalCount
+                            }}
+                            prs: pullRequests {{
+                                totalCount
+                            }}
+                            branches: refs(refPrefix:"refs/heads/") {{
+                                totalCount
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        """
+        path_to_page_info = 'data.organization.repositories'
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info
+        ):
+            for repo in result['data']['organization']['repositories']['repos']:
+                yield repo
+
+    def get_pr_manifest_data(
+        self, login: str, repo_name: str, page_size=100
+    ) -> Generator[dict, None, None]:
+        query_body = f"""{{
+                organization(login: "{login}") {{
+                        repository(name: "{repo_name}") {{
+                            name
+                            id: databaseId
+                            prs_query: pullRequests(first: {page_size}, after: %s) {{
+                                pageInfo {{
+                                    endCursor
+                                    hasNextPage
+                                }}
+                                totalCount
+                                prs: nodes {{
+                                    updatedAt
+                                    id: databaseId
+                                    title
+                                    number
+                                    repository {{id: databaseId, name}}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+        """
+
+        path_to_page_info = 'data.organization.repository.prs_query'
+        for result in self._page_results(
+            query_body=query_body, path_to_page_info=path_to_page_info
+        ):
+            for pr in result['data']['organization']['repository']['prs_query']['prs']:
+                yield pr
