@@ -27,11 +27,7 @@ class GithubGqlClient:
             author {{
                 email
                 name
-                user {{
-                    id: databaseId
-                    login
-                    email
-                }}
+                user {{ id: databaseId, login }}
             }}
             message
             committedDate
@@ -49,11 +45,28 @@ class GithubGqlClient:
     ) -> None:
         self.token = token
         self.base_url = get_github_gql_base_url(base_url=base_url)
+        # We need to hit the REST API for one API call, see get_organization_by_login
+        self.rest_api_url = base_url or 'https://api.github.com'
 
         if not session:
             session = retry_session()
 
         self.session = get_github_gql_session(token=token, verify=verify, session=session)
+
+    def _get_raw_rest_result(self, url):
+        result = self.session.get(url)
+
+        # HACK: This appears to happen after we have been
+        # rate-limited when hitting certain URLs, there is
+        # likely a more elegant way to solve this but it takes
+        # about an hour to test each time and it works.
+        # NOTE: This is unlikely for this call, because we are only hitting
+        # the org once for an entire git config
+        if result.status_code == 403:
+            result = self.session.get(url)
+
+        result.raise_for_status()
+        return result
 
     def _get_raw_result(self, query_body: str):
         return get_raw_result(query_body=query_body, base_url=self.base_url, session=self.session)
@@ -76,31 +89,37 @@ class GithubGqlClient:
     # the nested user object
     @staticmethod
     def _process_git_actor_author_gql_object(author: dict) -> dict:
-        user = author['user']
+        user: dict = author.get('user') or {}
         return {
-            'id': author['user']['id'] if author['user'] else None,
-            'login': author['user']['login'] if author['user'] else None,
+            'id': user.get('id'),
+            'login': user.get('login'),
             'email': author['email'],
             'name': author['name'],
         }
 
+    # HACK: This call will actually use the REST endpoint
+    # Agent clients are supposed to have the [org:read] scope,
+    # but many of them don't. This wasn't a problem before
+    # because the REST org API doesn't actually hide behind any perms...
+    # TODO: Once we straighten out everybody's permissions we can sunset
+    # this function
     def get_organization_by_login(self, login: str):
-        query_body = f"""{{
-            organization(login: \"{login}\") {{
-                id: databaseId
-                login
-                name
-                url
-            }}
-        }}
-        """
-        try:
-            return self._get_raw_result(query_body=query_body)['data']['organization']
-        except Exception as e:
-            log_and_print_request_error(
-                e, f'fetching source project {login}. ' f'Skipping...',
-            )
-            return None
+        # NOTE: We are hitting a different base url here!
+        url = f'{self.rest_api_url}/orgs/{login}'
+
+        result = self.session.get(url)
+
+        # HACK: This appears to happen after we have been
+        # rate-limited when hitting certain URLs, there is
+        # likely a more elegant way to solve this but it takes
+        # about an hour to test each time and it works.
+        # NOTE: This is unlikely for this call, because we are only hitting
+        # the org once for an entire git config
+        if result.status_code == 403:
+            result = self.session.get(url)
+
+        result.raise_for_status()
+        return result.json()
 
     def get_users(self, login: str) -> Generator[dict, None, None]:
         query_body = f"""{{

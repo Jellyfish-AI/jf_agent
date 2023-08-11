@@ -261,20 +261,16 @@ def _normalize_user(api_user) -> NormalizedUser:
     if not api_user:
         return None
 
-    # Backwards compatability paranoia.
-    # rest returns blank emails as null, vs ""
-    if api_user['email'] == '':
-        email = None
-    else:
-        email = api_user['email']
+    id = api_user.get('id')
+    name = api_user.get('name')
+    login = api_user.get('login')
+    email = api_user.get('email')
     # raw user, just have email (e.g. from a commit)
-    if not api_user.get('id', None):
-        return NormalizedUser(id=email, login=email, name=api_user['name'], email=email,)
+    if not id:
+        return NormalizedUser(id=email, login=email, name=name, email=email,)
 
     # API user, where github matched to a known account
-    return NormalizedUser(
-        id=api_user['id'], login=api_user['login'], name=api_user['name'], email=email
-    )
+    return NormalizedUser(id=id, login=login, name=name, email=email)
 
 
 def _normalize_project(api_org: dict, redact_names_and_urls: bool) -> NormalizedProject:
