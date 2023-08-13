@@ -277,9 +277,9 @@ def _normalize_project(api_org: dict, redact_names_and_urls: bool) -> Normalized
     return NormalizedProject(
         id=api_org['id'],
         login=api_org['login'],
-        name=api_org['name']
+        name=api_org.get('name')
         if not redact_names_and_urls
-        else _project_redactor.redact_name(api_org['name']),
+        else _project_redactor.redact_name(api_org.get('name')),
         url=api_org['url'] if not redact_names_and_urls else None,
     )
 
