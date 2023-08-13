@@ -38,15 +38,18 @@ def load_and_dump(
 ):
     # Logic to help with debugging the scopes that clients have with their API key
     try:
-        scopes: dict[str:str] = {
-            org: git_conn.get_scopes_of_api_token(org) for org in config.git_include_projects
-        }
-        print(
-            f'Attempting to run github ingest using an API key with the following scopes: {scopes}'
+        scopes = git_conn.get_scopes_of_api_token()
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            'Attempting to ingest github data with the following '
+            f'scopes for {config.git_instance_slug}: {scopes}',
         )
     except Exception as e:
-        print(
-            f'Problem finding scopes. This should not affect your github agent processing. Error: {e}'
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            f'Problem finding scopes for your API key. This should not affect your github agent processing. Error: {e}',
         )
 
     write_file(
