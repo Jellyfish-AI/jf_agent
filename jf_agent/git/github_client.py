@@ -28,9 +28,11 @@ class GithubClient:
             }
         )
 
-    def get_scopes_of_api_token(self, org):
-        url = f'{self.base_url}/orgs/{org}'
-        result: Response = self.get_raw_result(url)
+    def get_scopes_of_api_token(self):
+        # Make an empty call against the orgs API to be quick
+        # and get the OAuth scopes
+        url = f'{self.base_url}/orgs/'
+        result = self.session.get(url)
         return result.headers.get('X-OAuth-Scopes')
 
     def get_organization_by_name(self, org):
