@@ -132,11 +132,8 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-        if jellyfish_endpoint_info.jf_options:
-            validate_num_repos_go_for = jellyfish_endpoint_info.jf_options.get('validate_num_repos', False)
-        else:
-            validate_num_repos_go_for = False
-        if validate_num_repos_go_for:
+
+        if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
             try:
                 validate_num_repos(config.git_configs, creds)
             except Exception as e:
@@ -329,7 +326,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
     agent_config_from_api = resp.json()
     jira_info = agent_config_from_api.get('jira_info')
     git_instance_info = agent_config_from_api.get('git_instance_info')
-    jf_options = agent_config_from_api.get("jf_options")
+    jf_options = agent_config_from_api.get("jf_options", {})
 
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned

@@ -111,7 +111,7 @@ def validate_num_repos(git_configs, creds):
                     client.session.close()
                     msg = f"credentials preface: {cred_slug} " \
                           f"identified {repo_count} repos in instance {git_config.git_instance_slug}"
-                    agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
+                    agent_logging.log_and_print(logger, logging.INFO, msg=msg)
 
                 except Exception as e:
                     if client and client.session:
