@@ -20,14 +20,30 @@ class GithubGqlClient:
 
     GITHUB_GQL_USER_FRAGMENT = "... on User {login, id: databaseId, email, name, url}"
     GITHUB_GQL_PAGE_INFO_BLOCK = "pageInfo {hasNextPage, endCursor}"
+    # Need to make a second, special actor fragment to make sure we grab
+    # the proper ID from either a bot or a User
+    GITHUB_GQL_ACTOR_FRAGMENT = """
+        ... on Actor 
+            { 
+                login 
+                ... on User { id: databaseId, email, name } 
+                ... on Bot { id: databaseId}
+            }
+    """
+    # NOTE: On the author block here, we have a type GitActor
+    # We cannot always get the email from the nested user object,
+    # so pull whatever email we can from the gitActor top level object.
+    # (we can't get the email from the user object bc of variable privacy configuration)
     GITHUB_GQL_COMMIT_FRAGMENT = f"""
         ... on Commit {{
             sha: oid
             url
             author {{
-                email
-                name
-                user {{ id: databaseId, login }}
+                ... on GitActor {{
+                    email
+                    name
+                    user {{ id: databaseId, login }}
+                }}
             }}
             message
             committedDate
@@ -83,12 +99,13 @@ class GithubGqlClient:
     def _to_git_timestamp(timestamp: datetime):
         return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # This is for commits, specifically merge commits I believe.
-    # There is some weird stuff going on here where our system
-    # expects email and name to come from author object, but ID and login to come from
-    # the nested user object
+    # This is for commits, specifically the 'author' block within them.
+    # On the GQL side of things, these are specifically a distinct type of object,
+    # GitActor. It has a nested user object, but the quality of data within it
+    # is variable due to a users privacy settings. Email, for example, is often
+    # not present in the child user block, so we always grab it from the top level.
     @staticmethod
-    def _process_git_actor_author_gql_object(author: dict) -> dict:
+    def _process_git_actor_gql_object(author: dict) -> dict:
         user: dict = author.get('user') or {}
         return {
             'id': user.get('id'),
@@ -247,9 +264,7 @@ class GithubGqlClient:
                 'commits'
             ]:
                 # Overwrite Author block for backwards compatibility
-                api_commit['author'] = self._process_git_actor_author_gql_object(
-                    api_commit['author']
-                )
+                api_commit['author'] = self._process_git_actor_gql_object(api_commit['author'])
                 yield api_commit
 
     #
@@ -262,7 +277,7 @@ class GithubGqlClient:
                 
                 comments: nodes {{
                     author {{
-                        {self.GITHUB_GQL_USER_FRAGMENT}
+                        {self.GITHUB_GQL_ACTOR_FRAGMENT}
                     }}
                     body
                     createdAt
@@ -279,7 +294,7 @@ class GithubGqlClient:
                 reviews: nodes {{
                     ... on PullRequestReview {{
                         author {{
-                            {self.GITHUB_GQL_USER_FRAGMENT}
+                            {self.GITHUB_GQL_ACTOR_FRAGMENT}
                         }}
                         id: databaseId
                         state
@@ -364,10 +379,10 @@ class GithubGqlClient:
                                 baseRepository {{ {self.GITHUB_GQL_SHORT_REPO_FRAGMENT} }}
                                 headRepository {{ {self.GITHUB_GQL_SHORT_REPO_FRAGMENT} }}
                                 author {{
-                                    {self.GITHUB_GQL_USER_FRAGMENT}
+                                    {self.GITHUB_GQL_ACTOR_FRAGMENT}
                                 }}
                                 mergedBy {{
-                                    {self.GITHUB_GQL_USER_FRAGMENT}
+                                    {self.GITHUB_GQL_ACTOR_FRAGMENT}
                                 }}
                                 mergeCommit {{
                                     {self.GITHUB_GQL_COMMIT_FRAGMENT}
@@ -430,10 +445,10 @@ class GithubGqlClient:
 
                 # Do some extra processing on commits to clean up their weird author block
                 for commit in api_pr['commits']:
-                    commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
+                    commit['author'] = self._process_git_actor_gql_object(commit['author'])
 
                 if api_pr['mergeCommit'] and api_pr['mergeCommit']['author']:
-                    api_pr['mergeCommit']['author'] = self._process_git_actor_author_gql_object(
+                    api_pr['mergeCommit']['author'] = self._process_git_actor_gql_object(
                         api_pr['mergeCommit']['author']
                     )
 
@@ -508,7 +523,7 @@ class GithubGqlClient:
             ]:
                 # Commit blocks are nested within the 'commits' block
                 commit = api_pr_commit['commit']
-                commit['author'] = self._process_git_actor_author_gql_object(commit['author'])
+                commit['author'] = self._process_git_actor_gql_object(commit['author'])
                 yield commit
 
     def get_users_count(self, login: str) -> int:
