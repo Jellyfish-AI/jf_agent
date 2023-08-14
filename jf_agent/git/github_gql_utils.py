@@ -2,6 +2,7 @@ import json
 from typing import Generator
 
 from requests import Session
+from requests.utils import default_user_agent
 
 from jf_agent.session import retry_session
 
@@ -21,7 +22,11 @@ def get_github_gql_session(token: str, verify: bool = True, session: Session = N
 
     session.verify = verify
     session.headers.update(
-        {'Authorization': f'token {token}', "Accept": "application/vnd.github+json",}
+        {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': f'jellyfish/1.0 ({default_user_agent()})',
+        }
     )
     return session
 
