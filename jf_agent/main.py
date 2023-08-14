@@ -133,15 +133,15 @@ def main():
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
-        if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
-            try:
+        try:
+            if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
-            except Exception as e:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    msg=f"Could not validate client/org creds, moving on. Got {e}"
-                )
+        except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.WARNING,
+                msg=f"Could not validate client/org creds, moving on. Got {e}"
+            )
 
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
