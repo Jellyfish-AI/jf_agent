@@ -7,9 +7,11 @@ from jira.exceptions import JIRAError
 from requests.exceptions import RequestException
 
 from jf_agent import agent_logging
+from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
+from jf_agent.data_manifests.git.generator import get_manifest_adapter
 from jf_agent.jf_jira import _get_raw_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
-from jf_agent.git import get_git_client, get_nested_repos_from_git
+from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 
 logger = logging.getLogger(__name__)
 
@@ -99,27 +101,25 @@ def validate_jira(config, creds):
 
 def validate_num_repos(git_configs, creds):
     for git_config in git_configs:
-        for cred in creds.git_instance_to_creds:
-            client = None
-            try:
-                client = get_git_client(
-                    git_config,
-                    creds.git_instance_to_creds[cred],
-                    skip_ssl_verification=False,
-                )
-                project_repo_dict = get_nested_repos_from_git(client, git_config)
-                client.session.close()
-                msg = f"credentials preface: {cred} " \
-                      f"identified {len(project_repo_dict)} repos in {git_config.git_instance_slug}"
-                agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
-
-            except Exception as e:
-                if client and client.session:
+        for cred_slug in creds.git_instance_to_creds:
+            for project in git_config.git_include_projects:
+                client = None
+                token = creds.git_instance_to_creds.get(cred_slug).get('github_token')
+                try:
+                    client = GithubGqlClient(base_url=git_config.git_url, token=token)
+                    repo_count = client.get_repos_count(login=project)
                     client.session.close()
-                print(e)
-                msg = f"credentials preface: {cred} not valid to config preface: " \
-                      f"{git_config.git_instance_slug}, got {e}, moving on."
-                agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
+                    msg = f"credentials preface: {cred_slug} " \
+                          f"identified {repo_count} repos in instance {git_config.git_instance_slug}"
+                    agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
+
+                except Exception as e:
+                    if client and client.session:
+                        client.session.close()
+                    print(e)
+                    msg = f"credentials preface: {cred_slug} not valid to config preface: " \
+                          f"{git_config.git_instance_slug}, got {e}, moving on."
+                    agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
 
 
 def validate_git(config, creds):
