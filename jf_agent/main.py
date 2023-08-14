@@ -34,7 +34,7 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
-from jf_agent.validation import validate_jira, validate_git, validate_memory
+from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,17 @@ def main():
 
     else:
         jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
+        try:
+            if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
+                validate_num_repos(config.git_configs, creds)
+        except Exception as e:
+            agent_logging.log_and_print(
+                logger,
+                logging.WARNING,
+                msg=f"Could not validate client/org creds, moving on. Got {e}"
+            )
+
         print(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
 
@@ -214,7 +225,7 @@ UserProvidedCreds = namedtuple(
     ],
 )
 
-JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info'])
+JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info', 'jf_options'])
 
 required_jira_fields = [
     'issuekey',
@@ -312,9 +323,11 @@ def obtain_jellyfish_endpoint_info(config, creds):
         )
         raise BadConfigException()
 
-    agent_config = resp.json()
-    jira_info = agent_config.get('jira_info')
-    git_instance_info = agent_config.get('git_instance_info')
+    agent_config_from_api = resp.json()
+    jira_info = agent_config_from_api.get('jira_info')
+    git_instance_info = agent_config_from_api.get('git_instance_info')
+    jf_options = agent_config_from_api.get("jf_options", {})
+
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
@@ -370,7 +383,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 )
                 raise BadConfigException()
 
-    return JellyfishEndpointInfo(jira_info, git_instance_info)
+    return JellyfishEndpointInfo(jira_info, git_instance_info, jf_options)
 
 
 @diagnostics.capture_timing()
