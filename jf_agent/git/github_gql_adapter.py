@@ -123,37 +123,48 @@ class GithubGqlAdapter(GitAdapter):
                 # scrubbed by our git_redact_names_and_urls logic
                 repo_id = api_repo['id']
                 self.repo_id_to_name_lookup[repo_id] = api_repo['name']
-                # Initiate branch lookup table
-                self.repo_to_branch_is_quiescent_lookups[repo_id] = {}
 
                 # Mark if the default branch in this repo is quiescent, to save on API calls later
-                if api_repo.get('defaultBranch'):
-                    default_branch = api_repo['defaultBranch']
-                    most_recent_commits = default_branch['target']['mostRecentCommits'] or {}
-                    if most_recent_commits.get('commits'):
-                        most_recent_commit = most_recent_commits.get('commits')[0]
-                        pull_since_for_commits = pull_since_date_for_repo(
-                            self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
-                        )
+                # Initiate branch lookup table
+                self.repo_to_branch_is_quiescent_lookups[repo_id] = {}
+                default_branch = api_repo.get('defaultBranch')
+                if default_branch:
+                    commits = (default_branch['target']['mostRecentCommits'] or {}).get(
+                        'commits', []
+                    )
+                    if commits:
+                        # Translate data from API
+                        most_recent_commit = commits[0]
                         most_recent_commit_date: datetime = github_gql_format_to_datetime(
                             most_recent_commit['committedDate']
                         )
+                        # Get our internal 'pull_from' value
+                        pull_since_for_commits = pull_since_date_for_repo(
+                            self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
+                        )
+
+                        # Mark if we can skip pulling this branch or not
                         self.repo_to_branch_is_quiescent_lookups[repo_id][
                             default_branch['name']
                         ] = (pull_since_for_commits >= most_recent_commit_date)
                     else:
+                        # If there are no commits, there is nothing to pull
+                        # Mark as quiescent
                         self.repo_to_branch_is_quiescent_lookups[repo_id][
                             default_branch['name']
                         ] = True
 
                 # Mark the latest date for PRs in this repo, to save on API calls later
-                if api_repo['prQuery']['prs']:
+                prs = api_repo['prQuery'].get('prs', [])
+                if prs:
+                    # Translate latest PR detected from API
+                    latest_pr_update = github_gql_format_to_datetime(prs[0]['updatedAt'])
+                    # Get our own pull since value
                     pull_since_for_prs = pull_since_date_for_repo(
                         self.server_git_instance_info, nrm_project.login, repo_id, 'prs'
                     )
-                    latest_pr_update = github_gql_format_to_datetime(
-                        api_repo['prQuery']['prs'][0]['updatedAt']
-                    )
+
+                    # Mark if we can skip this PR or not
                     self.repo_has_quiescent_prs_lookup[repo_id] = (
                         pull_since_for_prs >= latest_pr_update
                     )
