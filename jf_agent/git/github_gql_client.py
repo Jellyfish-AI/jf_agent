@@ -1,19 +1,21 @@
-import inspect
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+import time
 from requests import Session
+import requests
+from requests.utils import default_user_agent
 from typing import Generator
+from jf_agent import agent_logging
+from jf_agent.git.github_gql_utils import datetime_to_gql_str_format, github_gql_format_to_datetime
 
-from jf_agent.git.github_gql_utils import (
-    get_github_gql_base_url,
-    get_github_gql_session,
-    get_raw_result,
-    page_results,
-)
-from jf_agent.git.utils import log_and_print_request_error
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
+
+
+class GqlRateLimitedException(Exception):
+    pass
 
 
 class GithubGqlClient:
@@ -60,44 +62,137 @@ class GithubGqlClient:
         self, base_url: str, token: str, verify: bool = True, session: Session = None
     ) -> None:
         self.token = token
-        self.base_url = get_github_gql_base_url(base_url=base_url)
+        self.base_url = self.get_github_gql_base_url(base_url=base_url)
         # We need to hit the REST API for one API call, see get_organization_by_login
         self.rest_api_url = base_url or 'https://api.github.com'
 
         if not session:
             session = retry_session()
 
-        self.session = get_github_gql_session(token=token, verify=verify, session=session)
+        self.session = self.get_github_gql_session(token=token, verify=verify, session=session)
 
-    def _get_raw_rest_result(self, url):
-        result = self.session.get(url)
+    def get_github_gql_base_url(self, base_url: str):
+        if base_url and 'api/v3' in base_url:
+            # Github server clients provide an API with a trailing '/api/v3'
+            # replace this with the graphql endpoint
+            return base_url.replace('api/v3', 'api/graphql')
+        else:
+            return 'https://api.github.com/graphql'
 
-        # HACK: This appears to happen after we have been
-        # rate-limited when hitting certain URLs, there is
-        # likely a more elegant way to solve this but it takes
-        # about an hour to test each time and it works.
-        # NOTE: This is unlikely for this call, because we are only hitting
-        # the org once for an entire git config
-        if result.status_code == 403:
-            result = self.session.get(url)
+    def get_github_gql_session(self, token: str, verify: bool = True, session: Session = None):
+        if not session:
+            session = retry_session()
 
-        result.raise_for_status()
-        return result
-
-    def _get_raw_result(self, query_body: str):
-        return get_raw_result(query_body=query_body, base_url=self.base_url, session=self.session)
-
-    def _page_results(self, query_body: str, path_to_page_info: str):
-        return page_results(
-            query_body=query_body,
-            path_to_page_info=path_to_page_info,
-            session=self.session,
-            base_url=self.base_url,
+        session.verify = verify
+        session.headers.update(
+            {
+                'Authorization': f'token {token}',
+                'Accept': 'application/vnd.github+json',
+                'User-Agent': f'jellyfish/1.0 ({default_user_agent()})',
+            }
         )
+        return session
 
-    @staticmethod
-    def _to_git_timestamp(timestamp: datetime):
-        return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+    def page_results(
+        self, query_body: str, path_to_page_info: str, cursor: str = 'null'
+    ) -> Generator[dict, None, None]:
+
+        # TODO: Write generalized paginator
+        hasNextPage = True
+        while hasNextPage:
+            # Fetch results
+            result = self.get_raw_result(query_body=(query_body % cursor))
+
+            yield result
+
+            # Get relevant data and yield it
+            path_tokens = path_to_page_info.split('.')
+            for token in path_tokens:
+                result = result[token]
+
+            page_info = result['pageInfo']
+            # Need to grab the cursor and wrap it in quotes
+            _cursor = page_info['endCursor']
+            # If endCursor returns null (None), break out of loop
+            hasNextPage = page_info['hasNextPage'] and _cursor
+            cursor = f'"{_cursor}"'
+
+    # This includes retry logic!
+    def get_raw_result(self, query_body: str) -> dict:
+        max_attempts = 7
+        attempt_number = 1
+        while True:
+            try:
+                response = self.session.post(url=self.base_url, json={'query': query_body})
+
+                response.raise_for_status()
+                json_str = response.content.decode()
+                json_data = json.loads(json_str)
+                if 'errors' in json_data:
+                    if len(json_data['errors']) == 1:
+                        error = json_data['errors'][0]
+                        if error.get('type') == 'RATE_LIMITED':
+                            raise GqlRateLimitedException(
+                                error.get('message', 'Rate Limit hit in GQL')
+                            )
+                    raise Exception(
+                        f'Exception encountered when trying to query: {query_body}. Error: {json_data["errors"]}'
+                    )
+                return json_data
+            # We can get transient 403 level errors that have to do with rate limiting,
+            # but aren't directly related to the above GqlRateLimitedException logic.
+            # Do a simple retry loop here
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != 403:
+                    raise
+                if attempt_number > max_attempts:
+                    raise
+
+                sleep_time = attempt_number ** 2
+                # Overwrite sleep time if github gives us a specific wait time
+                if e.response.headers.get('retry-after') and attempt_number == 1:
+                    retry_after = int(e.response.headers.get('retry-after'))
+                    if retry_after > (60 * 5):
+                        # if the given wait time is more than 5 minutes, call their bluff
+                        # and try the experimental backoff approach
+                        pass
+                    elif retry_after <= 0:
+                        # if the given wait time is negative ignore their suggestion
+                        pass
+                    else:
+                        # Add three seconds for gracetime
+                        sleep_time = retry_after + 3
+
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'A secondary rate limit was hit. Sleeping for {sleep_time} seconds. (attempt {attempt_number}/{max_attempts})',
+                )
+                time.sleep(sleep_time)
+                attempt_number += 1
+            except GqlRateLimitedException:
+                rate_limit_info = self.get_rate_limit(base_url=self.base_url)
+                reset_at: datetime = github_gql_format_to_datetime(rate_limit_info['resetAt'])
+                reset_at_timestamp = reset_at.replace(tzinfo=timezone.utc).timestamp()
+                curr_timestamp = datetime.utcnow().timestamp()
+                # Add ten seconds for some extra wiggle room...
+                # Github can be very finicky with it's throttle handling
+                sleep_time = (reset_at_timestamp - curr_timestamp) + 10
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',
+                )
+                time.sleep(sleep_time)
+
+    # Getting the rate limit info is never affected by the current rate limit
+    def get_rate_limit(self, base_url: str):
+        response = self.session.post(
+            url=base_url, json={'query': '{rateLimit {remaining, resetAt}}'}
+        )
+        response.raise_for_status()
+        json_str = response.content.decode()
+        return json.loads(json_str)['data']['rateLimit']
 
     # This is for commits, specifically the 'author' block within them.
     # On the GQL side of things, these are specifically a distinct type of object,
@@ -150,7 +245,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.userQuery'
         ):
             for user in page['data']['organization']['userQuery']['users']:
@@ -172,6 +267,16 @@ class GithubGqlClient:
                             isFork
                             defaultBranch: defaultBranchRef {{
                                     name
+                                    target {{
+                                        ... on Commit {{
+                                            mostRecentCommits: history(first: 1, after: null) {{
+                                                commits: nodes {{ committedDate }}
+                                            }}
+                                        }}
+                                    }}
+                            }}
+                            prQuery: pullRequests(first: 1, after: null, orderBy: {{field: UPDATED_AT, direction: DESC}}) {{
+                                prs: nodes {{ updatedAt }}
                             }}
                             # This should be broken out into a separate query if 
                             # hasNextPage is True.
@@ -190,7 +295,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repoQuery'
         ):
             for api_repo in page['data']['organization']['repoQuery']['repos']:
@@ -227,7 +332,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repository.branchQuery'
         ):
             for api_branch in page['data']['organization']['repository']['branchQuery']['branches']:
@@ -243,7 +348,7 @@ class GithubGqlClient:
                         branch: ref(qualifiedName: "{branch_name}") {{
                             target {{
                                 ... on Commit {{
-                                    history(first: 100, since: "{self._to_git_timestamp(since)}", after: %s) {{
+                                    history(first: 100, since: "{datetime_to_gql_str_format(since)}", after: %s) {{
                                         {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                                         commits: nodes {{
                                             {self.GITHUB_GQL_COMMIT_FRAGMENT}
@@ -257,7 +362,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repo.branch.target.history'
         ):
             for api_commit in page['data']['organization']['repo']['branch']['target']['history'][
@@ -343,7 +448,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        return self._get_raw_result(query_body=query_body)['data']['organization']['repo'][
+        return self.get_raw_result(query_body=query_body)['data']['organization']['repo'][
             'prQuery'
         ]['prs']
 
@@ -397,7 +502,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repo.prQuery'
         ):
             for api_pr in page['data']['organization']['repo']['prQuery']['prs']:
@@ -469,7 +574,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repo.pr.commentsQuery'
         ):
             for api_pr_comment in page['data']['organization']['repo']['pr']['commentsQuery'][
@@ -492,7 +597,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repo.pr.reviewsQuery'
         ):
             for api_pr_review in page['data']['organization']['repo']['pr']['reviewsQuery'][
@@ -515,7 +620,7 @@ class GithubGqlClient:
             }}
         }}
         """
-        for page in self._page_results(
+        for page in self.page_results(
             query_body=query_body, path_to_page_info='data.organization.repo.pr.commitsQuery'
         ):
             for api_pr_commit in page['data']['organization']['repo']['pr']['commitsQuery'][
@@ -536,7 +641,7 @@ class GithubGqlClient:
             }}
         """
         # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
-        return self._get_raw_result(query_body=query_body)['data']['organization']['users'][
+        return self.get_raw_result(query_body=query_body)['data']['organization']['users'][
             'totalCount'
         ]
 
@@ -550,7 +655,7 @@ class GithubGqlClient:
             }}
         """
         # TODO: Maybe serialize the return results so that we don't have to do this crazy nested grabbing?
-        return self._get_raw_result(query_body=query_body)['data']['organization']['repos'][
+        return self.get_raw_result(query_body=query_body)['data']['organization']['repos'][
             'totalCount'
         ]
 
@@ -594,9 +699,7 @@ class GithubGqlClient:
             }}
         """
         path_to_page_info = 'data.organization.repositories'
-        for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info
-        ):
+        for result in self.page_results(query_body=query_body, path_to_page_info=path_to_page_info):
             for repo in result['data']['organization']['repositories']['repos']:
                 yield repo
 
@@ -628,8 +731,6 @@ class GithubGqlClient:
         """
 
         path_to_page_info = 'data.organization.repository.prs_query'
-        for result in self._page_results(
-            query_body=query_body, path_to_page_info=path_to_page_info
-        ):
+        for result in self.page_results(query_body=query_body, path_to_page_info=path_to_page_info):
             for pr in result['data']['organization']['repository']['prs_query']['prs']:
                 yield pr
