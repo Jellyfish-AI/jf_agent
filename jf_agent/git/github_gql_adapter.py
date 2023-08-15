@@ -1,5 +1,7 @@
+from datetime import datetime, timezone
 import traceback
 from jf_agent.git.github_gql_client import GithubGqlClient
+from jf_agent.git.github_gql_utils import github_gql_format_to_datetime
 from jf_agent.git.utils import get_branches_for_normalized_repo
 from tqdm import tqdm
 from dateutil import parser
@@ -38,12 +40,21 @@ _repo_redactor = NameRedactor()
 
 class GithubGqlAdapter(GitAdapter):
     def __init__(
-        self, config: GitConfig, outdir: str, compress_output_files: bool, client: GithubGqlClient
+        self,
+        config: GitConfig,
+        outdir: str,
+        compress_output_files: bool,
+        client: GithubGqlClient,
+        server_git_instance_info: dict,
     ):
         super().__init__(config, outdir, compress_output_files)
         self.client = client
 
+        self.server_git_instance_info = server_git_instance_info
+
         self.repo_id_to_name_lookup: dict = {}
+        self.repo_to_branch_is_quiescent_lookups: dict = {}
+        self.repo_has_quiescent_prs_lookup: dict = {}
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -110,7 +121,45 @@ class GithubGqlAdapter(GitAdapter):
             ):
                 # Enter the repo to the ID to Name look up, incase the repo name gets
                 # scrubbed by our git_redact_names_and_urls logic
-                self.repo_id_to_name_lookup[api_repo['id']] = api_repo['name']
+                repo_id = api_repo['id']
+                self.repo_id_to_name_lookup[repo_id] = api_repo['name']
+                # Initiate branch lookup table
+                self.repo_to_branch_is_quiescent_lookups[repo_id] = {}
+
+                # Mark if the default branch in this repo is quiescent, to save on API calls later
+                if api_repo.get('defaultBranch'):
+                    default_branch = api_repo['defaultBranch']
+                    most_recent_commits = default_branch['target']['mostRecentCommits'] or {}
+                    if most_recent_commits.get('commits'):
+                        most_recent_commit = most_recent_commits.get('commits')[0]
+                        pull_since_for_commits = pull_since_date_for_repo(
+                            self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
+                        )
+                        most_recent_commit_date: datetime = github_gql_format_to_datetime(
+                            most_recent_commit['committedDate']
+                        )
+                        self.repo_to_branch_is_quiescent_lookups[repo_id][
+                            default_branch['name']
+                        ] = (pull_since_for_commits >= most_recent_commit_date)
+                    else:
+                        self.repo_to_branch_is_quiescent_lookups[repo_id][
+                            default_branch['name']
+                        ] = True
+
+                # Mark the latest date for PRs in this repo, to save on API calls later
+                if api_repo['prQuery']['prs']:
+                    pull_since_for_prs = pull_since_date_for_repo(
+                        self.server_git_instance_info, nrm_project.login, repo_id, 'prs'
+                    )
+                    latest_pr_update = github_gql_format_to_datetime(
+                        api_repo['prQuery']['prs'][0]['updatedAt']
+                    )
+                    self.repo_has_quiescent_prs_lookup[repo_id] = (
+                        pull_since_for_prs >= latest_pr_update
+                    )
+                else:
+                    self.repo_has_quiescent_prs_lookup[repo_id] = True
+
                 nrm_repos.append(
                     _normalize_repo(api_repo, nrm_project, self.config.git_redact_names_and_urls)
                 )
@@ -138,6 +187,10 @@ class GithubGqlAdapter(GitAdapter):
                 )
 
                 for branch_name in get_branches_for_normalized_repo(nrm_repo, included_branches):
+                    if self.repo_to_branch_is_quiescent_lookups[nrm_repo.id].get(
+                        branch_name, False
+                    ):
+                        continue
                     try:
                         for j, api_commit in enumerate(
                             tqdm(
@@ -177,13 +230,15 @@ class GithubGqlAdapter(GitAdapter):
 
         nrm_prs = []
         for i, nrm_repo in enumerate(normalized_repos, start=1):
-            print(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
                     pull_since = pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
+
+                    if self.repo_has_quiescent_prs_lookup[nrm_repo.id]:
+                        continue
 
                     # This will return a page size between 0 and 25 (upper bound set by GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY)
                     def _get_pagesize_for_prs() -> int:
@@ -207,36 +262,40 @@ class GithubGqlAdapter(GitAdapter):
                         page_size=page_size,
                     )
 
-                    for api_pr in tqdm(
-                        api_prs,
-                        desc=f'processing prs for {nrm_repo.name} ({nrm_repo.id})',
-                        unit='prs',
+                    for j, api_pr in enumerate(
+                        tqdm(
+                            api_prs,
+                            desc=f'processing prs for {nrm_repo.name} ({nrm_repo.id})',
+                            unit='prs',
+                        ),
+                        start=1,
                     ):
-                        try:
-                            updated_at = parser.parse(api_pr['updatedAt'])
+                        with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
+                            try:
+                                updated_at = parser.parse(api_pr['updatedAt'])
 
-                            # PRs are ordered newest to oldest
-                            # if this is too old, we're done with this repo
-                            if pull_since and updated_at < pull_since:
-                                break
+                                # PRs are ordered newest to oldest
+                                # if this is too old, we're done with this repo
+                                if pull_since and updated_at < pull_since:
+                                    break
 
-                            nrm_prs.append(
-                                _normalize_pr(
-                                    api_pr,
-                                    nrm_repo,
-                                    self.config.git_strip_text_content,
-                                    self.config.git_redact_names_and_urls,
+                                nrm_prs.append(
+                                    _normalize_pr(
+                                        api_pr,
+                                        nrm_repo,
+                                        self.config.git_strip_text_content,
+                                        self.config.git_redact_names_and_urls,
+                                    )
                                 )
-                            )
-                        except Exception as e:
-                            # if something goes wrong with normalizing one of the prs - don't stop pulling. try
-                            # the next one.
-                            pr_id = f' {api_pr["id"]}' if api_pr else ''
-                            log_and_print_request_error(
-                                e,
-                                f'normalizing PR {pr_id} from repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
-                                log_as_exception=True,
-                            )
+                            except Exception as e:
+                                # if something goes wrong with normalizing one of the prs - don't stop pulling. try
+                                # the next one.
+                                pr_id = f' {api_pr["id"]}' if api_pr else ''
+                                log_and_print_request_error(
+                                    e,
+                                    f'normalizing PR {pr_id} from repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
+                                    log_as_exception=True,
+                                )
 
                 except Exception as e:
                     # if something happens when pulling PRs for a repo, just keep going.

@@ -321,7 +321,11 @@ def load_and_dump_git(
 
             if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
                 GithubGqlAdapter(
-                    config, outdir, compress_output_files, git_connection
+                    config,
+                    outdir,
+                    compress_output_files,
+                    git_connection,
+                    server_git_instance_info=endpoint_git_instance_info,
                 ).load_and_dump_git(endpoint_git_instance_info)
             else:
                 # using old func method, todo: refactor to use GitAdapter
