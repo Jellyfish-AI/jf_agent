@@ -139,8 +139,11 @@ class GithubGqlAdapter(GitAdapter):
                             most_recent_commit['committedDate']
                         )
                         # Get our internal 'pull_from' value
-                        pull_since_for_commits = pull_since_date_for_repo(
-                            self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
+                        pull_since_for_commits = (
+                            pull_since_date_for_repo(
+                                self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
+                            )
+                            or datetime.min
                         )
 
                         # Mark if we can skip pulling this branch or not
@@ -160,8 +163,11 @@ class GithubGqlAdapter(GitAdapter):
                     # Translate latest PR detected from API
                     latest_pr_update = github_gql_format_to_datetime(prs[0]['updatedAt'])
                     # Get our own pull since value
-                    pull_since_for_prs = pull_since_date_for_repo(
-                        self.server_git_instance_info, nrm_project.login, repo_id, 'prs'
+                    pull_since_for_prs = (
+                        pull_since_date_for_repo(
+                            self.server_git_instance_info, nrm_project.login, repo_id, 'prs'
+                        )
+                        or datetime.min
                     )
 
                     # Mark if we can skip this PR or not
@@ -193,8 +199,11 @@ class GithubGqlAdapter(GitAdapter):
         print('downloading github commits on included branches... ', end='', flush=True)
         for i, nrm_repo in enumerate(normalized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
-                pull_since = pull_since_date_for_repo(
-                    server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
+                pull_since = (
+                    pull_since_date_for_repo(
+                        server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
+                    )
+                    or datetime.min
                 )
 
                 for branch_name in get_branches_for_normalized_repo(nrm_repo, included_branches):
