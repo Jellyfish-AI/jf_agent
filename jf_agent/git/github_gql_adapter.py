@@ -256,33 +256,17 @@ class GithubGqlAdapter(GitAdapter):
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
+                    # Check if we flagged this repo as quiescent
+                    if self.repo_has_quiescent_prs_lookup[nrm_repo.id]:
+                        continue
+
                     pull_since = pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
                     )
 
-                    if self.repo_has_quiescent_prs_lookup[nrm_repo.id]:
-                        continue
-
-                    # This will return a page size between 0 and 25 (upper bound set by GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY)
-                    def _get_pagesize_for_prs() -> int:
-                        api_prs_updated_at_only = self.client.get_pr_last_update_dates(
-                            login=nrm_repo.project.login,
-                            repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
-                            page_size=GithubGqlClient.MAX_PAGE_SIZE_FOR_PR_QUERY,
-                        )
-                        updated_at_values = [
-                            1
-                            for api_pr in api_prs_updated_at_only
-                            if pull_since and parser.parse(api_pr['updatedAt']) >= pull_since
-                        ]
-                        return len(updated_at_values)
-
-                    page_size = _get_pagesize_for_prs()
-
                     api_prs = self.client.get_prs(
                         login=nrm_repo.project.login,
                         repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
-                        page_size=page_size,
                         include_top_level_comments=self.jf_options.get(
                             'get_all_issue_comments', False
                         ),
@@ -301,8 +285,10 @@ class GithubGqlAdapter(GitAdapter):
                                 updated_at = parser.parse(api_pr['updatedAt'])
 
                                 # PRs are ordered newest to oldest
-                                # if this is too old, we're done with this repo
-                                if pull_since and updated_at < pull_since:
+                                # if this is too old, we're done with this repo.
+                                # This is an INCLUSIVE check, to stop us from grabbing
+                                # the last PR that is our marker for pull_since!
+                                if pull_since and pull_since >= updated_at:
                                     break
 
                                 nrm_prs.append(
