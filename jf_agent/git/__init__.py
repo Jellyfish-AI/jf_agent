@@ -290,6 +290,7 @@ def load_and_dump_git(
     outdir: str,
     compress_output_files: bool,
     git_connection,
+    jf_options: dict,
 ):
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
@@ -326,6 +327,7 @@ def load_and_dump_git(
                     compress_output_files,
                     git_connection,
                     server_git_instance_info=endpoint_git_instance_info,
+                    jf_options=jf_options,
                 ).load_and_dump_git(endpoint_git_instance_info)
             else:
                 # using old func method, todo: refactor to use GitAdapter
