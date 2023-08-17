@@ -377,7 +377,7 @@ class GithubGqlClient:
     #
     def _get_pr_comments_query_block(self, enable_paging: bool = False):
         return f"""
-            commentsQuery: comments(first: 50{', after: %s' if enable_paging else ''}) {{
+            commentsQuery: comments(first: 100{', after: %s' if enable_paging else ''}) {{
                 {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                 
                 comments: nodes {{
@@ -390,7 +390,8 @@ class GithubGqlClient:
             }}
         """
 
-    # NOTE: There are comments associated with reviews that we need to fetch as well
+    # NOTE: The comments we care about are associated with reviews,
+    # NOT the comments GQL endpoint!
     def _get_pr_reviews_query_block(self, enable_paging: bool = False):
         return f"""
             reviewsQuery: reviews(first: 25{', after: %s' if enable_paging else ''}) {{
@@ -403,7 +404,6 @@ class GithubGqlClient:
                         }}
                         id: databaseId
                         state
-                        # NOTE! We are paging for comments here as well!
                         {self._get_pr_comments_query_block()}
                     }}
                 }}
@@ -492,7 +492,6 @@ class GithubGqlClient:
                                 mergeCommit {{
                                     {self.GITHUB_GQL_COMMIT_FRAGMENT}
                                 }}
-                                {self._get_pr_comments_query_block(enable_paging=False)}
                                 {self._get_pr_reviews_query_block(enable_paging=False)}
                                 {self._get_pr_commits_query_block(enable_paging=False)}
                             }}
@@ -517,25 +516,10 @@ class GithubGqlClient:
                     else api_pr['reviewsQuery']['reviews']
                 )
 
-                # NOTE: COMMENTS ARE WEIRD! They exist in there own API endpoint (these
-                # are typically top level comments in a PR, considered an IssueComment)
-                # but there are also comments associated with each review (typically only one)
-                # Grab top level comments
-                top_level_comments = (
-                    [
-                        comment
-                        for comment in self.get_pr_comments(login, repo_name, pr_number=pr_number)
-                    ]
-                    if api_pr['commentsQuery']['pageInfo']['hasNextPage']
-                    else api_pr['commentsQuery']['comments']
-                )
-
-                # Grab review level comments
-                review_level_comments = [
+                # Grab comments from reviews
+                api_pr['comments'] = [
                     comment for review in reviews for comment in review['commentsQuery']['comments']
                 ]
-
-                api_pr['comments'] = review_level_comments + top_level_comments
 
                 api_pr['reviews'] = reviews
 
@@ -559,29 +543,8 @@ class GithubGqlClient:
 
                 yield api_pr
 
-    def get_pr_comments(
-        self, login: str, repo_name: str, pr_number: int
-    ) -> Generator[dict, None, None]:
-        query_body = f"""{{
-            organization(login: "{login}") {{
-                repo: repository(name: "{repo_name}") {{
-                    pr: pullRequest(number: {pr_number}) {{
-                        ... on PullRequest {{
-                            {self._get_pr_comments_query_block(enable_paging=True)}
-                        }}
-                    }}
-                }}
-            }}
-        }}
-        """
-        for page in self.page_results(
-            query_body=query_body, path_to_page_info='data.organization.repo.pr.commentsQuery'
-        ):
-            for api_pr_comment in page['data']['organization']['repo']['pr']['commentsQuery'][
-                'comments'
-            ]:
-                yield api_pr_comment
-
+    # NOTE: We get comments from each review!
+    # With each review, there is typically 1 comment
     def get_pr_reviews(
         self, login: str, repo_name: str, pr_number: int
     ) -> Generator[dict, None, None]:
