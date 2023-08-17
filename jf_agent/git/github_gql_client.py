@@ -169,21 +169,34 @@ class GithubGqlClient:
                     f'A secondary rate limit was hit. Sleeping for {sleep_time} seconds. (attempt {attempt_number}/{max_attempts})',
                 )
                 time.sleep(sleep_time)
-                attempt_number += 1
             except GqlRateLimitedException:
+                if attempt_number > max_attempts:
+                    raise
+
                 rate_limit_info = self.get_rate_limit(base_url=self.base_url)
                 reset_at: datetime = github_gql_format_to_datetime(rate_limit_info['resetAt'])
-                reset_at_timestamp = reset_at.replace(tzinfo=timezone.utc).timestamp()
+                reset_at_timestamp = reset_at.timestamp()
                 curr_timestamp = datetime.utcnow().timestamp()
-                # Add ten seconds for some extra wiggle room...
-                # Github can be very finicky with it's throttle handling
-                sleep_time = (reset_at_timestamp - curr_timestamp) + 10
+
+                sleep_time = reset_at_timestamp - curr_timestamp
+
+                # Sometimes github gives a reset time way in the
+                # future. But rate limits reset each hour, so don't
+                # wait longer than that
+                sleep_time = min(sleep_time, 3600)
+
+                # Sometimes github gives a reset time in the
+                # past. In that case, wait for 5 mins just in case.
+                if sleep_time <= 0:
+                    sleep_time = 300
                 agent_logging.log_and_print(
                     logger,
                     logging.WARNING,
                     f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',
                 )
                 time.sleep(sleep_time)
+            finally:
+                attempt_number += 1
 
     # Getting the rate limit info is never affected by the current rate limit
     def get_rate_limit(self, base_url: str):
