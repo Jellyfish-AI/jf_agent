@@ -425,33 +425,6 @@ class GithubGqlClient:
             }}
         """
 
-    # Generally, if we are running agent ingest daily, there aren't that many PRs
-    # day to day (for most repos). This function takes this assumption into account and
-    # is a cheap test to see if we should make a big query against PRs.
-    # I.e. it helps with determining the page size for get_prs(),
-    # as well as IF we should call get PRs at all!
-    def get_pr_last_update_dates(
-        self, login: str, repo_name: str, page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY
-    ) -> list[dict]:
-        query_body = f"""{{
-            organization(login: "{login}") {{
-                repo: repository(name: "{repo_name}") {{
-                    prQuery: pullRequests(first: {page_size}, orderBy: {{direction: DESC, field: UPDATED_AT}}, after: null) {{
-                        {self.GITHUB_GQL_PAGE_INFO_BLOCK}
-                        prs: nodes {{
-                            ... on PullRequest {{
-                                updatedAt
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        }}
-        """
-        return self.get_raw_result(query_body=query_body)['data']['organization']['repo'][
-            'prQuery'
-        ]['prs']
-
     # PR query is HUGE, see above GITHUB_GQL_PR_* blocks for reused code
     # page_size is optimally variable. Most repos only have a 0 to a few PRs day to day,
     # so sometimes the optimal page_size is 0. Generally, we should never go over 25
