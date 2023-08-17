@@ -22,6 +22,7 @@ from jf_agent.git import (
 )
 from jf_agent.git.utils import log_and_print_request_error
 from jf_agent import diagnostics, agent_logging
+from jf_agent.main import JellyfishEndpointInfo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent.config_file_reader import GitConfig
 
@@ -46,11 +47,13 @@ class GithubGqlAdapter(GitAdapter):
         compress_output_files: bool,
         client: GithubGqlClient,
         server_git_instance_info: dict,
+        jf_options: dict,
     ):
         super().__init__(config, outdir, compress_output_files)
         self.client = client
 
         self.server_git_instance_info = server_git_instance_info
+        self.jf_options = jf_options
 
         self.repo_id_to_name_lookup: dict = {}
         self.repo_to_branch_is_quiescent_lookups: dict = {}
@@ -280,6 +283,9 @@ class GithubGqlAdapter(GitAdapter):
                         login=nrm_repo.project.login,
                         repo_name=self.repo_id_to_name_lookup[nrm_repo.id],
                         page_size=page_size,
+                        include_top_level_comments=self.jf_options.get(
+                            'get_all_issue_comments', False
+                        ),
                     )
 
                     for j, api_pr in enumerate(

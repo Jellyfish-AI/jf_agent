@@ -140,7 +140,7 @@ def main():
             agent_logging.log_and_print(
                 logger,
                 logging.WARNING,
-                msg=f"Could not validate client/org creds, moving on. Got {e}"
+                msg=f"Could not validate client/org creds, moving on. Got {e}",
             )
 
         print(f'Will write output files into {config.outdir}')
@@ -185,6 +185,7 @@ def main():
                     creds,
                     jellyfish_endpoint_info.jira_info,
                     jellyfish_endpoint_info.git_instance_info,
+                    jellyfish_endpoint_info.jf_options,
                 )
 
                 success = all(s['status'] == 'success' for s in download_data_status)
@@ -225,7 +226,9 @@ UserProvidedCreds = namedtuple(
     ],
 )
 
-JellyfishEndpointInfo = namedtuple('JellyfishEndpointInfo', ['jira_info', 'git_instance_info', 'jf_options'])
+JellyfishEndpointInfo = namedtuple(
+    'JellyfishEndpointInfo', ['jira_info', 'git_instance_info', 'jf_options']
+)
 
 required_jira_fields = [
     'issuekey',
@@ -327,7 +330,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
     jira_info = agent_config_from_api.get('jira_info')
     git_instance_info = agent_config_from_api.get('git_instance_info')
     jf_options = agent_config_from_api.get("jf_options", {})
-
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
@@ -478,7 +480,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info):
+def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
     download_data_status = []
 
     if config.jira_url:
@@ -513,6 +515,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                     creds,
                     endpoint_git_instances_info,
                     len(config.git_configs) > 1,
+                    jf_options,
                 )
             )
 
@@ -520,7 +523,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
 
 def _download_git_data(
-    git_config, config, creds, endpoint_git_instances_info, is_multi_git_config
+    git_config, config, creds, endpoint_git_instances_info, is_multi_git_config, jf_options
 ) -> dict:
     if is_multi_git_config:
         instance_slug = git_config.git_instance_slug
@@ -543,6 +546,7 @@ def _download_git_data(
         outdir=config.outdir,
         compress_output_files=config.compress_output_files,
         git_connection=git_connection,
+        jf_options=jf_options,
     )
 
 

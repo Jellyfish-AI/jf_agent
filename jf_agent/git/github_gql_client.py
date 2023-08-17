@@ -390,7 +390,7 @@ class GithubGqlClient:
     #
     def _get_pr_comments_query_block(self, enable_paging: bool = False):
         return f"""
-            commentsQuery: comments(first: 50{', after: %s' if enable_paging else ''}) {{
+            commentsQuery: comments(first: 100{', after: %s' if enable_paging else ''}) {{
                 {self.GITHUB_GQL_PAGE_INFO_BLOCK}
                 
                 comments: nodes {{
@@ -469,7 +469,11 @@ class GithubGqlClient:
     # page_size is optimally variable. Most repos only have a 0 to a few PRs day to day,
     # so sometimes the optimal page_size is 0. Generally, we should never go over 25
     def get_prs(
-        self, login: str, repo_name: str, page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY
+        self,
+        login: str,
+        repo_name: str,
+        include_top_level_comments: bool = False,
+        page_size: int = MAX_PAGE_SIZE_FOR_PR_QUERY,
     ) -> Generator[dict, None, None]:
         query_body = f"""{{
             organization(login: "{login}") {{
@@ -505,7 +509,7 @@ class GithubGqlClient:
                                 mergeCommit {{
                                     {self.GITHUB_GQL_COMMIT_FRAGMENT}
                                 }}
-                                {self._get_pr_comments_query_block(enable_paging=False)}
+                                {self._get_pr_comments_query_block(enable_paging=False) if include_top_level_comments else ''}
                                 {self._get_pr_reviews_query_block(enable_paging=False)}
                                 {self._get_pr_commits_query_block(enable_paging=False)}
                             }}
@@ -533,22 +537,27 @@ class GithubGqlClient:
                 # NOTE: COMMENTS ARE WEIRD! They exist in there own API endpoint (these
                 # are typically top level comments in a PR, considered an IssueComment)
                 # but there are also comments associated with each review (typically only one)
-                # Grab top level comments
-                top_level_comments = (
-                    [
-                        comment
-                        for comment in self.get_pr_comments(login, repo_name, pr_number=pr_number)
-                    ]
-                    if api_pr['commentsQuery']['pageInfo']['hasNextPage']
-                    else api_pr['commentsQuery']['comments']
-                )
+                # The baseline for what we care about is the Review Level comment, pulled from
+                # the reviews endpoint. Grabbing Top Level Comments is an optional feature flag
 
-                # Grab review level comments
-                review_level_comments = [
+                # Grab the comments pulled from reviews. We ALWAYS want these!
+                api_pr['comments'] = [
                     comment for review in reviews for comment in review['commentsQuery']['comments']
                 ]
 
-                api_pr['comments'] = review_level_comments + top_level_comments
+                # Grab the potentially optional top level comments
+                if include_top_level_comments:
+                    top_level_comments = (
+                        [
+                            comment
+                            for comment in self.get_pr_top_level_comments(
+                                login, repo_name, pr_number=pr_number
+                            )
+                        ]
+                        if api_pr['commentsQuery']['pageInfo']['hasNextPage']
+                        else api_pr['commentsQuery']['comments']
+                    )
+                    api_pr['comments'].extend(top_level_comments)
 
                 api_pr['reviews'] = reviews
 
@@ -572,7 +581,7 @@ class GithubGqlClient:
 
                 yield api_pr
 
-    def get_pr_comments(
+    def get_pr_top_level_comments(
         self, login: str, repo_name: str, pr_number: int
     ) -> Generator[dict, None, None]:
         query_body = f"""{{
