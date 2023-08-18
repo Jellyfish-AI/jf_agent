@@ -521,7 +521,7 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options, dist_repos=False):
+def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
     download_data_status = []
 
     if config.jira_url:
@@ -540,8 +540,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
 
-        if dist_repos:  # TODO: use a queue for threads to pull from & support include/exclude repos
+        if jf_options.get('distribute_repos', False):
             metadata_by_project = validate_num_repos(git_configs=config.git_configs, creds=creds)
+            # TODO: use a queue for threads to pull from & support include/exclude repos
             git_configs = distribute_repos_between_workers(config.git_configs, metadata_by_project)
         else:
             git_configs = config.git_configs
