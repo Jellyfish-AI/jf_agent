@@ -26,7 +26,7 @@ from jf_agent.data_manifests.jira.generator import create_manifest as create_jir
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
 from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config
+from jf_agent.config_file_reader import obtain_config, GitConfig
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -34,7 +34,7 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
-from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos
+from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos, ProjectMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ def main():
             agent_logging.log_and_print(
                 logger,
                 logging.WARNING,
-                msg=f"Could not validate client/org creds, moving on. Got {e}",
+                msg=f"Could not validate client/org creds, moving on. Got {e}"
             )
 
         print(f'Will write output files into {config.outdir}')
@@ -478,9 +478,50 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     )
 
 
+# far more straightforward than real bin packing because we have a set number of bins to start
+def _pack_bins(num_bins: int, packing_items: list[ProjectMetadata]) -> list:
+    bins = [[] for i in range(num_bins)]
+    bin_size = [0 for i in range(num_bins)]  # size is based on number of *repos* in a bin, not projects
+
+    for item in packing_items:
+        smallest_bin_index = min(range(len(bin_size)), key=bin_size.__getitem__)
+        bins[smallest_bin_index].append(item)
+        bin_size[smallest_bin_index] += item.num_repos
+
+    return bins
+
+
+def distribute_repos_between_workers(git_configs, metadata_by_project):
+
+    projects_to_be_distributed = []
+    configs_can_be_distributed = set()
+    configs_cannot_be_distributed = set()
+    for project in metadata_by_project:
+        if len(metadata_by_project[project].valid_creds) > 1:
+            for prefix in metadata_by_project[project].valid_creds: configs_can_be_distributed.add(prefix)
+            projects_to_be_distributed.append(metadata_by_project[project])
+        else:
+            configs_cannot_be_distributed.add(metadata_by_project[project].valid_creds[0])
+
+    projects_to_be_distributed.sort(key=lambda p: p.num_repos, reverse=True)  # desc so that largest project goes first
+    # naively assume only distributing between one set (ie n number of 1:1 cred:org projects and y number cred x 2:org)
+    # will be feature flagged by company (so no guesswork)
+    num_bins = len(projects_to_be_distributed[0].valid_creds)
+    bins = _pack_bins(num_bins=num_bins, packing_items=projects_to_be_distributed)
+
+    bin_index = 0
+    for prefix in configs_can_be_distributed:
+        for config in git_configs:
+            if config.creds_envvar_prefix == prefix:
+                config.git_include_projects = [project.project_name for project in bins[bin_index]]
+                bin_index += 1
+
+    return git_configs
+
+
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
-def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
+def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options, dist_repos=False):
     download_data_status = []
 
     if config.jira_url:
@@ -498,7 +539,14 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
-        for git_config in config.git_configs:
+
+        if dist_repos:  # TODO: use a queue for threads to pull from & support include/exclude repos
+            metadata_by_project = validate_num_repos(git_configs=config.git_configs, creds=creds)
+            git_configs = distribute_repos_between_workers(config.git_configs, metadata_by_project)
+        else:
+            git_configs = config.git_configs
+
+        for git_config in git_configs:
             agent_logging.log_and_print(
                 logger,
                 logging.INFO,
