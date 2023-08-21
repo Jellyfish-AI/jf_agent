@@ -492,7 +492,9 @@ def _pack_bins(num_bins: int, packing_items: list[ProjectMetadata]) -> list:
 
 
 def distribute_repos_between_workers(git_configs, metadata_by_project):
-
+    agent_logging.log_and_print(
+        logger, logging.INFO, f'Starting to distribute projects/ repos between workers'
+    )
     projects_to_be_distributed = []
     configs_can_be_distributed = set()
     configs_cannot_be_distributed = set()
@@ -503,18 +505,32 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
         else:
             configs_cannot_be_distributed.add(metadata_by_project[project].valid_creds[0])
 
+    agent_logging.log_and_print(
+        logger, logging.INFO, f'{len(configs_can_be_distributed)} of {len(git_configs)} '
+                              f'configs can have projects distributed'
+    )
     projects_to_be_distributed.sort(key=lambda p: p.num_repos, reverse=True)  # desc so that largest project goes first
     # naively assume only distributing between one set (ie n number of 1:1 cred:org projects and y number cred x 2:org)
     # will be feature flagged by company (so no guesswork)
     num_bins = len(projects_to_be_distributed[0].valid_creds)
+    agent_logging.log_and_print(logger, logging.INFO, f'Before packing:')
+    for git_config in git_configs:
+        agent_logging.log_and_print(
+            logger, logging.INFO, f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
+
     bins = _pack_bins(num_bins=num_bins, packing_items=projects_to_be_distributed)
 
     bin_index = 0
     for prefix in configs_can_be_distributed:
-        for config in git_configs:
-            if config.creds_envvar_prefix == prefix:
-                config.git_include_projects = [project.project_name for project in bins[bin_index]]
+        for git_config in git_configs:
+            if git_config.creds_envvar_prefix == prefix:
+                git_config.git_include_projects = [project.project_name for project in bins[bin_index]]
                 bin_index += 1
+
+    agent_logging.log_and_print(logger, logging.INFO, f'After packing:')
+    for git_config in git_configs:
+        agent_logging.log_and_print(
+            logger, logging.INFO, f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
 
     return git_configs
 
@@ -552,7 +568,8 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 logger,
                 logging.INFO,
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
-                + f'in parallel with {config.git_max_concurrent} workers'
+                + f'in parallel with {config.git_max_concurrent} workers, '
+                  f'for {len(git_config.git_include_projects)} projects'
                 if len(config.git_configs) > 1
                 else "...",
             )
