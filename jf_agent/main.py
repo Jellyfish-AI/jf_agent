@@ -569,7 +569,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 logging.INFO,
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
                 + f'in parallel with {config.git_max_concurrent} workers, '
-                  f'for {len(git_config.git_include_projects)} projects'
+                + f'for {len(git_config.git_include_projects)} projects'
                 if len(config.git_configs) > 1
                 else "...",
             )
