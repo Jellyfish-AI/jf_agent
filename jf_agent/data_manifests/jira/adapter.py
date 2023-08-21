@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import partial
 import traceback
 from typing import Callable, Generator
+from jf_agent import agent_logging
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
@@ -16,7 +17,10 @@ class JiraCloudManifestAdapter:
         self.company_slug = company_slug
         self.jira_connection = get_basic_jira_connection(config, creds)
         self.config = config
-        self.jira_url = config.jira_url
+
+        # Sanity check: remove trailing slash because
+        # it doesn't play nice with JIRA API endpoints
+        self.jira_url = config.jira_url[:-1] if config.jira_url.endswith('/') else config.jira_url
 
         self._boards_cache = []
         self._projects_cache = []
@@ -75,11 +79,27 @@ class JiraCloudManifestAdapter:
 
     def _get_all_projects(self) -> list[dict]:
         if not self._projects_cache:
+            if self.config.jira_gdpr_active:
+                all_projects = [
+                    project
+                    for project in self._page_get_results(
+                        url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
+                    )
+                ]
+            # Different endpoint for Jira Server
+            else:
+                all_projects = [
+                    project
+                    for project in self._get_raw_result(
+                        url=f'{self.jira_url}/rest/api/latest/project?includedArchived=True'
+                    )
+                ]
+
+            # Filter for only projects that are included in the config
             self._projects_cache = [
                 project
-                for project in self._page_get_results(
-                    url=f'{self.jira_url}/rest/api/latest/project/search?startAt=%s&maxResults=500&status=archived&status=live'
-                )
+                for project in all_projects
+                if project['key'] in self.config.jira_include_projects
             ]
 
         return self._projects_cache
@@ -101,29 +121,6 @@ class JiraCloudManifestAdapter:
         result = self._get_jql_search(jql_search="", max_results=0)
         return result['total']
 
-    def get_boards_count_for_project(self, project_id: int) -> int:
-        return sum(
-            [
-                1
-                for board in self._get_all_boards()
-                # Boards can come from a ew different places and thus
-                # a few different formats. We only care about project
-                # boards, though, which have the 'location' dict
-                # and the 'projectId' key within that dict
-                if (
-                    'location' in board
-                    and 'projectId' in board['location']
-                    and board['location']['projectId'] == project_id
-                )
-            ]
-        )
-
-    def get_board_ids(self, project_id: int):
-        result = self._get_raw_result(
-            url=f'{self.jira_url}/rest/agile/1.0/board?projectKeyOrId={project_id}&startAt=0&maxResults=100'
-        )
-        return [value['id'] for value in result['values']]
-
     def _get_all_boards(self):
         if not self._boards_cache:
             self._boards_cache = [
@@ -134,11 +131,6 @@ class JiraCloudManifestAdapter:
             ]
 
         return self._boards_cache
-
-    def get_projects_count(self) -> int:
-        url = f'{self.jira_url}/rest/api/latest/project/search?startAt=0&maxResults=0&status=archived&status=live'
-        result = self._get_raw_result(url=url)
-        return result['total']
 
     def get_project_versions_count(self) -> int:
         total_project_versions = 0
@@ -152,42 +144,6 @@ class JiraCloudManifestAdapter:
     def get_boards_count(self) -> int:
         return len([b for b in self._func_paginator(func_endpoint=self.jira_connection.boards)])
 
-    def get_sprints_count(self) -> int:
-        def _get_sprints_for_board(board_id: int):
-            total_sprints_for_board = 0
-            try:
-                total_sprints_for_board += len(
-                    [
-                        sprint
-                        for sprint in self._page_get_results(
-                            url=f'{self.jira_url}/rest/agile/1.0/board/{board_id}/sprint?startAt=%s&maxResults=100'
-                        )
-                    ]
-                )
-            except JIRAError as e:
-                # JIRA returns 500 errors for various reasons: board is
-                # misconfigured; "failed to execute search"; etc.  Just
-                # skip and move on
-                if e.status_code == 500 or e.status_code == 400:
-                    pass
-                else:
-                    raise
-
-            return total_sprints_for_board
-
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = []
-            for board in self._page_get_results(
-                url=f'{self.jira_url}/rest/agile/1.0/board?startAt=%s&maxResults=100'
-            ):
-                futures.append(executor.submit(_get_sprints_for_board, board["id"]))
-            futures = [
-                executor.submit(_get_sprints_for_board, board["id"])
-                for board in self._get_all_boards()
-            ]
-
-            return sum([future.result() for future in futures if future])
-
     def test_basic_auth_for_project(self, project_id: int) -> bool:
         # Doing a basic query for issues is the best way to test auth.
         # Catch and error, if it happens, and bubble up more specific error
@@ -196,20 +152,18 @@ class JiraCloudManifestAdapter:
             return True
         except JIRAError:
             return False
-        except Exception:
+        except Exception as e:
             # This is unexpected behavior and it should never happen, log the error
             # before returning
-            print(
+            agent_logging.log_and_print(
                 'Unusual exception encountered when testing auth. '
-                f'JIRAError was expected but the following error was raised: {traceback.format_exc()}'
+                'This should not affect agent uploading. '
+                f'JIRAError was expected but the following error was raised: {e}'
             )
             return False
 
     def get_issues_count_for_project(self, project_id: int) -> int:
         return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
-
-    def get_issues_data_count_for_project(self, project_id: int) -> int:
-        return self.get_issues_count_for_project(project_id=project_id)
 
     def _get_raw_result(self, url) -> dict:
         response = self.jira_connection._session.get(url)

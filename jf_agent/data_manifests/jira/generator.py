@@ -64,8 +64,6 @@ def create_manifest(company_slug, config, creds):
 
         _agent_log(f'Done processing {len(project_data_dicts)} Jira Projects!')
 
-        _agent_log('Processing Jira Global Values (this make take up to 15 more minutes)')
-
         # Load base Jira Manifest object from globals generator
         jira_manifest = generate_base_manifest_future.result()
         # Append additional manifests (only project manifests, for now)
@@ -86,7 +84,6 @@ def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> Jira
     total_issue_link_types_count = manifest_adapter.get_issue_link_types_count()
     total_priorities_count = manifest_adapter.get_priorities_count()
     total_boards_count = manifest_adapter.get_boards_count()
-    total_sprints_count = manifest_adapter.get_sprints_count()
     project_data_dicts = manifest_adapter.get_project_data_dicts()
     project_versions_count = manifest_adapter.get_project_versions_count()
     issues_count = manifest_adapter.get_issues_count()
@@ -102,7 +99,6 @@ def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> Jira
         priorities_count=total_priorities_count,
         projects_count=len(project_data_dicts),
         boards_count=total_boards_count,
-        sprints_count=total_sprints_count,
         project_versions_count=project_versions_count,
         issues_count=issues_count,
         # The following fields must be filled out after processing
@@ -127,7 +123,6 @@ def generate_project_manifest(
                 f'Exception encountered when trying to do basic auth test against Jira Project {project_key}. It is very likely that we do not have permissions to this Project.'
             )
 
-        board_count = manifest_adapter.get_boards_count_for_project(project_id=project_id)
         issues_count = manifest_adapter.get_issues_count_for_project(project_id=project_id)
         version_count = manifest_adapter.get_project_versions_count_for_project(
             project_id=project_id
@@ -139,7 +134,6 @@ def generate_project_manifest(
             project_id=project_id,
             project_key=project_key,
             issues_count=issues_count,
-            board_count=board_count,
             version_count=version_count,
         )
     except JIRAError as e:

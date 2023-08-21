@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import logging
 import pytz
 import requests
-from requests import HTTPError
+from requests import HTTPError, Response
 from requests.utils import default_user_agent
 import time
 
@@ -27,6 +27,13 @@ class GithubClient:
                 'Authorization': f'token {token}',
             }
         )
+
+    def get_scopes_of_api_token(self):
+        # Make an empty call against the orgs API to be quick
+        # and get the OAuth scopes
+        url = f'{self.base_url}/orgs/'
+        result = self.session.get(url)
+        return result.headers.get('X-OAuth-Scopes')
 
     def get_organization_by_name(self, org):
         url = f'{self.base_url}/orgs/{org}'

@@ -8,7 +8,6 @@ from jf_agent.data_manifests.manifest import Manifest, ManifestSource
 IGitDataManifest = TypeVar('IGitDataManifest', bound='GitDataManifest')
 IGitRepoManifest = TypeVar('IGitRepoManifest', bound='GitRepoManifest')
 IGitUserManifest = TypeVar('IGitUserManifest', bound='GitUserManifest')
-IGitTeamManifest = TypeVar('IGitTeamManifest', bound='GitTeamManifest')
 IGitPullRequestManifest = TypeVar('IGitPullRequestManifest', bound='GitPullRequestManifest')
 
 # This is the parent class for all GitManifest type classes. It inherits
@@ -32,11 +31,9 @@ class GitManifest(Manifest):
 @dataclass
 class GitDataManifest(GitManifest):
     users_count: int
-    teams_count: int
     repos_count: int
     repo_manifests: list[IGitRepoManifest]
     user_manifests: list[IGitUserManifest]
-    team_manifests: list[IGitTeamManifest]
 
     def _find_unique_manifests(
         self, minuend_list: list[Manifest], subtrahend_list: list[Manifest]
@@ -52,25 +49,6 @@ class GitDataManifest(GitManifest):
     # Function used for doing class comparisons
     def get_manifest_full_name(self):
         return super().get_manifest_full_name()
-
-
-@dataclass
-class GitTeamManifest(GitManifest):
-
-    team_id: str
-    slug: str
-    name: str
-    member_count: int
-
-    # Function used for doing class comparisons
-    def get_manifest_full_name(self):
-        return f'{super().get_manifest_full_name()}_{self.team_id}'
-
-    def __hash__(self):
-        return super().__hash__()
-
-    def __eq__(self, __o: IGitRepoManifest) -> bool:
-        return super().__eq__(__o)
 
 
 @dataclass

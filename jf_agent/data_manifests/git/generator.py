@@ -8,7 +8,6 @@ from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapte
 from jf_agent.data_manifests.git.manifest import (
     GitDataManifest,
     GitRepoManifest,
-    GitTeamManifest,
     GitUserManifest,
 )
 from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
@@ -49,8 +48,8 @@ def create_manifests(
             if not instance_slug:
                 agent_logging.log_and_print(
                     logger,
-                    logging.ERROR,
-                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded',
+                    logging.WARNING,
+                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded. This should NOT affect your agent upload',
                 )
                 continue
 
@@ -73,7 +72,6 @@ def create_manifests(
 
                 repo_manifests: list[GitRepoManifest] = []
                 user_manifests: list[GitUserManifest] = []
-                team_manifests: list[GitTeamManifest] = []
 
                 # Process Repos
                 repos_count = manifest_adapter.get_repos_count()
@@ -115,14 +113,6 @@ def create_manifests(
                 ]
                 agent_logging.log_and_print(logger, logging.INFO, 'Done processing Users')
 
-                # Process Teams
-                teams_count = manifest_adapter.get_teams_count()
-                agent_logging.log_and_print(logger, logging.INFO, f'Processing {teams_count} teams')
-                team_manifests += [
-                    team_manifest for team_manifest in manifest_adapter.get_all_team_data()
-                ]
-                agent_logging.log_and_print(logger, logging.INFO, 'Done processing Teams')
-
                 manifests.append(
                     GitDataManifest(
                         data_source=ManifestSource.remote,
@@ -130,22 +120,24 @@ def create_manifests(
                         instance=instance_slug,
                         org=org,
                         users_count=users_count,
-                        teams_count=teams_count,
                         repos_count=repos_count,
                         repo_manifests=repo_manifests,
                         user_manifests=user_manifests,
-                        team_manifests=team_manifests,
                     )
                 )
         except UnsupportedGitProvider as e:
             agent_logging.log_and_print(
-                logger, logging.ERROR, f'Unsupported Git Provider exception encountered. {e}'
+                logger,
+                logging.WARNING,
+                'Unsupported Git Provider exception encountered. '
+                f'This shouldn\'t affect your agent upload. Error: {e}',
             )
-        except Exception:
+        except Exception as e:
             agent_logging.log_and_print(
                 logger,
-                logging.ERROR,
-                f'An exception happened when creating manifest. Err: {traceback.format_exc()}',
+                logging.WARNING,
+                'An exception happened when creating manifest. This shouldn\'t affect your agent upload. '
+                f'Exception: {e}',
             )
 
     return manifests
@@ -159,5 +151,9 @@ def get_manifest_adapter(
             f'Currently only instances of source github are supported, cannot process instance {instance} which has git_provider type {git_config.git_provider}'
         )
     return GithubManifestGenerator(
-        token=git_creds['github_token'], company=company_slug, instance=instance, org=org
+        token=git_creds['github_token'],
+        base_url=git_config.git_url,
+        company=company_slug,
+        instance=instance,
+        org=org,
     )

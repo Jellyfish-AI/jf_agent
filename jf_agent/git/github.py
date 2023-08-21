@@ -34,8 +34,24 @@ def load_and_dump(
     outdir: str,
     compress_output_files: bool,
     endpoint_git_instance_info: dict,
-    git_conn,
+    git_conn: GithubClient,
 ):
+    # Logic to help with debugging the scopes that clients have with their API key
+    try:
+        scopes = git_conn.get_scopes_of_api_token()
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            'Attempting to ingest github data with the following '
+            f'scopes for {config.git_instance_slug}: {scopes}',
+        )
+    except Exception as e:
+        agent_logging.log_and_print(
+            logger,
+            logging.INFO,
+            f'Problem finding scopes for your API key. This should not affect your github agent processing. Error: {e}',
+        )
+
     write_file(
         outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
     )
