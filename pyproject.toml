@@ -45,3 +45,43 @@ exclude = '''
   | \.txt$
 )
 '''
+
+[tool.pdm]
+[[tool.pdm.source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "requests-mock",
+]
+[project]
+name = "jf_agent"
+version = "0.0.1"
+description = "An agent that can run on-premise to download and send data to Jellyfish."
+authors = [
+    {name = "jellyfish-oss", email = "oss@jellyfish.co"},
+]
+dependencies = [
+    "urllib3>=1.26.5",
+    "pyyaml>=4.21b",
+    "jira<2.1,>=2.0.0",
+    "tqdm",
+    "stashy",
+    "dateparser",
+    "jsonstreams",
+    "psutil",
+    "python-gitlab",
+    "pre-commit",
+    "black~=19.10b0",
+    "click~=8.0.4",
+    "requests>=2.31.0",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

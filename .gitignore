@@ -146,3 +146,5 @@ output
 docs/.jekyll-cache
 docs/_site
 /docs/node_modules/
+
+.pdm-python
