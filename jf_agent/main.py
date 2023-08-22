@@ -509,6 +509,11 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
         logger, logging.INFO, f'{len(configs_can_be_distributed)} of {len(git_configs)} '
                               f'configs can have projects distributed'
     )
+    if len(configs_can_be_distributed) < 1:
+        agent_logging.log_and_print(
+            logger, logging.INFO, f'No configs can be distributed, moving on'
+        )
+        return git_configs
     projects_to_be_distributed.sort(key=lambda p: p.num_repos, reverse=True)  # desc so that largest project goes first
     # naively assume only distributing between one set (ie n number of 1:1 cred:org projects and y number cred x 2:org)
     # will be feature flagged by company (so no guesswork)
@@ -569,7 +574,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 logging.INFO,
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
                 + f'in parallel with {config.git_max_concurrent} workers, '
-                + f'for {len(git_config.git_include_projects)} projects'
+                +  f'for {len(git_config.git_include_projects)} projects'
                 if len(config.git_configs) > 1
                 else "...",
             )
