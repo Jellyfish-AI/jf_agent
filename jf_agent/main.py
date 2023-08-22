@@ -562,9 +562,16 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
 
         if jf_options.get('normalize_project_distribution', False):
-            metadata_by_project = validate_num_repos(git_configs=config.git_configs, creds=creds)
-            # TODO: use a queue for threads to pull from & support include/exclude repos
-            git_configs = distribute_repos_between_workers(config.git_configs, metadata_by_project)
+            try:
+                metadata_by_project = validate_num_repos(git_configs=config.git_configs, creds=creds)
+                # TODO: use a queue for threads to pull from & support include/exclude repos
+                git_configs = distribute_repos_between_workers(config.git_configs, metadata_by_project)
+            except Exception as e:
+                agent_logging.log_and_print(
+                    logger,
+                    logging.WARNING,
+                    f'Exception during project distribution, using default config and moving on. Got: {e}'
+                )
         else:
             git_configs = config.git_configs
 
