@@ -7,25 +7,13 @@ from jira.exceptions import JIRAError
 from requests.exceptions import RequestException
 
 from jf_agent import agent_logging
+from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
+from jf_agent.data_manifests.git.generator import get_manifest_adapter
 from jf_agent.jf_jira import _get_raw_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 
 logger = logging.getLogger(__name__)
-
-
-class ProjectMetadata:
-    project_name = ""
-    valid_creds: list[str] = []
-    num_repos: int = 0
-
-    def __init__(self, project_name="", valid_creds=[], num_repos=0):
-        self.project_name = project_name
-        self.valid_creds = valid_creds
-        self.num_repos = num_repos
-
-    def __str__(self):
-        return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
 def validate_jira(config, creds):
@@ -112,7 +100,6 @@ def validate_jira(config, creds):
 
 
 def validate_num_repos(git_configs, creds):
-    metadata_by_project = {}
     for git_config in git_configs:
         for cred_slug in creds.git_instance_to_creds:
             for project in git_config.git_include_projects:
@@ -122,13 +109,8 @@ def validate_num_repos(git_configs, creds):
                     client = GithubGqlClient(base_url=git_config.git_url, token=token)
                     repo_count = client.get_repos_count(login=project)
                     client.session.close()
-                    if project in metadata_by_project.keys():
-                        metadata_by_project[project].valid_creds.append(cred_slug)
-                    else:
-                        metadata_by_project[project] = ProjectMetadata(
-                            project_name=project, valid_creds=[cred_slug], num_repos=repo_count)
                     msg = f"credentials preface: {cred_slug} " \
-                          f"identified {repo_count} repos in instance {git_config.git_instance_slug}/{project}"
+                          f"identified {repo_count} repos in instance {git_config.git_instance_slug}"
                     agent_logging.log_and_print(logger, logging.INFO, msg=msg)
 
                 except Exception as e:
@@ -138,8 +120,6 @@ def validate_num_repos(git_configs, creds):
                     msg = f"credentials preface: {cred_slug} not valid to config preface: " \
                           f"{git_config.git_instance_slug}, got {e}, moving on."
                     agent_logging.log_and_print(logger, logging.WARNING, msg=msg)
-
-    return metadata_by_project
 
 
 def validate_git(config, creds):

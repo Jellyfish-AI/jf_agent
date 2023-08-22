@@ -26,7 +26,7 @@ from jf_agent.data_manifests.jira.generator import create_manifest as create_jir
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
 from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config, GitConfig
+from jf_agent.config_file_reader import obtain_config
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -34,7 +34,7 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
-from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos, ProjectMetadata
+from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ def main():
             agent_logging.log_and_print(
                 logger,
                 logging.WARNING,
-                msg=f"Could not validate client/org creds, moving on. Got {e}"
+                msg=f"Could not validate client/org creds, moving on. Got {e}",
             )
 
         print(f'Will write output files into {config.outdir}')
