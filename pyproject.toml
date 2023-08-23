@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 skip-string-normalization = true
-target_version = ['py310']
+target_version = ['py37', 'py38']
 include = '\.pyi?$'
 exclude = '''
 (
@@ -81,6 +81,7 @@ name = "pypi"
 [tool.pdm.dev-dependencies]
 dev = [
     "requests-mock",
+    "pytest>=7.4.0",
 ]
 
 [build-system]
