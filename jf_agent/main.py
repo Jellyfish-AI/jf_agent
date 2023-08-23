@@ -34,7 +34,7 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
-from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos
+from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos, ProjectMetadata
 
 logger = logging.getLogger(__name__)
 
