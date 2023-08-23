@@ -1,3 +1,4 @@
+import os
 import requests_mock
 import time
 import json
@@ -100,7 +101,9 @@ class TestJiraDownload(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.jira_connection = get_connection()
-        with open("tests/test_data/jira/test_issues_response.json", "r") as issues_file:
+        with open(
+            f"{os.path.dirname(__file__)}/test_data/jira/test_issues_response.json", "r"
+        ) as issues_file:
             issue_json = issues_file.read()
         cls.mock_response = issue_json
 
