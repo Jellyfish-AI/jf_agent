@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 skip-string-normalization = true
-target_version = ['py310']
+target_version = ['py37', 'py38']
 include = '\.pyi?$'
 exclude = '''
 (
@@ -67,6 +67,7 @@ dependencies = [
     "black~=19.10b0",
     "click~=8.0.4",
     "requests>=2.31.0",
+    "pytest>=7.4.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
