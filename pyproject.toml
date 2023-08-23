@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 skip-string-normalization = true
-target_version = ['py37', 'py38']
+target_version = ['py310']
 include = '\.pyi?$'
 exclude = '''
 (
@@ -68,7 +68,7 @@ dependencies = [
     "click~=8.0.4",
     "requests>=2.31.0",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
