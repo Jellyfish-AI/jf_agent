@@ -11,10 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+      - name: Install pdm
+        run: pip install --user pdm
+      - name: Convert pdm.lock to requirements.txt
+        run: pdm export -o requirements.txt 
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/python@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: monitor
-          args: --project-name=jf_agent --org=jellyfish-k9n
+          args: --project-name=jf_agent --org=jellyfish-k9n --file=requirements.txt
