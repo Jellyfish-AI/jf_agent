@@ -653,24 +653,6 @@ def _download_jira_issues_segment(
         q.put(e)
 
 
-def _split_id_list(jira_issue_ids_segment: list[str]):
-
-    # same logic as `download_all_issue_metadata` for splitting lists of ids
-    max_length = 20000
-    len_issue_ids_string = len(",".join(jira_issue_ids_segment)) + len(jira_issue_ids_segment) * 2 + 200
-    num_pulls = len_issue_ids_string // max_length + 1
-
-    issue_ids_array = []
-    if num_pulls == 1:
-        issue_ids_array.append(jira_issue_ids_segment)
-    else:
-        # Over 20K characters - break up issue_ids evenly based on num_pulls
-        n = len(jira_issue_ids_segment) // num_pulls
-        issue_ids_array = [jira_issue_ids_segment[i: i + n] for i in range(0, len(jira_issue_ids_segment), n)]
-
-    return issue_ids_array
-
-
 def _download_jira_issues_page(
         jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
 ):
@@ -679,57 +661,45 @@ def _download_jira_issues_page(
     '''
     get_changelog = True
 
-    issue_ids_array = []
-    try:
-        issue_ids_array = _split_id_list(jira_issue_ids_segment)
-    except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
-            logger, logging.WARNING,
-            f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list"
-        )
-        issue_ids_array.append(jira_issue_ids_segment)
+    while batch_size > 0:
+        search_params = {
+            'jql': f"id in ({','.join(str(iid) for iid in jira_issue_ids_segment)}) order by id asc",
+            'fields': field_spec,
+            'expand': ['renderedFields'],
+            'startAt': start_at,
+            'maxResults': batch_size,
+        }
+        if get_changelog:
+            search_params['expand'].append('changelog')
 
-    for issue_ids in issue_ids_array:
+        try:
+            resp_json = json_loads(
+                jira_connection._session.post(
+                    url=jira_connection._get_url('search'), data=json.dumps(search_params)
+                )
+            )
+            return _expand_changelog(resp_json['issues'], jira_connection), 0
 
-        while batch_size > 0:
-            search_params = {
-                'jql': f"id in ({','.join(str(iid) for iid in issue_ids)}) order by id asc",
-                'fields': field_spec,
-                'expand': ['renderedFields'],
-                'startAt': start_at,
-                'maxResults': batch_size,
-            }
-            if get_changelog:
-                search_params['expand'].append('changelog')
+        except (json.decoder.JSONDecodeError, JIRAError) as e:
+            if hasattr(e, 'status_code') and e.status_code == 429:
+                # This is rate limiting ("Too many requests")
+                raise
 
-            try:
-                resp_json = json_loads(
-                    jira_connection._session.post(
-                        url=jira_connection._get_url('search'), data=json.dumps(search_params)
+            batch_size = int(batch_size / 2)
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+            )
+            if batch_size == 0:
+                if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
+                    return [], 1
+                elif not get_changelog:
+                    agent_logging.log_and_print_error_or_warning(
+                        logger, logging.WARNING, msg_args=[search_params], error_code=3062,
                     )
-                )
-                return _expand_changelog(resp_json['issues'], jira_connection), 0
-
-            except (json.decoder.JSONDecodeError, JIRAError) as e:
-                if hasattr(e, 'status_code') and e.status_code == 429:
-                    # This is rate limiting ("Too many requests")
-                    raise
-
-                batch_size = int(batch_size / 2)
-                agent_logging.log_and_print_error_or_warning(
-                    logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
-                )
-                if batch_size == 0:
-                    if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
-                        return [], 1
-                    elif not get_changelog:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.WARNING, msg_args=[search_params], error_code=3062,
-                        )
-                        return [], 0
-                    else:
-                        get_changelog = False
-                        batch_size = 1
+                    return [], 0
+                else:
+                    get_changelog = False
+                    batch_size = 1
 
 
 # Sometimes the results of issue search has an incomplete changelog.  Fill it in if so.
