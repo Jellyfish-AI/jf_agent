@@ -683,7 +683,7 @@ def _download_jira_issues_page(
     try:
         issue_ids_array = _split_id_list(jira_issue_ids_segment)
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_and_print(
             logger, logging.WARNING,
             f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list"
         )
