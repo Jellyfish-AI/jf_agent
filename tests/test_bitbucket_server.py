@@ -54,7 +54,7 @@ class TestBitbucketServer(TestCase):
             len(result_projects), len(test_projects), f"project size should be {len(test_projects)}"
         )
 
-        # get_projects returns a list of (api_object, normalized_project). Use the normalized version for verification.
+        # get_projects returns a list of (api_object, standardized_project). Use the standardized version for verification.
         result_project = result_projects[0][1]
         input_project = test_projects[0]
         self.assertEqual(
@@ -110,7 +110,7 @@ class TestBitbucketServer(TestCase):
             result_repos[0][0], mock_repo, "resulting tuple should have input mock as first element"
         )
 
-        # get_repos returns a list of (api_object, normalized_project). Use the normalized version for verification.
+        # get_repos returns a list of (api_object, standardized_project). Use the standardized version for verification.
         result_repo = result_repos[0][1]
         input_repo = test_repos[0]
         self.assertEqual(
@@ -243,12 +243,12 @@ class TestBitbucketServer(TestCase):
             self.assertNotIn(
                 'emailAddress',
                 result_commit['author'].keys(),
-                "author field of commit was not normalized; 'emailAddress' not renamed to 'email'",
+                "author field of commit was not standardized; 'emailAddress' not renamed to 'email'",
             )
             self.assertIn(
                 'login',
                 result_commit['author'].keys(),
-                "author field of commit was not normalized; 'login' not present as username key",
+                "author field of commit was not standardized; 'login' not present as username key",
             )
 
     def test_get_pull_requests(self):

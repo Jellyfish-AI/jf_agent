@@ -225,7 +225,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     print('✓')
 
 
-def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
+def _standardized_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
@@ -266,8 +266,8 @@ def get_commits_for_included_branches(
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly
             # provided in a config, only pull from the repo's default branch.
-            # We are working with the BBS api object rather than a NormalizedRepository here,
-            # so we can not use get_branches_for_normalized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
+            # We are working with the BBS api object rather than a StandardizedRepository here,
+            # so we can not use get_branches_for_standardized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
             branches_to_process = [_get_default_branch_name(api_repo)]
             additional_branch_patterns = included_branches.get(api_repo.get()['name'])
 
@@ -298,15 +298,15 @@ def get_commits_for_included_branches(
                                 tqdm.write(
                                     f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
                                 )
-                            normalized_commit = _normalize_commit(
+                            standardized_commit = _standardized_commit(
                                 commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
                             # commits are ordered newest to oldest
                             # if this is too old, we're done with this repo
-                            if pull_since and normalized_commit['commit_date'] < pull_since:
+                            if pull_since and standardized_commit['commit_date'] < pull_since:
                                 break
 
-                            yield normalized_commit
+                            yield standardized_commit
 
                 except stashy.errors.NotFoundException as e:
                     print(f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...')
@@ -452,7 +452,7 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(
+                        _standardized_commit(
                             c,
                             repo,
                             pr['toRef']['displayId'],
@@ -472,7 +472,7 @@ def get_pull_requests(
                     )
                     commits = []
 
-                normalized_pr = {
+                standardized_pr = {
                     'id': pr['id'],
                     'author': _normalize_user(pr['author']['user']),
                     'title': sanitize_text(pr['title'], strip_text_content),
@@ -510,7 +510,7 @@ def get_pull_requests(
                     'merge_commit': None,
                 }
 
-                yield normalized_pr
+                yield standardized_pr
 
             if skipped_prs > 5:
                 agent_logging.log_and_print(

@@ -4,15 +4,15 @@ from tqdm import tqdm
 
 from jf_agent.git import (
     GithubClient,
-    NormalizedBranch,
-    NormalizedCommit,
-    NormalizedProject,
-    NormalizedPullRequest,
-    NormalizedPullRequestComment,
-    NormalizedPullRequestReview,
-    NormalizedRepository,
-    NormalizedShortRepository,
-    NormalizedUser,
+    StandardizedBranch,
+    StandardizedRepository,
+    StandardizedProject,
+    StandardizedPullRequest,
+    StandardizedPullRequestComment,
+    StandardizedPullRequestComment,
+    StandardizedRepository,
+    StandardizedShortRepository,
+    StandardizedUser,
 )
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.git.utils import get_matching_branches
@@ -132,12 +132,12 @@ def _normalize_user(user):
 
     # raw user, just have email (e.g. from a commit)
     if 'id' not in user:
-        return NormalizedUser(
+        return StandardizedUser(
             id=user['email'], login=user['email'], name=user['name'], email=user['email']
         )
 
     # API user, where github matched to a known account
-    return NormalizedUser(
+    return StandardizedUser(
         id=user['id'], login=user['login'], name=user['name'], email=user['email']
     )
 
@@ -153,7 +153,7 @@ def get_users(client: GithubClient, include_orgs):
 
 
 def _normalize_project(api_org, redact_names_and_urls):
-    return NormalizedProject(
+    return StandardizedProject(
         id=api_org['id'],
         login=api_org['login'],
         name=(
@@ -183,7 +183,7 @@ def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
 
 
 def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls):
-    return NormalizedRepository(
+    return StandardizedRepository(
         id=repo['id'],
         name=(
             repo['name']
@@ -202,7 +202,7 @@ def _normalize_repo(client: GithubClient, org_name, repo, redact_names_and_urls)
             client.get_json(repo['organization']['url']), redact_names_and_urls
         ),
         branches=[
-            NormalizedBranch(
+            StandardizedBranch(
                 name=(
                     b['name']
                     if not redact_names_and_urls
@@ -247,7 +247,7 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
         {'name': commit['commit']['author']['name'], 'email': commit['commit']['author']['email']}
     )
 
-    return NormalizedCommit(
+    return StandardizedRepository(
         hash=commit['sha'],
         url=commit['html_url'] if not redact_names_and_urls else None,
         message=sanitize_text(commit['commit']['message'], strip_text_content),
@@ -263,7 +263,7 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
 
 
 def _normalize_pr_repo(repo, redact_names_and_urls):
-    return NormalizedShortRepository(
+    return StandardizedShortRepository(
         id=repo['id'],
         name=(
             repo['name'] if not redact_names_and_urls else _repo_redactor.redact_name(repo['name'])
@@ -288,8 +288,8 @@ def get_commits_for_included_branches(
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly
             # provided in a config, only pull from the repo's default branch.
-            # We are working with the github api object rather than a NormalizedRepository here,
-            # so we can not use get_branches_for_normalized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
+            # We are working with the github api object rather than a StandardizedRepository here,
+            # so we can not use get_branches_for_standardized_repo as we do in bitbucket_cloud_adapter and gitlab_adapter.
             branches_to_process = [repo['default_branch']]
             additional_branch_patterns = included_branches.get(repo['name'])
 
@@ -342,7 +342,7 @@ def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names
 
 
 def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
-    return NormalizedPullRequest(
+    return StandardizedPullRequest(
         id=pr['number'],
         additions=pr['additions'],
         deletions=pr['deletions'],
@@ -383,7 +383,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
         ],
         merge_commit=_get_merge_commit(client, pr, strip_text_content, redact_names_and_urls),
         comments=[
-            NormalizedPullRequestComment(
+            StandardizedPullRequestComment(
                 user=_normalize_user(client.get_json(c['user']['url'])),
                 body=sanitize_text(c['body'], strip_text_content),
                 created_at=c['created_at'],
@@ -391,7 +391,7 @@ def _normalize_pr(client: GithubClient, pr, strip_text_content, redact_names_and
             for c in client.get_pr_comments(pr['base']['repo']['full_name'], pr['number'])
         ],
         approvals=[
-            NormalizedPullRequestReview(
+            StandardizedPullRequestComment(
                 user=_normalize_user(client.get_json(r['user']['url'])),
                 foreign_id=r['id'],
                 review_state=r['state'],

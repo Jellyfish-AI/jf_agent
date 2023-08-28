@@ -45,7 +45,7 @@ class TestGithub(TestCase):
         # Assert
         self.assertEqual(len(result_projects), 1, "project size should be 1")
 
-        # get_projects returns a list of (api_object, normalized_project). Use the normalized version for verification.
+        # get_projects returns a list of (api_object, standardized_project). Use the standardized version for verification.
         result_project = result_projects[0]
         input_project = test_projects[0]
         self.assertEqual(
@@ -84,7 +84,7 @@ class TestGithub(TestCase):
         # Assert
         self.assertEqual(len(result_repos), 1, "repo size should be 1")
 
-        # get_repos returns a list of (api_object, normalized_project). Use the normalized version for verification.
+        # get_repos returns a list of (api_object, standardized_project). Use the standardized version for verification.
         result_repo = result_repos[0][1]
         test_repo = test_repos[0]
         self.assertEqual(result_repo.id, test_repo['id'], "resulting repo id does not match input")

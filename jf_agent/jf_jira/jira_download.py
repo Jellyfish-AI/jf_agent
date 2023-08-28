@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_users(
-        jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
+    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
 ):
     if not quiet:
         print('downloading jira users... ', end='', flush=True)
@@ -42,7 +42,7 @@ def download_users(
             logger=logger,
             level=logging.INFO,
             msg=f'Page limit reached with {len(jira_users)} users, '
-                'falling back to search by letter method.',
+            'falling back to search by letter method.',
         )
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
@@ -153,7 +153,7 @@ def download_priorities(jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_projects_and_versions(
-        jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
+    jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
     print('downloading jira projects... ', end='', flush=True)
 
@@ -194,9 +194,9 @@ def download_projects_and_versions(
             # but are not actually accessible.  I don't know wtf Black
             # is doing with this formatting, but whatever.
             if (
-                    e.status_code == 400
-                    and e.text
-                    == f"A value with ID '{project_id}' does not exist for the field 'project'."
+                e.status_code == 400
+                and e.text
+                == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
                 agent_logging.log_and_print_error_or_warning(
                     logger, logging.ERROR, msg_args=[project_id], error_code=2112,
@@ -295,8 +295,12 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
                     elif e.status_code == 400:
                         agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, msg_args=[str(b), str(s_start_at), str(e)],
-                            error_code=2203, exc_info=True)
+                            logger,
+                            logging.ERROR,
+                            msg_args=[str(b), str(s_start_at), str(e)],
+                            error_code=2203,
+                            exc_info=True,
+                        )
                     else:
                         raise
 
@@ -349,8 +353,12 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
     # copied logic from jellyfish direct connect
     # don't bail, just skip
     # khardy 2023-03-16
-    agent_logging.log_and_print_error_or_warning(logger, logging.WARNING, msg_args=
-    [f"{type(error)}", issue_jql, start_at, original_batch_size], error_code=3092)
+    agent_logging.log_and_print_error_or_warning(
+        logger,
+        logging.WARNING,
+        msg_args=[f"{type(error)}", issue_jql, start_at, original_batch_size],
+        error_code=3092,
+    )
 
     return {}
 
@@ -358,7 +366,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_all_issue_metadata(
-        jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
+    jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
 ) -> Dict[int, IssueMetadata]:
     print('downloading issue metadata... ', end='', flush=True)
 
@@ -382,7 +390,7 @@ def download_all_issue_metadata(
     else:
         # Over 20K characters - break up project_ids evenly based on num_pulls
         n = len(all_project_ids) // num_pulls
-        project_ids_array = [all_project_ids[i: i + n] for i in range(0, len(all_project_ids), n)]
+        project_ids_array = [all_project_ids[i : i + n] for i in range(0, len(all_project_ids), n)]
 
     all_issue_metadata: Dict[int, IssueMetadata] = {}
     for project_ids in project_ids_array:
@@ -446,8 +454,8 @@ def download_all_issue_metadata(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def detect_issues_needing_sync(
-        issue_metadata_from_jira: Dict[int, IssueMetadata],
-        issue_metadata_from_jellyfish: Dict[int, IssueMetadata],
+    issue_metadata_from_jira: Dict[int, IssueMetadata],
+    issue_metadata_from_jellyfish: Dict[int, IssueMetadata],
 ):
     missing_issue_ids = set()
     already_up_to_date_issue_ids = set()
@@ -469,7 +477,7 @@ def detect_issues_needing_sync(
 
 
 def detect_issues_needing_re_download(
-        downloaded_issue_info, issue_metadata_from_jellyfish, issue_metadata_addl_from_jellyfish
+    downloaded_issue_info, issue_metadata_from_jellyfish, issue_metadata_addl_from_jellyfish
 ):
     issue_keys_changed = []
     for issue_id_str, issue_key in downloaded_issue_info:
@@ -500,12 +508,12 @@ def detect_issues_needing_re_download(
 
 
 def download_necessary_issues(
-        jira_connection,
-        issue_ids_to_download,
-        include_fields,
-        exclude_fields,
-        suggested_batch_size,
-        num_parallel_threads,
+    jira_connection,
+    issue_ids_to_download,
+    include_fields,
+    exclude_fields,
+    suggested_batch_size,
+    num_parallel_threads,
 ):
     '''
     A generator that yields batches of issues, until we've downloaded all of the issues given by
@@ -552,7 +560,7 @@ def download_necessary_issues(
 
     encountered_issue_ids = set()
     with tqdm(
-            desc='downloading jira issues', total=len(issue_ids_to_download), file=sys.stdout
+        desc='downloading jira issues', total=len(issue_ids_to_download), file=sys.stdout
     ) as prog_bar:
         # Read batches from queue
         finished = 0
@@ -619,7 +627,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
 
 @agent_logging.log_entry_exit(logger)
 def _download_jira_issues_segment(
-        thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
+    thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
 ):
     '''
     Each thread's target function.  Downloads 1/nth of the issues necessary, where
@@ -657,7 +665,11 @@ def _split_id_list(jira_issue_ids_segment: list):
 
     # same logic as `download_all_issue_metadata` for splitting lists of ids
     max_length = 20000
-    len_issue_ids_string = len(','.join(str(x) for x in jira_issue_ids_segment)) + len(jira_issue_ids_segment) * 2 + 200
+    len_issue_ids_string = (
+        len(','.join(str(x) for x in jira_issue_ids_segment))
+        + len(jira_issue_ids_segment) * 2
+        + 200
+    )
     num_pulls = len_issue_ids_string // max_length + 1
 
     issue_ids_array = []
@@ -666,13 +678,15 @@ def _split_id_list(jira_issue_ids_segment: list):
     else:
         # Over 20K characters - break up issue_ids evenly based on num_pulls
         n = len(jira_issue_ids_segment) // num_pulls
-        issue_ids_array = [jira_issue_ids_segment[i: i + n] for i in range(0, len(jira_issue_ids_segment), n)]
+        issue_ids_array = [
+            jira_issue_ids_segment[i : i + n] for i in range(0, len(jira_issue_ids_segment), n)
+        ]
 
     return issue_ids_array
 
 
 def _download_jira_issues_page(
-        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+    jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
 ):
     '''
     Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
@@ -684,8 +698,9 @@ def _download_jira_issues_page(
         issue_ids_array = _split_id_list(jira_issue_ids_segment)
     except Exception as e:
         agent_logging.log_and_print(
-            logger, logging.WARNING,
-            f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list"
+            logger,
+            logging.WARNING,
+            f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list",
         )
         issue_ids_array.append(jira_issue_ids_segment)
 
@@ -717,7 +732,11 @@ def _download_jira_issues_page(
 
                 batch_size = int(batch_size / 2)
                 agent_logging.log_and_print_error_or_warning(
-                    logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+                    logger,
+                    logging.WARNING,
+                    msg_args=[e, batch_size],
+                    error_code=3052,
+                    exc_info=True,
                 )
                 if batch_size == 0:
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
@@ -834,7 +853,7 @@ def download_statuses(jira_connection):
 def _is_option_field(field_meta):
     schema = field_meta['schema']
     is_option_field = schema['type'] == 'option' or (
-            'items' in schema and schema['items'] == 'option'
+        'items' in schema and schema['items'] == 'option'
     )
     return is_option_field
 
@@ -877,37 +896,37 @@ def _users_by_letter(jira_connection, gdpr_active):
             {
                 _jira_user_key(u): u
                 for u in _search_users(
-                jira_connection,
-                gdpr_active,
-                query=f'{letter}.',
-                include_inactive=True,
-                include_active=False,
-            )
+                    jira_connection,
+                    gdpr_active,
+                    query=f'{letter}.',
+                    include_inactive=True,
+                    include_active=False,
+                )
             }
         )
         jira_users.update(
             {
                 _jira_user_key(u): u
                 for u in _search_users(
-                jira_connection,
-                gdpr_active,
-                query=f'{letter}.',
-                include_inactive=False,
-                include_active=True,
-            )
+                    jira_connection,
+                    gdpr_active,
+                    query=f'{letter}.',
+                    include_inactive=False,
+                    include_active=True,
+                )
             }
         )
     return list(jira_users.values())
 
 
 def _search_users(
-        jira_connection,
-        gdpr_active,
-        query,
-        start_at=0,
-        max_results=1000,
-        include_active=True,
-        include_inactive=False,
+    jira_connection,
+    gdpr_active,
+    query,
+    start_at=0,
+    max_results=1000,
+    include_active=True,
+    include_inactive=False,
 ):
     if query is None:
         # use new endpoint that doesn't take a query.  This may not exist in some instances.
@@ -1074,9 +1093,9 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
 
     git_repo_names = []
     git_repo_urls = []
-    for normalized_repo in git_repos:
-        git_repo_names.extend([normalized_repo.get('full_name'), normalized_repo.get('name')])
-        git_repo_urls.append(normalized_repo.get('url'))
+    for standardized_repo in git_repos:
+        git_repo_names.extend([standardized_repo.get('full_name'), standardized_repo.get('name')])
+        git_repo_urls.append(standardized_repo.get('url'))
 
     ignore_repos = []
     for repo in list(repos_found_by_jira.values()):

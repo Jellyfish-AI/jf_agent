@@ -2,22 +2,22 @@ from datetime import datetime, timezone
 import traceback
 from jf_agent.git.github_gql_client import GithubGqlClient
 from jf_agent.git.github_gql_utils import github_gql_format_to_datetime
-from jf_agent.git.utils import get_branches_for_normalized_repo
+from jf_agent.git.utils import get_branches_for_standardized_repo
 from tqdm import tqdm
 from dateutil import parser
 from typing import List
 import logging
 from jf_agent.git import (
     GitAdapter,
-    NormalizedUser,
-    NormalizedProject,
-    NormalizedBranch,
-    NormalizedRepository,
-    NormalizedCommit,
-    NormalizedPullRequest,
-    NormalizedPullRequestComment,
-    NormalizedPullRequestReview,
-    NormalizedShortRepository,
+    StandardizedUser,
+    StandardizedProject,
+    StandardizedBranch,
+    StandardizedRepository,
+    StandardizedRepository,
+    StandardizedPullRequest,
+    StandardizedPullRequestComment,
+    StandardizedPullRequestComment,
+    StandardizedShortRepository,
     pull_since_date_for_repo,
 )
 from jf_agent.git.utils import log_and_print_request_error
@@ -61,7 +61,7 @@ class GithubGqlAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_projects(self) -> List[NormalizedProject]:
+    def get_projects(self) -> List[StandardizedProject]:
         print('downloading github projects... ', end='', flush=True)
         projects = []
 
@@ -85,7 +85,7 @@ class GithubGqlAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_users(self) -> List[NormalizedUser]:
+    def get_users(self) -> List[StandardizedUser]:
         print('downloading github users... ', end='', flush=True)
         users = [
             _normalize_user(user)
@@ -98,11 +98,11 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_repos(
-        self, normalized_projects: List[NormalizedProject],
-    ) -> List[NormalizedRepository]:
+        self, standardized_projects: List[StandardizedProject],
+    ) -> List[StandardizedRepository]:
         print('downloading github repos... ', end='', flush=True)
 
-        nrm_repos: List[NormalizedRepository] = []
+        nrm_repos: List[StandardizedRepository] = []
 
         filters = []
         if self.config.git_include_repos:
@@ -116,7 +116,7 @@ class GithubGqlAdapter(GitAdapter):
                 not in set([r.lower() for r in self.config.git_exclude_repos])
             )
 
-        for nrm_project in normalized_projects:
+        for nrm_project in standardized_projects:
             for api_repo in tqdm(
                 self.client.get_repos(nrm_project.login, repo_filters=filters),
                 desc=f'downloading repos for {nrm_project.login}',
@@ -195,12 +195,12 @@ class GithubGqlAdapter(GitAdapter):
     @agent_logging.log_entry_exit(logger)
     def get_commits_for_included_branches(
         self,
-        normalized_repos: List[NormalizedRepository],
+        standardized_repos: List[StandardizedRepository],
         included_branches: dict,
         server_git_instance_info,
-    ) -> List[NormalizedCommit]:
+    ) -> List[StandardizedRepository]:
         print('downloading github commits on included branches... ', end='', flush=True)
-        for i, nrm_repo in enumerate(normalized_repos, start=1):
+        for i, nrm_repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = (
                     pull_since_date_for_repo(
@@ -209,7 +209,7 @@ class GithubGqlAdapter(GitAdapter):
                     or datetime.min
                 )
 
-                for branch_name in get_branches_for_normalized_repo(nrm_repo, included_branches):
+                for branch_name in get_branches_for_standardized_repo(nrm_repo, included_branches):
                     if self.repo_to_branch_is_quiescent_lookups[nrm_repo.id].get(
                         branch_name, False
                     ):
@@ -247,12 +247,12 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
-        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
-    ) -> List[NormalizedPullRequest]:
+        self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
+    ) -> List[StandardizedPullRequest]:
         print('downloading github prs... ', end='', flush=True)
 
         nrm_prs = []
-        for i, nrm_repo in enumerate(normalized_repos, start=1):
+        for i, nrm_repo in enumerate(standardized_repos, start=1):
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
@@ -328,7 +328,7 @@ class GithubGqlAdapter(GitAdapter):
 '''
 
 
-def _normalize_user(api_user) -> NormalizedUser:
+def _normalize_user(api_user) -> StandardizedUser:
     if not api_user:
         return None
 
@@ -338,14 +338,14 @@ def _normalize_user(api_user) -> NormalizedUser:
     email = api_user.get('email')
     # raw user, just have email (e.g. from a commit)
     if not id:
-        return NormalizedUser(id=email, login=email, name=name, email=email,)
+        return StandardizedUser(id=email, login=email, name=name, email=email,)
 
     # API user, where github matched to a known account
-    return NormalizedUser(id=id, login=login, name=name, email=email)
+    return StandardizedUser(id=id, login=login, name=name, email=email)
 
 
-def _normalize_project(api_org: dict, redact_names_and_urls: bool) -> NormalizedProject:
-    return NormalizedProject(
+def _normalize_project(api_org: dict, redact_names_and_urls: bool) -> StandardizedProject:
+    return StandardizedProject(
         id=api_org['id'],
         login=api_org['login'],
         name=api_org.get('name')
@@ -355,8 +355,8 @@ def _normalize_project(api_org: dict, redact_names_and_urls: bool) -> Normalized
     )
 
 
-def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBranch:
-    return NormalizedBranch(
+def _normalize_branch(api_branch, redact_names_and_urls: bool) -> StandardizedBranch:
+    return StandardizedBranch(
         name=api_branch['name']
         if not redact_names_and_urls
         else _branch_redactor.redact_name(api_branch['name']),
@@ -365,8 +365,8 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
 
 
 def _normalize_repo(
-    api_repo, normalized_project: NormalizedProject, redact_names_and_urls: bool,
-) -> NormalizedRepository:
+    api_repo, standardized_project: StandardizedProject, redact_names_and_urls: bool,
+) -> StandardizedRepository:
     repo_name = (
         api_repo['name']
         if not redact_names_and_urls
@@ -374,7 +374,7 @@ def _normalize_repo(
     )
     url = api_repo['url'] if not redact_names_and_urls else None
 
-    normalized_branches = [
+    standardized_branches = [
         _normalize_branch(branch, redact_names_and_urls) for branch in api_repo['branches']
     ]
 
@@ -382,21 +382,21 @@ def _normalize_repo(
     # this can mess with our ingestion due to the 'name' field being nested
     # on a None object
     default_branch_name = api_repo['defaultBranch']['name'] if api_repo['defaultBranch'] else None
-    return NormalizedRepository(
+    return StandardizedRepository(
         id=api_repo['id'],
         name=repo_name,
         full_name=repo_name,
         url=url,
         default_branch_name=default_branch_name,
         is_fork=api_repo['isFork'],
-        branches=normalized_branches,
-        project=normalized_project,
+        branches=standardized_branches,
+        project=standardized_project,
     )
 
 
 def _normalize_short_form_repo(
     api_repo: dict, redact_names_and_urls: dict
-) -> NormalizedShortRepository:
+) -> StandardizedShortRepository:
     repo_name = (
         api_repo['name']
         if not redact_names_and_urls
@@ -404,19 +404,19 @@ def _normalize_short_form_repo(
     )
     url = api_repo['url'] if not redact_names_and_urls else None
 
-    return NormalizedShortRepository(id=api_repo['id'], name=repo_name, url=url)
+    return StandardizedShortRepository(id=api_repo['id'], name=repo_name, url=url)
 
 
 def _normalize_commit(
     api_commit: dict,
-    normalized_repo: NormalizedRepository,
+    standardized_repo: StandardizedRepository,
     branch_name: str,
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
     author = _normalize_user(api_commit['author'])
     commit_url = api_commit['url'] if not redact_names_and_urls else None
-    return NormalizedCommit(
+    return StandardizedRepository(
         hash=api_commit['sha'],
         author=author,
         url=commit_url,
@@ -424,18 +424,18 @@ def _normalize_commit(
         author_date=api_commit['authoredDate'],
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=api_commit['parents']['totalCount'] > 1,
-        repo=normalized_repo.short(),  # use short form of repo
+        repo=standardized_repo.short(),  # use short form of repo
         branch_name=branch_name
         if not redact_names_and_urls
         else _branch_redactor.redact_name(branch_name),
     )
 
 
-def _get_normalized_pr_comments(
+def _get_standardized_pr_comments(
     api_comments: list[dict], strip_text_content
-) -> List[NormalizedPullRequestComment]:
+) -> List[StandardizedPullRequestComment]:
     return [
-        NormalizedPullRequestComment(
+        StandardizedPullRequestComment(
             user=_normalize_user(api_comment['author']),
             body=sanitize_text(api_comment['body'], strip_text_content),
             created_at=api_comment['createdAt'],
@@ -444,9 +444,9 @@ def _get_normalized_pr_comments(
     ]
 
 
-def _get_normalized_reviews(api_reviews: list[dict]):
+def _get_standardized_reviews(api_reviews: list[dict]):
     return [
-        NormalizedPullRequestReview(
+        StandardizedPullRequestComment(
             user=_normalize_user(api_review['author']),
             foreign_id=api_review['id'],
             review_state=api_review['state'],
@@ -457,16 +457,16 @@ def _get_normalized_reviews(api_reviews: list[dict]):
 
 def _normalize_pr(
     api_pr,
-    normalized_repo: NormalizedRepository,
+    standardized_repo: StandardizedRepository,
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
     base_branch_name = api_pr['baseRefName']
     head_branch_name = api_pr['headRefName']
-    normalized_merge_commit = (
+    standardized_merge_commit = (
         _normalize_commit(
             api_pr['mergeCommit'],
-            normalized_repo=normalized_repo,
+            standardized_repo=standardized_repo,
             branch_name=base_branch_name,
             strip_text_content=strip_text_content,
             redact_names_and_urls=redact_names_and_urls,
@@ -474,7 +474,7 @@ def _normalize_pr(
         if api_pr['mergeCommit']
         else None
     )
-    return NormalizedPullRequest(
+    return StandardizedPullRequest(
         id=api_pr['id'],
         additions=api_pr['additions'],
         deletions=api_pr['deletions'],
@@ -500,22 +500,22 @@ def _normalize_pr(
         # sanitized fields
         title=sanitize_text(api_pr['title'], strip_text_content),
         body=sanitize_text(api_pr['body'], strip_text_content),
-        # normalized fields
+        # standardized fields
         commits=[
             _normalize_commit(
                 api_commit=commit,
-                normalized_repo=normalized_repo,
+                standardized_repo=standardized_repo,
                 branch_name=base_branch_name,
                 strip_text_content=strip_text_content,
                 redact_names_and_urls=redact_names_and_urls,
             )
             for commit in api_pr['commits']
         ],
-        merge_commit=normalized_merge_commit,
+        merge_commit=standardized_merge_commit,
         author=_normalize_user(api_user=api_pr['author']),
         merged_by=_normalize_user(api_user=api_pr['mergedBy']),
-        approvals=_get_normalized_reviews(api_pr['reviews']),
-        comments=_get_normalized_pr_comments(api_pr['comments'], strip_text_content),
+        approvals=_get_standardized_reviews(api_pr['reviews']),
+        comments=_get_standardized_pr_comments(api_pr['comments'], strip_text_content),
         base_repo=_normalize_short_form_repo(api_pr['baseRepository'], redact_names_and_urls),
         head_repo=_normalize_short_form_repo(api_pr['baseRepository'], redact_names_and_urls),
     )
