@@ -5,7 +5,7 @@ from dateutil import parser
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from jf_agent.git import NormalizedShortRepository
+from jf_agent.git import StandardizedShortRepository
 from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
 
 TEST_INPUT_FILE_PATH = 'tests/test_data/bitbucket_cloud/'
@@ -69,14 +69,14 @@ class TestBitbucketCloudAdapter(TestCase):
         test_repos = _get_test_data('test_repos.json')
         test_branches = _get_test_data('test_branches.json')
 
-        mock_normalized_project = MagicMock()
-        mock_normalized_projects = [mock_normalized_project]
+        mock_standardized_project = MagicMock()
+        mock_standardized_projects = [mock_standardized_project]
 
         self.mock_client.get_all_repos.return_value = test_repos
         self.mock_client.get_branches.return_value = test_branches
 
         # Act
-        resulting_repos = self.adapter.get_repos(mock_normalized_projects)
+        resulting_repos = self.adapter.get_repos(mock_standardized_projects)
 
         # Assert
         self.assertEqual(
@@ -110,7 +110,7 @@ class TestBitbucketCloudAdapter(TestCase):
         )
         self.assertEqual(
             resulting_repo.project,
-            mock_normalized_project,
+            mock_standardized_project,
             "Resulting repo project does not match input",
         )
 
@@ -136,11 +136,13 @@ class TestBitbucketCloudAdapter(TestCase):
         # Arrange
         test_commits = _get_test_data('test_commits.json')
 
-        mock_normalized_repo = MagicMock()
-        mock_normalized_repo.default_branch_name = 'default_branch_name'
-        test_short_repo = NormalizedShortRepository(id='test_id', name='test_name', url='test_url')
-        mock_normalized_repo.short.return_value = test_short_repo
-        mock_normalized_repos = [mock_normalized_repo]
+        mock_standardized_repo = MagicMock()
+        mock_standardized_repo.default_branch_name = 'default_branch_name'
+        test_short_repo = StandardizedShortRepository(
+            id='test_id', name='test_name', url='test_url'
+        )
+        mock_standardized_repo.short.return_value = test_short_repo
+        mock_standardized_repos = [mock_standardized_repo]
 
         self.mock_client.get_commits.return_value = test_commits
 
@@ -150,7 +152,7 @@ class TestBitbucketCloudAdapter(TestCase):
         # Act
         resulting_commits = list(
             self.adapter.get_commits_for_included_branches(
-                mock_normalized_repos, {'test_repo': ['test_branch_name']}, test_git_instance_info
+                mock_standardized_repos, {'test_repo': ['test_branch_name']}, test_git_instance_info
             )
         )
 
@@ -210,9 +212,9 @@ class TestBitbucketCloudAdapter(TestCase):
         test_prs = _get_test_data('test_prs.json')
         test_commits = _get_test_data('test_commits.json')
 
-        mock_normalized_repo = MagicMock()
-        mock_normalized_repo.default_branch_name = 'default_branch_name'
-        mock_normalized_repos = [mock_normalized_repo]
+        mock_standardized_repo = MagicMock()
+        mock_standardized_repo.default_branch_name = 'default_branch_name'
+        mock_standardized_repos = [mock_standardized_repo]
 
         self.mock_client.get_pullrequests.return_value = test_prs
         self.mock_client.pr_diff.return_value = ""
@@ -226,7 +228,7 @@ class TestBitbucketCloudAdapter(TestCase):
 
         # Act
         resulting_prs = list(
-            self.adapter.get_pull_requests(mock_normalized_repos, test_git_instance_info)
+            self.adapter.get_pull_requests(mock_standardized_repos, test_git_instance_info)
         )
 
         # Assert

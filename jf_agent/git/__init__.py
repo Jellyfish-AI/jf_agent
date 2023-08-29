@@ -32,13 +32,13 @@ PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER]
 
 '''
 
-    Normalized Structure
+    Standardized Structure
 
 '''
 
 
 @dataclass
-class NormalizedUser:
+class StandardizedUser:
     id: str
     name: str
     login: str
@@ -48,13 +48,13 @@ class NormalizedUser:
 
 
 @dataclass
-class NormalizedBranch:
+class StandardizedBranch:
     name: str
     sha: str
 
 
 @dataclass
-class NormalizedProject:
+class StandardizedProject:
     id: str
     name: str
     login: str
@@ -62,58 +62,58 @@ class NormalizedProject:
 
 
 @dataclass
-class NormalizedShortRepository:
+class StandardizedShortRepository:
     id: int
     name: str
     url: str
 
 
 @dataclass
-class NormalizedRepository:
+class StandardizedRepository:
     id: int
     name: str
     full_name: str
     url: str
     is_fork: bool
     default_branch_name: str
-    project: NormalizedProject
-    branches: List[NormalizedBranch]
+    project: StandardizedProject
+    branches: List[StandardizedBranch]
 
     def short(self):
-        # return the short form of Normalized Repository
-        return NormalizedShortRepository(id=self.id, name=self.name, url=self.url)
+        # return the short form of Standardized Repository
+        return StandardizedShortRepository(id=self.id, name=self.name, url=self.url)
 
 
 @dataclass
-class NormalizedCommit:
+class StandardizedCommit:
     hash: str
     url: str
     message: str
     commit_date: str
     author_date: str
-    author: NormalizedUser
-    repo: NormalizedShortRepository
+    author: StandardizedUser
+    repo: StandardizedShortRepository
     is_merge: bool
     branch_name: str = None
 
 
 @dataclass
-class NormalizedPullRequestComment:
-    user: NormalizedUser
+class StandardizedPullRequestComment:
+    user: StandardizedUser
     body: str
     created_at: str
     system_generated: bool = None
 
 
 @dataclass
-class NormalizedPullRequestReview:
-    user: NormalizedUser
+class StandardizedPullRequestReview:
+    user: StandardizedUser
     foreign_id: int
     review_state: str
 
 
 @dataclass
-class NormalizedPullRequest:
+class StandardizedPullRequest:
     id: any
     additions: int
     deletions: int
@@ -129,14 +129,14 @@ class NormalizedPullRequest:
     url: str
     base_branch: str
     head_branch: str
-    author: NormalizedUser
-    merged_by: NormalizedUser
-    commits: List[NormalizedCommit]
-    merge_commit: NormalizedCommit
-    comments: List[NormalizedPullRequestComment]
-    approvals: List[NormalizedPullRequestReview]
-    base_repo: NormalizedShortRepository
-    head_repo: NormalizedShortRepository
+    author: StandardizedUser
+    merged_by: StandardizedUser
+    commits: List[StandardizedCommit]
+    merge_commit: StandardizedCommit
+    comments: List[StandardizedPullRequestComment]
+    approvals: List[StandardizedPullRequestReview]
+    base_repo: StandardizedShortRepository
+    head_repo: StandardizedShortRepository
 
 
 class GitAdapter(ABC):
@@ -146,29 +146,31 @@ class GitAdapter(ABC):
         self.compress_output_files = compress_output_files
 
     @abstractmethod
-    def get_users(self) -> List[NormalizedUser]:
+    def get_users(self) -> List[StandardizedUser]:
         pass
 
     @abstractmethod
-    def get_projects(self) -> List[NormalizedProject]:
+    def get_projects(self) -> List[StandardizedProject]:
         pass
 
     @abstractmethod
-    def get_repos(self) -> List[NormalizedRepository]:
+    def get_repos(self) -> List[StandardizedRepository]:
         pass
 
     @abstractmethod
     def get_commits_for_included_branches(
         self, api_repos, server_git_instance_info
-    ) -> List[NormalizedCommit]:
+    ) -> List[StandardizedCommit]:
         pass
 
     @abstractmethod
-    def get_pull_requests(self, api_repos, server_git_instance_info) -> List[NormalizedPullRequest]:
+    def get_pull_requests(
+        self, api_repos, server_git_instance_info
+    ) -> List[StandardizedPullRequest]:
         pass
 
     def load_and_dump_git(self, endpoint_git_instance_info):
-        nrm_projects: List[NormalizedProject] = self.get_projects()
+        nrm_projects: List[StandardizedProject] = self.get_projects()
         write_file(self.outdir, 'bb_projects', self.compress_output_files, nrm_projects)
 
         write_file(
@@ -487,7 +489,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
                 not in set([r.lower() for r in config.git_exclude_repos])
             )
 
-        for api_project, _normalized_project_dict in projects:
+        for api_project, _standardized_project_dict in projects:
             project_repos = []
             project = git_connection.projects[api_project['key']]
             for repo in project.repos.list():
@@ -508,7 +510,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
             output_dict[project.name] = project_repos
 
     elif config.git_provider == 'github':
-        from jf_agent.git.github import _normalize_repo
+        from jf_agent.git.github import _standardize_repo
 
         filters = []
         if config.git_include_repos:
@@ -523,7 +525,7 @@ def get_nested_repos_from_git(git_connection, config: GitConfig):
 
         for org in config.git_include_projects:
             org_repos = [
-                _normalize_repo(git_connection, org, r, config.git_redact_names_and_urls)
+                _standardize_repo(git_connection, org, r, config.git_redact_names_and_urls)
                 for r in git_connection.get_all_repos(org)
                 if all(filt(r) for filt in filters)
             ]

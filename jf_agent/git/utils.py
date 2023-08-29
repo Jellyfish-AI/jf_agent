@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 # Return branches for which we should pull commits, specified by customer in git config.
 # The repo's default branch will always be included in the returned list.
-def get_branches_for_normalized_repo(repo: Any, included_branches: dict):
+def get_branches_for_standardized_repo(repo: Any, included_branches: dict):
     branches_to_process = [repo.default_branch_name] if repo.default_branch_name else []
     additional_branches_for_repo = included_branches.get(repo.name)
     if additional_branches_for_repo:

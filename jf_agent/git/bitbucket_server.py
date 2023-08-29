@@ -111,7 +111,7 @@ def datetime_from_bitbucket_server_timestamp(bb_server_timestamp_str):
     return datetime.fromtimestamp(float(bb_server_timestamp_str) / 1000).replace(tzinfo=pytz.utc)
 
 
-def _normalize_user(user):
+def _standardize_user(user):
     if not user:
         return None
 
@@ -127,12 +127,12 @@ def _normalize_user(user):
 @agent_logging.log_entry_exit(logger)
 def get_users(client):
     print(f'[{datetime.now().isoformat()}] downloading bitbucket users... ', end='', flush=True)
-    users = [_normalize_user(user) for user in client.admin.users]
+    users = [_standardize_user(user) for user in client.admin.users]
     print('✓')
     return users
 
 
-def _normalize_project(api_project, redact_names_and_urls):
+def _standardize_project(api_project, redact_names_and_urls):
     return {
         'id': api_project['id'],
         'login': api_project['key'],
@@ -157,7 +157,7 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
         filters.append(lambda p: p['key'] not in exclude_projects)
 
     projects = [
-        (p, _normalize_project(p, redact_names_and_urls))
+        (p, _standardize_project(p, redact_names_and_urls))
         for p in client.projects.list()
         if all(filt(p) for filt in filters)
     ]
@@ -165,7 +165,7 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
     return projects
 
 
-def _normalize_repo(api_project, api_repo, redact_names_and_urls):
+def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     repo = api_repo.get()
 
     name = (
@@ -199,7 +199,7 @@ def _normalize_repo(api_project, api_repo, redact_names_and_urls):
         'default_branch_name': default_branch_name,
         'branches': branches,
         'is_fork': 'origin' in repo,
-        'project': _normalize_project(api_project, redact_names_and_urls),
+        'project': _standardize_project(api_project, redact_names_and_urls),
     }
 
 
@@ -220,16 +220,16 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
         for repo in project.repos.list():
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
-                yield api_repo, _normalize_repo(api_project, api_repo, redact_names_and_urls)
+                yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
 
     print('✓')
 
 
-def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
+def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
     return {
         'hash': commit['id'],
         'commit_date': datetime_from_bitbucket_server_timestamp(commit['committerTimestamp']),
-        'author': _normalize_user(commit['author']),
+        'author': _standardize_user(commit['author']),
         'author_date': datetime_from_bitbucket_server_timestamp(commit['authorTimestamp']),
         'url': (
             repo['links']['self'][0]['href'].replace('browse', f'commits/{commit["id"]}')
@@ -238,7 +238,7 @@ def _normalize_commit(commit, repo, branch_name, strip_text_content, redact_name
         ),
         'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
-        'repo': _normalize_pr_repo(repo, redact_names_and_urls),
+        'repo': _standardize_pr_repo(repo, redact_names_and_urls),
         'branch_name': branch_name
         if not redact_names_and_urls
         else _branch_redactor.redact_name(branch_name),
@@ -266,8 +266,8 @@ def get_commits_for_included_branches(
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly
             # provided in a config, only pull from the repo's default branch.
-            # We are working with the BBS api object rather than a NormalizedRepository here,
-            # so we can not use get_branches_for_normalized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
+            # We are working with the BBS api object rather than a StandardizedRepository here,
+            # so we can not use get_branches_for_standardized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
             branches_to_process = [_get_default_branch_name(api_repo)]
             additional_branch_patterns = included_branches.get(api_repo.get()['name'])
 
@@ -298,21 +298,21 @@ def get_commits_for_included_branches(
                                 tqdm.write(
                                     f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
                                 )
-                            normalized_commit = _normalize_commit(
+                            standardized_commit = _standardize_commit(
                                 commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
                             # commits are ordered newest to oldest
                             # if this is too old, we're done with this repo
-                            if pull_since and normalized_commit['commit_date'] < pull_since:
+                            if pull_since and standardized_commit['commit_date'] < pull_since:
                                 break
 
-                            yield normalized_commit
+                            yield standardized_commit
 
                 except stashy.errors.NotFoundException as e:
                     print(f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...')
 
 
-def _normalize_pr_repo(repo, redact_names_and_urls):
+def _standardize_pr_repo(repo, redact_names_and_urls):
     normal_repo = {
         'id': repo['id'],
         'name': (
@@ -421,7 +421,7 @@ def get_pull_requests(
                     if activity['action'] == 'COMMENTED':
                         comments.append(
                             {
-                                'user': _normalize_user(activity['comment']['author']),
+                                'user': _standardize_user(activity['comment']['author']),
                                 'body': sanitize_text(
                                     activity['comment']['text'], strip_text_content
                                 ),
@@ -434,7 +434,7 @@ def get_pull_requests(
                         approvals.append(
                             {
                                 'foreign_id': activity['id'],
-                                'user': _normalize_user(activity['user']),
+                                'user': _standardize_user(activity['user']),
                                 'review_state': activity['action'],
                             }
                         )
@@ -442,7 +442,7 @@ def get_pull_requests(
                         merge_date = datetime_from_bitbucket_server_timestamp(
                             activity['createdDate']
                         )
-                        merged_by = _normalize_user(activity['user'])
+                        merged_by = _standardize_user(activity['user'])
 
                 closed_date = (
                     datetime_from_bitbucket_server_timestamp(pr['closedDate'])
@@ -452,7 +452,7 @@ def get_pull_requests(
 
                 try:
                     commits = [
-                        _normalize_commit(
+                        _standardize_commit(
                             c,
                             repo,
                             pr['toRef']['displayId'],
@@ -472,9 +472,9 @@ def get_pull_requests(
                     )
                     commits = []
 
-                normalized_pr = {
+                standardized_pr = {
                     'id': pr['id'],
-                    'author': _normalize_user(pr['author']['user']),
+                    'author': _standardize_user(pr['author']['user']),
                     'title': sanitize_text(pr['title'], strip_text_content),
                     'body': sanitize_text(pr.get('description'), strip_text_content),
                     'is_closed': pr['state'] != 'OPEN',
@@ -483,7 +483,7 @@ def get_pull_requests(
                     'updated_at': updated_at,
                     'closed_date': closed_date,
                     'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
-                    'base_repo': _normalize_pr_repo(
+                    'base_repo': _standardize_pr_repo(
                         pr['toRef']['repository'], redact_names_and_urls
                     ),
                     'base_branch': (
@@ -491,7 +491,7 @@ def get_pull_requests(
                         if not redact_names_and_urls
                         else _branch_redactor.redact_name(pr['toRef']['displayId'])
                     ),
-                    'head_repo': _normalize_pr_repo(
+                    'head_repo': _standardize_pr_repo(
                         pr['fromRef']['repository'], redact_names_and_urls
                     ),
                     'head_branch': (
@@ -510,7 +510,7 @@ def get_pull_requests(
                     'merge_commit': None,
                 }
 
-                yield normalized_pr
+                yield standardized_pr
 
             if skipped_prs > 5:
                 agent_logging.log_and_print(

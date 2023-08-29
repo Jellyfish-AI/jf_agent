@@ -1,4 +1,4 @@
-from jf_agent.git.utils import get_branches_for_normalized_repo
+from jf_agent.git.utils import get_branches_for_standardized_repo
 from tqdm import tqdm
 import re
 from dateutil import parser
@@ -8,15 +8,15 @@ import requests
 
 from jf_agent.git import (
     GitAdapter,
-    NormalizedUser,
-    NormalizedProject,
-    NormalizedBranch,
-    NormalizedRepository,
-    NormalizedCommit,
-    NormalizedPullRequest,
-    NormalizedPullRequestComment,
-    NormalizedPullRequestReview,
-    NormalizedShortRepository,
+    StandardizedUser,
+    StandardizedProject,
+    StandardizedBranch,
+    StandardizedRepository,
+    StandardizedCommit,
+    StandardizedPullRequest,
+    StandardizedPullRequestComment,
+    StandardizedPullRequestReview,
+    StandardizedShortRepository,
     pull_since_date_for_repo,
 )
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
@@ -45,7 +45,7 @@ class BitbucketCloudAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_users(self) -> List[NormalizedUser]:
+    def get_users(self) -> List[StandardizedUser]:
         # Bitbucket Cloud API doesn't have a way to fetch all users;
         # we'll reconstruct them from repo history (commiters, PR
         # authors, etc)
@@ -53,12 +53,12 @@ class BitbucketCloudAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_projects(self) -> List[NormalizedProject]:
+    def get_projects(self) -> List[StandardizedProject]:
         # Bitbucket Cloud API doesn't have a way to fetch all top-level projects;
         # instead, need to configure the agent with a specific set of projects to pull
         print('downloading bitbucket projects... ', end='', flush=True)
         projects = [
-            _normalize_project(p, self.config.git_redact_names_and_urls)
+            _standardize_project(p, self.config.git_redact_names_and_urls)
             for p in self.config.git_include_projects
         ]
         print('✓')
@@ -68,12 +68,12 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_repos(
-        self, normalized_projects: List[NormalizedProject],
-    ) -> List[NormalizedRepository]:
+        self, standardized_projects: List[StandardizedProject],
+    ) -> List[StandardizedRepository]:
         print('downloading bitbucket repos... ', end='', flush=True)
 
         repos = []
-        for p in normalized_projects:
+        for p in standardized_projects:
             for i, api_repo in enumerate(
                 tqdm(
                     self.client.get_all_repos(p.id),
@@ -149,7 +149,7 @@ class BitbucketCloudAdapter(GitAdapter):
 
                 branches = self.get_branches(p, api_repo)
                 repos.append(
-                    _normalize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
+                    _standardize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
                 )
 
         print('✓')
@@ -164,18 +164,18 @@ class BitbucketCloudAdapter(GitAdapter):
     @agent_logging.log_entry_exit(logger)
     def get_commits_for_included_branches(
         self,
-        normalized_repos: List[NormalizedRepository],
+        standardized_repos: List[StandardizedRepository],
         included_branches: dict,
         server_git_instance_info,
-    ) -> List[NormalizedCommit]:
+    ) -> List[StandardizedCommit]:
         print('downloading bitbucket commits on included branches... ', end='', flush=True)
-        for i, repo in enumerate(normalized_repos, start=1):
+        for i, repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
                     server_git_instance_info, repo.project.login, repo.id, 'commits'
                 )
 
-                for branch in get_branches_for_normalized_repo(repo, included_branches):
+                for branch in get_branches_for_standardized_repo(repo, included_branches):
                     for j, commit in enumerate(
                         tqdm(
                             self.client.get_commits(repo.project.id, repo.id, branch),
@@ -187,7 +187,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         with agent_logging.log_loop_iters(
                             logger, 'branch commit inside repo', j, 100
                         ):
-                            commit = _normalize_commit(
+                            commit = _standardize_commit(
                                 commit,
                                 repo,
                                 branch,
@@ -205,11 +205,11 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
-        self, normalized_repos: List[NormalizedRepository], server_git_instance_info,
-    ) -> List[NormalizedPullRequest]:
+        self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
+    ) -> List[StandardizedPullRequest]:
         print('downloading bitbucket prs... ', end='', flush=True)
         for i, repo in enumerate(
-            tqdm(normalized_repos, desc='downloading prs for repos', unit='repos'), start=1
+            tqdm(standardized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
@@ -241,7 +241,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 )
                                 continue
 
-                            yield _normalize_pr(
+                            yield _standardize_pr(
                                 self.client,
                                 repo,
                                 api_pr,
@@ -277,23 +277,23 @@ class BitbucketCloudAdapter(GitAdapter):
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
-    def get_branches(self, project, api_repo) -> List[NormalizedBranch]:
+    def get_branches(self, project, api_repo) -> List[StandardizedBranch]:
         return [
-            _normalize_branch(api_branch, self.config.git_redact_names_and_urls)
+            _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
             for api_branch in self.client.get_branches(project.id, api_repo['uuid'])
         ]
 
 
-def _normalize_project(project_name, redact_names_and_urls):
-    return NormalizedProject(id=project_name, login=project_name, name=project_name, url=None)
+def _standardize_project(project_name, redact_names_and_urls):
+    return StandardizedProject(id=project_name, login=project_name, name=project_name, url=None)
 
 
-def _normalize_repo(
+def _standardize_repo(
     api_repo,
-    normalized_branches: List[NormalizedBranch],
-    normalized_project: NormalizedProject,
+    standardized_branches: List[StandardizedBranch],
+    standardized_project: StandardizedProject,
     redact_names_and_urls: bool,
-) -> NormalizedRepository:
+) -> StandardizedRepository:
     repo_name = (
         api_repo['name']
         if not redact_names_and_urls
@@ -301,7 +301,7 @@ def _normalize_repo(
     )
     url = api_repo['links']['self']['href'] if not redact_names_and_urls else None
 
-    return NormalizedRepository(
+    return StandardizedRepository(
         id=api_repo['uuid'],
         name=repo_name,
         full_name=api_repo['full_name'],
@@ -312,13 +312,13 @@ def _normalize_repo(
             else None
         ),
         is_fork='origin' in api_repo,
-        branches=normalized_branches,
-        project=normalized_project,
+        branches=standardized_branches,
+        project=standardized_project,
     )
 
 
-def _normalize_short_form_repo(api_repo, redact_names_and_urls):
-    return NormalizedShortRepository(
+def _standardize_short_form_repo(api_repo, redact_names_and_urls):
+    return StandardizedShortRepository(
         id=api_repo['uuid'],
         name=(
             api_repo['name']
@@ -329,8 +329,8 @@ def _normalize_short_form_repo(api_repo, redact_names_and_urls):
     )
 
 
-def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBranch:
-    return NormalizedBranch(
+def _standardize_branch(api_branch, redact_names_and_urls: bool) -> StandardizedBranch:
+    return StandardizedBranch(
         name=(
             api_branch['name']
             if not redact_names_and_urls
@@ -340,12 +340,16 @@ def _normalize_branch(api_branch, redact_names_and_urls: bool) -> NormalizedBran
     )
 
 
-def _normalize_commit(
-    api_commit, normalized_repo, branch_name, strip_text_content: bool, redact_names_and_urls: bool
+def _standardize_commit(
+    api_commit,
+    standardized_repo,
+    branch_name,
+    strip_text_content: bool,
+    redact_names_and_urls: bool,
 ):
-    author = _normalize_user(api_commit['author'])
+    author = _standardize_user(api_commit['author'])
     commit_url = api_commit['links']['html']['href'] if not redact_names_and_urls else None
-    return NormalizedCommit(
+    return StandardizedCommit(
         hash=api_commit['hash'],
         author=author,
         url=commit_url,
@@ -353,18 +357,18 @@ def _normalize_commit(
         author_date=None,  # Not available in BB Cloud API,
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=len(api_commit['parents']) > 1,
-        repo=normalized_repo.short(),  # use short form of repo
+        repo=standardized_repo.short(),  # use short form of repo
         branch_name=branch_name
         if not redact_names_and_urls
         else _branch_redactor.redact_name(branch_name),
     )
 
 
-def _normalize_user(api_user):
+def _standardize_user(api_user):
     if 'uuid' in api_user:
         # This is a bitbucket cloud web user, we know their UUID
 
-        return NormalizedUser(
+        return StandardizedUser(
             id=api_user['uuid'],
             name=api_user['display_name'],
             login=api_user.get('username'),
@@ -381,12 +385,12 @@ def _normalize_user(api_user):
         username, email = m.groups()
         username = username.strip()
         email = email.strip()
-        return NormalizedUser(id=raw_name, login=email, name=username, email=email,)
+        return StandardizedUser(id=raw_name, login=email, name=username, email=email,)
 
-    return NormalizedUser(id=raw_name, name=raw_name, login=raw_name,)
+    return StandardizedUser(id=raw_name, name=raw_name, login=raw_name,)
 
 
-def _normalize_pr(
+def _standardize_pr(
     client, repo, api_pr, strip_text_content: bool, redact_names_and_urls: bool,
 ):
     # Process the PR's diff to get additions, deletions, changed_files
@@ -423,8 +427,8 @@ def _normalize_pr(
 
     # Comments
     comments = [
-        NormalizedPullRequestComment(
-            user=_normalize_user(c['user']),
+        StandardizedPullRequestComment(
+            user=_standardize_user(c['user']),
             body=sanitize_text(c['content']['raw'], strip_text_content),
             created_at=parser.parse(c['created_on']),
         )
@@ -439,8 +443,8 @@ def _normalize_pr(
     try:
         activity = list(client.pr_activity(repo.project.id, repo.id, api_pr['id']))
         approvals = [
-            NormalizedPullRequestReview(
-                user=_normalize_user(approval['user']),
+            StandardizedPullRequestReview(
+                user=_standardize_user(approval['user']),
                 foreign_id=i,  # There's no true ID (unlike with GitHub); use a per-PR sequence
                 review_state='APPROVED',
             )
@@ -454,7 +458,7 @@ def _normalize_pr(
         for a in sorted(pr_updates, key=lambda x: x['update']['date'], reverse=True):
             if a['update']['state'] == 'MERGED':
                 merge_date = parser.parse(a['update']['date'])
-                merged_by = _normalize_user(a['update']['author'])
+                merged_by = _standardize_user(a['update']['author'])
                 break
 
         # Obtain the closed_date by crawling over the activity history, looking for the
@@ -472,7 +476,7 @@ def _normalize_pr(
 
     # Commits
     commits = [
-        _normalize_commit(
+        _standardize_commit(
             c,
             repo,
             api_pr['destination']['branch']['name'],
@@ -491,7 +495,7 @@ def _normalize_pr(
         api_merge_commit = client.get_commit(
             repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
         )
-        merge_commit = _normalize_commit(
+        merge_commit = _standardize_commit(
             api_merge_commit,
             repo,
             api_pr['destination']['branch']['name'],
@@ -500,12 +504,12 @@ def _normalize_pr(
         )
 
     # Repo links
-    base_repo = _normalize_short_form_repo(
+    base_repo = _standardize_short_form_repo(
         api_pr['destination']['repository'], redact_names_and_urls
     )
-    head_repo = _normalize_short_form_repo(api_pr['source']['repository'], redact_names_and_urls)
+    head_repo = _standardize_short_form_repo(api_pr['source']['repository'], redact_names_and_urls)
 
-    return NormalizedPullRequest(
+    return StandardizedPullRequest(
         id=api_pr['id'],
         title=api_pr['title'],
         body=api_pr['description'],
@@ -514,7 +518,7 @@ def _normalize_pr(
         head_branch=api_pr['source']['branch']['name'],
         base_repo=base_repo,
         head_repo=head_repo,
-        author=_normalize_user(api_pr['author']),
+        author=_standardize_user(api_pr['author']),
         is_closed=api_pr['state'] != 'OPEN',
         is_merged=api_pr['state'] == 'MERGED',
         created_at=parser.parse(api_pr['created_on']),
