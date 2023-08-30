@@ -727,7 +727,7 @@ def _download_jira_issues_page(
                 tries = 0
                 return _expand_changelog(resp_json['issues'], jira_connection), 0
 
-            except (json.decoder.JSONDecodeError, JIRAError) as e:
+            except Exception as e:
                 if hasattr(e, 'status_code') and e.status_code == 429:
                     if tries >= 5:
                         agent_logging.log_and_print(
@@ -755,6 +755,8 @@ def _download_jira_issues_page(
                     error_code=3052,
                     exc_info=True,
                 )
+                agent_logging.log_and_print(logger, logging.WARNING, f"Got {e}, reducing batch size")
+                time.sleet(30)
                 if batch_size == 0:
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                         return [], 1
