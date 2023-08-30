@@ -5,6 +5,7 @@ import math
 import random
 import re
 import traceback
+import time
 from typing import Dict
 
 from dateutil import parser
@@ -705,7 +706,7 @@ def _download_jira_issues_page(
         issue_ids_array.append(jira_issue_ids_segment)
 
     for issue_ids in issue_ids_array:
-
+        tries = 0
         while batch_size > 0:
             search_params = {
                 'jql': f"id in ({','.join(str(iid) for iid in issue_ids)}) order by id asc",
@@ -723,12 +724,28 @@ def _download_jira_issues_page(
                         url=jira_connection._get_url('search'), data=json.dumps(search_params)
                     )
                 )
+                tries = 0
                 return _expand_changelog(resp_json['issues'], jira_connection), 0
 
             except (json.decoder.JSONDecodeError, JIRAError) as e:
                 if hasattr(e, 'status_code') and e.status_code == 429:
-                    # This is rate limiting ("Too many requests")
-                    raise
+                    if tries >= 5:
+                        agent_logging.log_and_print(
+                            logger, logging.INFO, f'exhausted 5 tries of ratelmiting'
+                        )
+                        raise
+                    if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
+                        wait_time = int(e.response.headers["Retry-After"])
+                        agent_logging.log_and_print(
+                            logger, logging.INFO, f'Retrying in {wait_time} seconds...'
+                        )
+                        time.sleep(wait_time)
+                    else:
+                        tries += 1
+                        agent_logging.log_and_print(
+                            logger, logging.INFO, f'No retry-after header, retrying in 30 seconds...'
+                        )
+                        time.sleep(30)
 
                 batch_size = int(batch_size / 2)
                 agent_logging.log_and_print_error_or_warning(
