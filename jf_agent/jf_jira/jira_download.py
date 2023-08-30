@@ -636,6 +636,7 @@ def _download_jira_issues_segment(
     download onto the shared queue.
     '''
     start_at = 0
+    agent_logging.log_and_print(logger, logging.INFO, f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
     try:
         while start_at < len(jira_issue_ids_segment):
             issues, num_apparently_deleted = _download_jira_issues_page(
@@ -665,13 +666,14 @@ def _download_jira_issues_segment(
 def _split_id_list(jira_issue_ids_segment: list):
 
     # same logic as `download_all_issue_metadata` for splitting lists of ids
-    max_length = 20000
+    max_length = 5000
     len_issue_ids_string = (
         len(','.join(str(x) for x in jira_issue_ids_segment))
         + len(jira_issue_ids_segment) * 2
         + 200
     )
     num_pulls = len_issue_ids_string // max_length + 1
+    agent_logging.log_and_print(logger, logging.INFO, f"Splitting the list of issue ids into {num_pulls} portions for server safety")
 
     issue_ids_array = []
     if num_pulls == 1:
@@ -748,13 +750,6 @@ def _download_jira_issues_page(
                         time.sleep(30)
 
                 batch_size = int(batch_size / 2)
-                agent_logging.log_and_print_error_or_warning(
-                    logger,
-                    logging.WARNING,
-                    msg_args=[e, batch_size],
-                    error_code=3052,
-                    exc_info=True,
-                )
                 agent_logging.log_and_print(logger, logging.WARNING, f"Got {e}, reducing batch size")
                 time.sleep(30)
                 if batch_size == 0:
@@ -767,7 +762,8 @@ def _download_jira_issues_page(
                         return [], 0
                     else:
                         get_changelog = False
-                        batch_size = 1
+                        batch_size = 100
+                        start_at += 1
 
 
 # Sometimes the results of issue search has an incomplete changelog.  Fill it in if so.
