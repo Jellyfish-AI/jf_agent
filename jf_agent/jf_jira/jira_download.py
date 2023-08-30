@@ -756,7 +756,7 @@ def _download_jira_issues_page(
                     exc_info=True,
                 )
                 agent_logging.log_and_print(logger, logging.WARNING, f"Got {e}, reducing batch size")
-                time.sleet(30)
+                time.sleep(30)
                 if batch_size == 0:
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                         return [], 1
