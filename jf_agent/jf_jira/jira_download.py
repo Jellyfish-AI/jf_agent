@@ -666,7 +666,7 @@ def _download_jira_issues_segment(
 def _split_id_list(jira_issue_ids_segment: list):
 
     # same logic as `download_all_issue_metadata` for splitting lists of ids
-    max_length = 5000
+    max_length = 20000
     len_issue_ids_string = (
         len(','.join(str(x) for x in jira_issue_ids_segment))
         + len(jira_issue_ids_segment) * 2
