@@ -126,9 +126,9 @@ def _standardize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client):
-    print(f'[{datetime.now().isoformat()}] downloading bitbucket users... ', end='', flush=True)
+    logger.info(f'downloading bitbucket users... [!n]')
     users = [_standardize_user(user) for user in client.admin.users]
-    print('✓')
+    logger.info('✓')
     return users
 
 
@@ -148,7 +148,7 @@ def _standardize_project(api_project, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client, include_projects, exclude_projects, redact_names_and_urls):
-    print(f'[{datetime.now().isoformat()}] downloading bitbucket projects... ', end='', flush=True)
+    logger.info(f'downloading bitbucket projects... [!n]')
 
     filters = []
     if include_projects:
@@ -161,7 +161,7 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
         for p in client.projects.list()
         if all(filt(p) for filt in filters)
     ]
-    print('✓')
+    logger.info('✓')
     return projects
 
 
@@ -205,9 +205,7 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
 
 @agent_logging.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
-    print(
-        f'[{datetime.now().isoformat()}] downloading bitbucket repositories... ', end='', flush=True
-    )
+    logger.info(f'downloading bitbucket repositories... [!n]')
 
     filters = []
     if include_repos:
@@ -222,7 +220,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
                 api_repo = project.repos[repo['name']]
                 yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
 
-    print('✓')
+    logger.info('✓')
 
 
 def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):
@@ -258,7 +256,7 @@ def get_commits_for_included_branches(
         with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
             repo = api_repo.get()
             if verbose:
-                agent_logging.verbose(f"Beginning download of commits for repo {repo}")
+                logger.info(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
@@ -280,9 +278,7 @@ def get_commits_for_included_branches(
             for branch in branches_to_process:
                 try:
                     if verbose:
-                        agent_logging.verbose(
-                            f"Beginning download of commits for repo {repo['name']}."
-                        )
+                        logger.info(f"Beginning download of commits for repo {repo['name']}.")
                     commits = api_project.repos[repo['name']].commits(until=branch)
 
                     for j, commit in enumerate(
@@ -309,7 +305,9 @@ def get_commits_for_included_branches(
                             yield standardized_commit
 
                 except stashy.errors.NotFoundException as e:
-                    print(f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...')
+                    logger.warning(
+                        f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...'
+                    )
 
 
 def _standardize_pr_repo(repo, redact_names_and_urls):
@@ -336,16 +334,14 @@ def get_pull_requests(
         with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
             repo = api_repo.get()
             if verbose:
-                agent_logging.verbose(f"Beginning download of PRs for repo {repo}")
+                logger.info(f"Beginning download of PRs for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             api_repo = api_project.repos[repo['name']]
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
             )
             if verbose:
-                agent_logging.verbose(
-                    f"Pulling pull requests starting at {pull_since} for repo {repo}"
-                )
+                logger.info(f"Pulling pull requests starting at {pull_since} for repo {repo}")
 
             skipped_prs = 0
 
@@ -371,20 +367,18 @@ def get_pull_requests(
                 except stashy.errors.NotFoundException:
                     additions, deletions, changed_files = None, None, None
                 except RetryError:
-                    print(
+                    logger.warning(
                         f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo.get()['name']}"
                     )
                     additions, deletions, changed_files = None, None, None
                 except ChunkedEncodingError as e:
-                    print(
+                    logger.warning(
                         f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}, error: {e}. Skipping.'
                     )
                     skipped_prs += 1
                     continue
                 except stashy.errors.GenericException:
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
+                    logger.info(
                         f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
                     )
                     additions, deletions, changed_files = None, None, None
@@ -411,9 +405,7 @@ def get_pull_requests(
                         [a for a in api_pr.activities()], key=lambda x: x['createdDate']
                     )
                 except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
-                    agent_logging.log_and_print(
-                        logger,
-                        logging.INFO,
+                    logger.info(
                         f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
                     )
 
@@ -467,7 +459,7 @@ def get_pull_requests(
                         )
                     ]
                 except stashy.errors.NotFoundException:
-                    print(
+                    logger.warning(
                         f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
                     )
                     commits = []
@@ -513,9 +505,7 @@ def get_pull_requests(
                 yield standardized_pr
 
             if skipped_prs > 5:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
+                logger.warning(
                     f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
                 )
 

@@ -48,7 +48,7 @@ def download_and_write_streaming(
     generator_func_args,
     item_id_dict_key,
     addl_info_dict_key=None,
-    batch_size=None   # batch size implies that we are being given a list of list (e.g. jira issue, nothing else)
+    batch_size=None,  # batch size implies that we are being given a list of list (e.g. jira issue, nothing else)
 ):
     batch_num = 0
     item_infos = set()
@@ -79,7 +79,7 @@ def download_and_write_streaming(
                             _get_item_by_key(item, addl_info_dict_key),
                         )
                     )
-            logger.info(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
+            logger.debug(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
 
         outfile.close()
         batch_num += 1

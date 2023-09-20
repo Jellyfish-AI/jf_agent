@@ -62,7 +62,7 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
-        print('downloading github projects... ', end='', flush=True)
+        logger.info('downloading github projects... [!n]')
         projects = []
 
         # NOTE: For github, project equates to a Github organization here!
@@ -75,7 +75,7 @@ class GithubGqlAdapter(GitAdapter):
             projects.append(
                 _standardize_project(organization, self.config.git_redact_names_and_urls,)
             )
-        print('✓')
+        logger.info('✓')
 
         if not projects:
             raise ValueError(
@@ -86,13 +86,13 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
-        print('downloading github users... ', end='', flush=True)
+        logger.info('downloading github users... [!n]')
         users = [
             _standardize_user(user)
             for project_id in self.config.git_include_projects
             for user in self.client.get_users(project_id)
         ]
-        print('✓')
+        logger.info('✓')
         return users
 
     @diagnostics.capture_timing()
@@ -100,7 +100,7 @@ class GithubGqlAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        print('downloading github repos... ', end='', flush=True)
+        logger.info('downloading github repos... [!n]')
 
         nrm_repos: List[StandardizedRepository] = []
 
@@ -184,7 +184,7 @@ class GithubGqlAdapter(GitAdapter):
                     _standardize_repo(api_repo, nrm_project, self.config.git_redact_names_and_urls)
                 )
 
-        print('✓')
+        logger.info('✓')
         if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Github and check your configuration of repos to pull.'
@@ -199,7 +199,7 @@ class GithubGqlAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        print('downloading github commits on included branches... ', end='', flush=True)
+        logger.info('downloading github commits on included branches... [!n]')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = (
@@ -240,16 +240,18 @@ class GithubGqlAdapter(GitAdapter):
                                 )
 
                     except Exception as e:
-                        print(traceback.format_exc())
-                        print(f':WARN: Got exception for branch {branch_name}: {e}. Skipping...')
-        print('✓')
+                        logger.info(traceback.format_exc())
+                        logger.info(
+                            f':WARN: Got exception for branch {branch_name}: {e}. Skipping...'
+                        )
+        logger.info('✓')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        print('downloading github prs... ', end='', flush=True)
+        logger.info('downloading github prs... [!n]')
 
         nrm_prs = []
         for i, nrm_repo in enumerate(standardized_repos, start=1):
@@ -316,9 +318,9 @@ class GithubGqlAdapter(GitAdapter):
                         f'getting PRs for repo {nrm_repo.name} ({nrm_repo.id}). Skipping...',
                         log_as_exception=True,
                     )
-        return nrm_prs
 
-    print('✓')
+        logger.info('✓')
+        return nrm_prs
 
 
 '''

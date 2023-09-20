@@ -34,7 +34,13 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
-from jf_agent.validation import validate_jira, validate_git, validate_memory, validate_num_repos, ProjectMetadata
+from jf_agent.validation import (
+    validate_jira,
+    validate_git,
+    validate_memory,
+    validate_num_repos,
+    ProjectMetadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +109,7 @@ def main():
     success = True
 
     if config.run_mode == 'validate':
-        print('Validating configuration...')
+        logger.info('Validating configuration...')
 
         # Check for Jira credentials
         if config.jira_url and (
@@ -111,18 +117,18 @@ def main():
         ):
             validate_jira(config, creds)
         else:
-            print("\nNo Jira URL or credentials provided, skipping Jira validation...")
+            logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
 
         # Check for Git configs
         if config.git_configs:
             validate_git(config, creds)
         else:
-            print("\nNo Git configs provided, skipping Git validation...")
+            logger.info("\nNo Git configs provided, skipping Git validation...")
 
         # Finally, display memory usage statistics.
         validate_memory()
 
-        print("\nDone")
+        logger.info("\nDone")
 
         return True
 
@@ -137,13 +143,9 @@ def main():
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
         except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.WARNING,
-                msg=f"Could not validate client/org creds, moving on. Got {e}",
-            )
+            logger.warning(msg=f"Could not validate client/org creds, moving on. Got {e}",)
 
-        print(f'Will write output files into {config.outdir}')
+        logger.info(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
 
         sys_diag_done_event = threading.Event()
@@ -164,9 +166,7 @@ def main():
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
                 )
             except Exception as e:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
+                logger.warning(
                     'Exception encountered when trying to generate manifests. '
                     f'This should not affect your agent upload. Exception: {e}',
                 )
@@ -206,11 +206,13 @@ def main():
     if config.run_mode_includes_send:
         success &= send_data(config, creds)
     else:
-        print(f'\nSkipping send_data because run_mode is "{config.run_mode}"')
-        print(f'You can now inspect the downloaded data in {config.outdir}')
-        print(f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"')
+        logger.info(
+            f'\nSkipping send_data because run_mode is "{config.run_mode}"\n'
+            f'You can now inspect the downloaded data in {config.outdir}\n'
+            f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"'
+        )
 
-    print('Done!')
+    logger.info('Done!')
 
     return success
 
@@ -252,7 +254,7 @@ def _get_git_instance_to_creds(git_config):
     def _check_and_get(envvar_name):
         envvar_val = os.environ.get(envvar_name)
         if not envvar_val:
-            print(
+            logger.error(
                 f'ERROR: Missing environment variable {envvar_name}. Required for instance {git_config.git_instance_slug}.'
             )
             raise BadConfigException()
@@ -279,7 +281,7 @@ def _get_git_instance_to_creds(git_config):
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
     if not jellyfish_api_token:
-        print('ERROR: JELLYFISH_API_TOKEN not found in the environment.')
+        logger.error('ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         raise BadConfigException()
 
     jira_username = os.environ.get('JIRA_USERNAME', None)
@@ -294,7 +296,7 @@ def obtain_creds(config):
     if len(set(list(token.values())[0] for token in git_instance_to_creds.values())) < len(
         git_instance_to_creds
     ):
-        print(
+        logger.warning(
             'WARNING: Tokens for each git instance provided are not unique. You will see better performance by configuring '
             'git instances for the same provider with separate tokens that have independent rate-limits.'
         )
@@ -302,7 +304,7 @@ def obtain_creds(config):
     jira_username_pass_missing = bool(not (jira_username and jira_password))
     jira_bearer_token_missing = bool(not jira_bearer_token)
     if config.jira_url and jira_username_pass_missing and jira_bearer_token_missing:
-        print(
+        logger.warning(
             'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD or JIRA_BEARER_TOKEN.'
         )
         raise BadConfigException()
@@ -320,7 +322,8 @@ def obtain_jellyfish_endpoint_info(config, creds):
     )
 
     if not resp.ok:
-        print(
+        # Base URL is our jellyfish URL. NOT sensitive client data
+        logger.error(
             f"ERROR: Couldn't get agent config info from {base_url}/agent/pull-state "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
@@ -333,7 +336,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
-        print(
+        logger.error(
             'ERROR: A Git instance is configured, but no Git instance '
             'info returned from the Jellyfish API -- please contact Jellyfish'
         )
@@ -346,7 +349,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
             # returned by the endpoint (we'll need this data later)
             slug = git_config.git_instance_slug
             if not git_instance_info.get(slug):
-                print(
+                logger.info(
                     f'ERROR: The Jellyfish API did not return an instance with the git_instance_slug `{slug}` -- '
                     f'please check your configuration or contact Jellyfish'
                 )
@@ -362,7 +365,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
             or not config.git_configs[0].git_instance_slug in git_instance_info
         )
     ):
-        print(
+        logger.info(
             'ERROR: A single Git instance has been configured, but multiple Git instances were returned '
             'from the Jellyfish API -- please contact Jellyfish'
         )
@@ -372,14 +375,14 @@ def obtain_jellyfish_endpoint_info(config, creds):
     if len(config.git_configs) > 1:
         for git_config in config.git_configs:
             if not git_config.git_instance_slug:
-                print(
+                logger.info(
                     'ERROR: Must specify git_instance slug in multi-git mode -- '
                     'please check your configuration or contact Jellyfish'
                 )
                 raise BadConfigException()
 
             if git_config.git_instance_slug not in git_instance_info:
-                print(
+                logger.info(
                     f'ERROR: Invalid `instance_slug` {git_config.git_instance_slug} in configuration. -- '
                     'please check your configuration or contact Jellyfish'
                 )
@@ -399,7 +402,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     )
 
     if not resp.ok:
-        print(
+        logger.info(
             f"ERROR: Couldn't get company info from {base_url}/agent/company "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
@@ -409,36 +412,26 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     company_slug = company_info.get('company_slug')
     # Create and add Jira Manifest
     if config.jira_url:
-        agent_logging.log_and_print(logger, logging.INFO, 'Attempting to generate Jira Manifest...')
+        logger.info('Attempting to generate Jira Manifest...')
         try:
             jira_manifest = create_jira_manifest(
                 company_slug=company_slug, config=config, creds=creds
             )
             if jira_manifest:
-                agent_logging.log_and_print(
-                    logger, logging.INFO, 'Successfully created Jira Manifest'
-                )
+                logger.info('Successfully created Jira Manifest')
                 manifests.append(jira_manifest)
             else:
-                agent_logging.log_and_print(
-                    logger, logging.WARNING, 'create_jira_manifest returned a None Type.'
-                )
+                logger.warning('create_jira_manifest returned a None Type.')
         except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.WARNING,
-                f'Error encountered when generating jira manifest. This should NOT affect your agent upload. Error: {e}',
+            logger.debug(
+                f'Error encountered when generating jira manifest. Error: {e}', exc_info=True
             )
     else:
-        agent_logging.log_and_print(
-            logger, logging.INFO, 'No Jira config detected, skipping Jira manifest generation'
-        )
+        logger.info('No Jira config detected, skipping Jira manifest generation')
 
     if config.git_configs:
         try:
-            agent_logging.log_and_print(
-                logger, logging.INFO, 'Attempting to generate Git Manifests...'
-            )
+            logger.info('Attempting to generate Git Manifests...')
             # Create and add Git Manifests
             manifests += create_git_manifests(
                 company_slug=company_slug,
@@ -447,24 +440,13 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
                 endpoint_git_instances_info=jellyfish_endpoint_info.git_instance_info,
             )
         except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.WARNING,
-                (
-                    f'Error encountered when generating git manifests. '
-                    f'This should NOT affect your agent upload. Error: {e}'
-                ),
+            logger.debug(
+                f'Error encountered when generating git manifests. Error: {e}', exc_info=True,
             )
     else:
-        agent_logging.log_and_print(
-            logger,
-            logging.INFO,
-            'No Git Configuration detection, skipping Git manifests generation',
-        )
+        logger.info('No Git Configuration detection, skipping Git manifests generation',)
 
-    agent_logging.log_and_print(
-        logger, logging.INFO, f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...'
-    )
+    logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
     for manifest in manifests:
         # Always send Manifest data to S3
@@ -473,15 +455,15 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             jellyfish_api_token=creds.jellyfish_api_token,
         )
 
-    agent_logging.log_and_print(
-        logger, logging.INFO, f'Successfully uploaded {len(manifests)} manifest(s) to Jellyfish!'
-    )
+    logger.info(f'Successfully uploaded {len(manifests)} manifest(s) to Jellyfish!')
 
 
 # far more straightforward than real bin packing because we have a set number of bins to start
 def _pack_bins(num_bins: int, packing_items: list[ProjectMetadata]) -> list:
     bins = [[] for i in range(num_bins)]
-    bin_size = [0 for i in range(num_bins)]  # size is based on number of *repos* in a bin, not projects
+    bin_size = [
+        0 for i in range(num_bins)
+    ]  # size is based on number of *repos* in a bin, not projects
 
     for item in packing_items:
         smallest_bin_index = min(range(len(bin_size)), key=bin_size.__getitem__)
@@ -492,36 +474,34 @@ def _pack_bins(num_bins: int, packing_items: list[ProjectMetadata]) -> list:
 
 
 def distribute_repos_between_workers(git_configs, metadata_by_project):
-    agent_logging.log_and_print(
-        logger, logging.INFO, f'Starting to distribute projects/ repos between workers'
-    )
+    logger.info(f'Starting to distribute projects/ repos between workers')
     projects_to_be_distributed = []
     configs_can_be_distributed = set()
     configs_cannot_be_distributed = set()
     for project in metadata_by_project:
         if len(metadata_by_project[project].valid_creds) > 1:
-            for prefix in metadata_by_project[project].valid_creds: configs_can_be_distributed.add(prefix)
+            for prefix in metadata_by_project[project].valid_creds:
+                configs_can_be_distributed.add(prefix)
             projects_to_be_distributed.append(metadata_by_project[project])
         else:
             configs_cannot_be_distributed.add(metadata_by_project[project].valid_creds[0])
 
-    agent_logging.log_and_print(
-        logger, logging.INFO, f'{len(configs_can_be_distributed)} of {len(git_configs)} '
-                              f'configs can have projects distributed'
+    logger.info(
+        f'{len(configs_can_be_distributed)} of {len(git_configs)} '
+        f'configs can have projects distributed'
     )
     if len(configs_can_be_distributed) < 1:
-        agent_logging.log_and_print(
-            logger, logging.INFO, f'No configs can be distributed, moving on'
-        )
+        logger.info(f'No configs can be distributed, moving on')
         return git_configs
-    projects_to_be_distributed.sort(key=lambda p: p.num_repos, reverse=True)  # desc so that largest project goes first
+    projects_to_be_distributed.sort(
+        key=lambda p: p.num_repos, reverse=True
+    )  # desc so that largest project goes first
     # naively assume only distributing between one set (ie n number of 1:1 cred:org projects and y number cred x 2:org)
     # will be feature flagged by company (so no guesswork)
     num_bins = len(projects_to_be_distributed[0].valid_creds)
-    agent_logging.log_and_print(logger, logging.INFO, f'Before packing:')
+    logger.info(f'Before packing:')
     for git_config in git_configs:
-        agent_logging.log_and_print(
-            logger, logging.INFO, f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
+        logger.info(f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
 
     bins = _pack_bins(num_bins=num_bins, packing_items=projects_to_be_distributed)
 
@@ -529,13 +509,14 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
     for prefix in configs_can_be_distributed:
         for git_config in git_configs:
             if git_config.creds_envvar_prefix == prefix:
-                git_config.git_include_projects = [project.project_name for project in bins[bin_index]]
+                git_config.git_include_projects = [
+                    project.project_name for project in bins[bin_index]
+                ]
                 bin_index += 1
 
-    agent_logging.log_and_print(logger, logging.INFO, f'After packing:')
+    logger.info(f'After packing:')
     for git_config in git_configs:
-        agent_logging.log_and_print(
-            logger, logging.INFO, f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
+        logger.info(f'{git_config.git_instance_slug}: {len(git_config.git_include_projects)}')
 
     return git_configs
 
@@ -546,9 +527,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
-        agent_logging.log_and_print(
-            logger, logging.INFO, 'Obtained Jira configuration, attempting download...',
-        )
+        logger.info('Obtained Jira configuration, attempting download...',)
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -563,27 +542,27 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
         if jf_options.get('normalize_project_distribution', False):
             try:
-                metadata_by_project = validate_num_repos(git_configs=config.git_configs, creds=creds)
+                metadata_by_project = validate_num_repos(
+                    git_configs=config.git_configs, creds=creds
+                )
                 # TODO: use a queue for threads to pull from & support include/exclude repos
-                git_configs = distribute_repos_between_workers(config.git_configs, metadata_by_project)
+                git_configs = distribute_repos_between_workers(
+                    config.git_configs, metadata_by_project
+                )
             except Exception as e:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
+                logger.warning(
                     f'Exception during project distribution, using default config and moving on. Got: {e}'
                 )
         else:
             git_configs = config.git_configs
 
         for git_config in git_configs:
-            agent_logging.log_and_print(
-                logger,
-                logging.INFO,
+            logger.info(
                 f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
                 + f'in parallel with {config.git_max_concurrent} workers, '
-                +  f'for {len(git_config.git_include_projects)} projects'
+                + f'for {len(git_config.git_include_projects)} projects'
                 if len(config.git_configs) > 1
-                else "...",
+                else f"Starting Git download for {len(config.git_configs)} provided git configurations",
             )
             futures.append(
                 executor.submit(
@@ -672,9 +651,7 @@ def send_data(config, creds):
                         files={'file': (path_to_obj, f)},
                     )
                     upload_resp.raise_for_status()
-                    agent_logging.log_and_print(
-                        logger, logging.INFO, msg=f'Successfully uploaded {filename}',
-                    )
+                    logger.info(msg=f'Successfully uploaded {filename}',)
                     return
             # For large file uploads, we run into intermittent 104 errors where the 'peer' (jellyfish)
             # will appear to shut down the session connection.
@@ -700,13 +677,13 @@ def send_data(config, creds):
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
-        print(f'Compressing {fname}')
+        logger.info(f'Compressing {fname}')
         with open(fname, 'rb') as f_in:
             with gzip.open(f'{fname}.gz', 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
         os.remove(fname)
 
-    print('Sending data to Jellyfish... ')
+    logger.info('Sending data to Jellyfish... ')
 
     # obtain file names from the directory
     _, directories, filenames = next(os.walk(config.outdir))
@@ -732,7 +709,7 @@ def send_data(config, creds):
         for (filename, file_dict) in signed_urls.items()
     ]
 
-    print(f'Starting {len(threads)} threads')
+    logger.info(f'Starting {len(threads)} threads')
 
     for t in threads:
         t.start()
@@ -747,7 +724,7 @@ def send_data(config, creds):
             agent_logging.log_and_print_error_or_warning(
                 logger, logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
             )
-        print(
+        logger.info(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         success = False
@@ -758,9 +735,7 @@ def send_data(config, creds):
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # Log this information before we upload the log file.
-    agent_logging.log_and_print(
-        logger, logging.INFO, msg=f'Agent run succeeded: {success}',
-    )
+    logger.info(msg=f'Agent run succeeded: {success}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
@@ -784,7 +759,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     if updated_within_last_x_months:
         params.update({'monthsback': updated_within_last_x_months})
 
-    print('Fetching Jira issues that are missing Git repo data in Jellyfish...')
+    logger.info('Fetching Jira issues that are missing Git repo data in Jellyfish...')
 
     resp = requests.get(
         f'{base_url}/endpoints/agent/unlinked-dev-issues',
@@ -795,9 +770,9 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
     # try and grab any specific error messages sent over
     try:
         data = resp.json()
-        print(data.get('message', ''))
+        logger.info(data.get('message', ''))
     except json.decoder.JSONDecodeError:
-        print(
+        logger.info(
             f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.'
         )
         return None
@@ -817,5 +792,5 @@ if __name__ == '__main__':
         if not success:
             sys.exit(1)
     except BadConfigException:
-        print('ERROR: Bad config; see earlier messages')
+        logger.info('ERROR: Bad config; see earlier messages')
         sys.exit(1)

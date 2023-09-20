@@ -11,6 +11,7 @@ class ReauthSession(requests.Session):
         # If we get HTTP 401, re-authenticate and try again
         response = super().request(method, url, **kwargs)
         if response.status_code == 401:
+            # Use print instead of logger.log, as URL could be considered sensitive data
             print(f'WARN: received 401 for the request [{method}] {url} - resetting client session')
 
             # Clear cookies and re-auth

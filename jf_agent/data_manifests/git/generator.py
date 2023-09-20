@@ -46,20 +46,14 @@ def create_manifests(
         try:
             # If the git config doesn't have a git instance, do not generate a manifest
             if not instance_slug:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded. This should NOT affect your agent upload',
+                logger.debug(
+                    f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded',
                 )
                 continue
 
-            agent_logging.log_and_print(
-                logger, logging.INFO, f'Generating manifest for instance {instance_slug}'
-            )
+            logger.info(f'Generating manifest for instance {instance_slug}')
             for org in git_config.git_include_projects:
-                agent_logging.log_and_print(
-                    logger,
-                    logging.INFO,
+                logger.info(
                     f'Processing git instance {instance_slug} for company {company_slug} under github org {org}',
                 )
                 manifest_adapter: ManifestAdapter = get_manifest_adapter(
@@ -75,9 +69,7 @@ def create_manifests(
 
                 # Process Repos
                 repos_count = manifest_adapter.get_repos_count()
-                agent_logging.log_and_print(
-                    logger,
-                    logging.INFO,
+                logger.info(
                     f'Processing {repos_count} repos {"including Branches and Pull Request" if verbose else ""}',
                 )
                 for repo_manifest in manifest_adapter.get_all_repo_data():
@@ -103,15 +95,15 @@ def create_manifests(
 
                     repo_manifests.append(repo_manifest)
 
-                agent_logging.log_and_print(logger, logging.INFO, 'Done processing Repos')
+                logger.info('Done processing Repos')
 
                 # Process Users
                 users_count = manifest_adapter.get_users_count()
-                agent_logging.log_and_print(logger, logging.INFO, f'Processing {users_count} users')
+                logger.info(f'Processing {users_count} users')
                 user_manifests += [
                     user_manifest for user_manifest in manifest_adapter.get_all_user_data()
                 ]
-                agent_logging.log_and_print(logger, logging.INFO, 'Done processing Users')
+                logger.info('Done processing Users')
 
                 manifests.append(
                     GitDataManifest(
@@ -126,16 +118,12 @@ def create_manifests(
                     )
                 )
         except UnsupportedGitProvider as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.WARNING,
+            logger.warning(
                 'Unsupported Git Provider exception encountered. '
                 f'This shouldn\'t affect your agent upload. Error: {e}',
             )
         except Exception as e:
-            agent_logging.log_and_print(
-                logger,
-                logging.WARNING,
+            logger.warning(
                 'An exception happened when creating manifest. This shouldn\'t affect your agent upload. '
                 f'Exception: {e}',
             )

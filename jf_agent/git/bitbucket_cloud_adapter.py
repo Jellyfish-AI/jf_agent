@@ -56,12 +56,12 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_projects(self) -> List[StandardizedProject]:
         # Bitbucket Cloud API doesn't have a way to fetch all top-level projects;
         # instead, need to configure the agent with a specific set of projects to pull
-        print('downloading bitbucket projects... ', end='', flush=True)
+        logger.info('downloading bitbucket projects... [!n]')
         projects = [
             _standardize_project(p, self.config.git_redact_names_and_urls)
             for p in self.config.git_include_projects
         ]
-        print('✓')
+        logger.info('✓')
 
         return projects
 
@@ -70,7 +70,7 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        print('downloading bitbucket repos... ', end='', flush=True)
+        logger.info('downloading bitbucket repos... [!n]')
 
         repos = []
         for p in standardized_projects:
@@ -91,9 +91,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         and api_repo['uuid'].lower() not in git_include_repos_lowered
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's not in git_include_repos''',
                             )
                         continue
@@ -108,9 +106,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         or api_repo['uuid'].lower() in git_exclude_repos_lowered
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's in git_exclude_repos''',
                             )
                         continue
@@ -125,9 +121,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         and repo_project['uuid'] not in self.config.git_include_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
                                 f'''("{repo_project['key']}"/{repo_project['uuid']}) is not in git_include_bbcloud_projects''',
                             )
@@ -139,9 +133,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         or repo_project['uuid'] in self.config.git_exclude_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
                                 f'''("{repo_project['key']}"/{repo_project['uuid']}) is in git_exclude_bbcloud_projects''',
                             )
@@ -152,7 +144,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     _standardize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
                 )
 
-        print('✓')
+        logger.info('✓')
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
@@ -168,7 +160,7 @@ class BitbucketCloudAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        print('downloading bitbucket commits on included branches... ', end='', flush=True)
+        logger.info('downloading bitbucket commits on included branches... [!n]')
         for i, repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -200,14 +192,14 @@ class BitbucketCloudAdapter(GitAdapter):
                             if commit.commit_date < pull_since:
                                 break
 
-        print('✓')
+        logger.info('✓')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        print('downloading bitbucket prs... ', end='', flush=True)
+        logger.info('downloading bitbucket prs... [!n]')
         for i, repo in enumerate(
             tqdm(standardized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
@@ -220,9 +212,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     api_prs = self.client.get_pullrequests(repo.project.id, repo.id)
 
                     if not api_prs:
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'no prs found for repo {repo.id}. Skipping... '
-                        )
+                        logger.info(f'no prs found for repo {repo.id}. Skipping... ')
                         continue
 
                     for api_pr in tqdm(api_prs, desc=f'processing prs for {repo.name}', unit='prs'):
@@ -273,7 +263,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         logger, logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
-        print('✓')
+        logger.info('✓')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)

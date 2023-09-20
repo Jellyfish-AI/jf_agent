@@ -163,9 +163,7 @@ class GithubGqlClient:
                         # Add three seconds for gracetime
                         sleep_time = retry_after + 3
 
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
+                logger.warning(
                     f'A secondary rate limit was hit. Sleeping for {sleep_time} seconds. (attempt {attempt_number}/{max_attempts})',
                 )
                 time.sleep(sleep_time)
@@ -189,11 +187,7 @@ class GithubGqlClient:
                 # past. In that case, wait for 5 mins just in case.
                 if sleep_time <= 0:
                     sleep_time = 300
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',
-                )
+                logger.warning(f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',)
                 time.sleep(sleep_time)
             finally:
                 attempt_number += 1

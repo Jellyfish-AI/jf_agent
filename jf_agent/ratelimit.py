@@ -62,9 +62,7 @@ class RateLimiter(object):
                         )
                     raise
 
-            agent_logging.log_and_print(
-                logger,
-                logging.INFO,
+            logger.info(
                 f'Rate limiter: exceeded {max_calls} calls in {period_secs} seconds for {realm}!',
             )
             if (sleep_until - start) >= timedelta(seconds=self.timeout_secs):
@@ -75,8 +73,7 @@ class RateLimiter(object):
 
             sleep_period_secs = (sleep_until - datetime.utcnow()).total_seconds()
             if sleep_period_secs > 0:  # it's possible that sleep_until was a couple ms ago
-                agent_logging.log_and_print(
-                    logger,
+                logger.info(
                     logging.INFO,
                     f'Sleeping for {sleep_period_secs:.1f} secs ({sleep_period_secs / 60.0:.1f} mins)',
                 )

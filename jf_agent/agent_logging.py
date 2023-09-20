@@ -1,50 +1,86 @@
-from datetime import datetime
 from contextlib import contextmanager
 from functools import wraps
 import logging
 import os
-import traceback
+import sys
 
 '''
 Guidance on logging/printing in the agent:
 
-stdout (e.g., print() output) is for the customer/operator; it should include
- - info on run progress: tqdm output, etc.
- - errors/warnings encountered
+stdout (e.g., print() output) is for the customer/operator; it should be used when
+we have customer sensitive data that they do not want to submit to jellyfish (i.e. passwords)
 
-logger output is for Jellyfish; it should include
+logger output is for Jellyfish and customers; it should include:
  - function entry/exit timings
  - loop iteration timings/liveness indicators
  - errors/warnings encountered
 
 logger output is submitted to Jellyfish, so should only contain non-sensitive data:
 e.g., function names, iteration counts
-
-Since we generally want errors/warnings to go to BOTH stdout and the logger, we
-should generally use log_and_print() instead of logger.whatever().
 '''
 
 LOG_FILE_NAME = 'jf_agent.log'
 
+# For styling in log files, I think it's best to always use new lines even when we use
+# the special character to ignore them. Leverage always_use_newlines for this
+def _emit_helper(_self: logging.Handler, record: logging.LogRecord, always_use_newlines=False):
+    special_code = '[!n]'
+
+    msg = _self.format(record)
+    if special_code in msg:
+        msg = msg.replace('[!n]', '')
+        if always_use_newlines:
+            msg += '\n'
+    else:
+        msg += '\n'
+
+    _self.stream.write(msg)
+    _self.flush()
+
+
+class CustomStreamHandler(logging.StreamHandler):
+    """Handler that controls the writing of the newline character"""
+
+    def emit(self, record) -> None:
+        _emit_helper(self, record)
+
+
+class CustomFileHandler(logging.FileHandler):
+    """Handler that controls the writing of the newline character"""
+
+    def emit(self, record) -> None:
+        _emit_helper(self, record, always_use_newlines=True)
+
 
 def configure(outdir):
+
+    # Send log messages to std using a stream handler
+    # All INFO level and above errors will go to STDOUT
+    stdout_handler = CustomStreamHandler(stream=sys.stdout)
+    stdout_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
+    stdout_handler.setLevel(logging.INFO)
+
+    # Send log messages to logger, using more structured format
+    # All DEBUG level and above errors will go to the log file
+    logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
+    logfile_handler.setFormatter(
+        logging.Formatter(fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s')
+    )
+    logfile_handler.setLevel(logging.DEBUG)
+
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        filename=os.path.join(outdir, LOG_FILE_NAME),
-        filemode='a',  # May be adding to a file created in a previous run
+        level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
     )
 
 
-def log_entry_exit(logger, *args, **kwargs):
+def log_entry_exit(logger: logging.Logger, *args, **kwargs):
     def actual_decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             func_name = func.__name__
-            logger.info(f'{func_name}: Starting')
+            logger.debug(f'{func_name}: Starting')
             ret = func(*args, **kwargs)
-            logger.info(f'{func_name}: Ending')
+            logger.debug(f'{func_name}: Ending')
             return ret
 
         return wrapper
@@ -58,10 +94,10 @@ def log_loop_iters(
 ):
     if (this_iternum - 1) % log_every_n_iters == 0:
         if log_entry:
-            logger.info(f'Loop "{loop_desc}", iter {this_iternum}: Starting')
+            logger.debug(f'Loop "{loop_desc}", iter {this_iternum}: Starting')
         yield
         if log_exit:
-            logger.info(f'Loop "{loop_desc}", iter {this_iternum}: Ending')
+            logger.debug(f'Loop "{loop_desc}", iter {this_iternum}: Ending')
     else:
         yield
 
@@ -125,13 +161,8 @@ ERROR_MESSAGES = {
 }
 
 
-def log_and_print(logger, level, msg):
-    '''
-    For an info-level message that should be sent to the logger, and also written
-    to stdout (for user visibility)
-    '''
-    logger.log(level, msg)
-    print(msg, flush=True)
+def generate_standard_error_msg(error_code, msg_args=[]):
+    return f'[{error_code}] {ERROR_MESSAGES.get(error_code).format(*msg_args)}'
 
 
 def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_info=False):
@@ -140,14 +171,12 @@ def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_i
     to stdout (for user visibility)
     '''
     assert level >= logging.WARNING
-    msg = f'[{error_code}] {ERROR_MESSAGES.get(error_code).format(*msg_args)}'
-    logger.log(level, msg, exc_info=exc_info)
-    print(msg, flush=True)
-    if exc_info:
-        print(traceback.format_exc())
-
-
-# TODO(asm,2021-08-12): This is sloppy, we should figure out a way to
-# get Python's native logging to behave the way we want.
-def verbose(msg):
-    print(f"[{datetime.now().isoformat()}] {msg}")
+    msg = generate_standard_error_msg(error_code=error_code, msg_args=msg_args)
+    if level == logging.WARNING or level == logging.WARN:
+        logger.warn(msg=msg, exc_info=exc_info)
+    elif level == logging.ERROR:
+        logger.error(msg=msg, exc_info=exc_info)
+    elif level == logging.CRITICAL:
+        logger.critical(msg=msg, exc_info=exc_info)
+    else:
+        logger.info(msg=msg, exc_info=exc_info)

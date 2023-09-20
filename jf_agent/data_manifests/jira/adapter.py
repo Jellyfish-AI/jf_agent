@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
-
+import logging
 from dataclasses import dataclass
 from functools import partial
 import traceback
@@ -9,6 +9,8 @@ from jf_agent import agent_logging
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -155,10 +157,11 @@ class JiraCloudManifestAdapter:
         except Exception as e:
             # This is unexpected behavior and it should never happen, log the error
             # before returning
-            agent_logging.log_and_print(
+            logger.debug(
                 'Unusual exception encountered when testing auth. '
                 'This should not affect agent uploading. '
-                f'JIRAError was expected but the following error was raised: {e}'
+                f'JIRAError was expected but the following error was raised: {e}',
+                exc_info=True,
             )
             return False
 

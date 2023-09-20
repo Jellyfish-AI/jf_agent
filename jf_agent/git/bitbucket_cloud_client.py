@@ -117,9 +117,7 @@ class BitbucketCloudClient:
                 if e.response.status_code == 429:
                     if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
                         wait_time = int(e.response.headers["Retry-After"]) + wait_extra
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'Retrying in {wait_time} seconds...'
-                        )
+                        logger.log(f'Retrying in {wait_time} seconds...')
                         time.sleep(wait_time)
                         continue
                     # rate-limited in spite of trying to throttle
@@ -151,9 +149,7 @@ class BitbucketCloudClient:
                     page = self.get_json(url, rate_limit_realm)
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404 and ignore404:
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'Caught a 404 for {url} - ignoring',
-                        )
+                        logger.log(f'Caught a 404 for {url} - ignoring',)
                         return
                     raise
 

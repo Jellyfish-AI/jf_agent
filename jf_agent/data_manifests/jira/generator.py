@@ -27,7 +27,7 @@ def create_manifest(company_slug, config, creds):
     )
 
     def _agent_log(msg: str):
-        agent_logging.log_and_print(logger, logging.INFO, msg)
+        logger.info(msg)
 
     project_data_dicts = manifest_adapter.get_project_data_dicts()
 
