@@ -51,7 +51,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
-        logger.info('downloading gitlab projects... [!n]')
+        logger.info('downloading gitlab projects...')
         projects = []
 
         for project_id in self.config.git_include_projects:
@@ -63,7 +63,7 @@ class GitLabAdapter(GitAdapter):
             projects.append(
                 _standardize_project(group, self.config.git_redact_names_and_urls,)  # are group_ids
             )
-        logger.info('✓')
+        logger.info('Done downloading gitlab projects!')
 
         if not projects:
             raise ValueError(
@@ -74,13 +74,13 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
-        logger.info('downloading gitlab users... [!n]')
+        logger.info('downloading gitlab users...')
         users = [
             _standardize_user(user)
             for project_id in self.config.git_include_projects
             for user in self.client.list_group_members(project_id)
         ]
-        logger.info('✓')
+        logger.info('Done downloading gitlab users!')
         return users
 
     @diagnostics.capture_timing()
@@ -88,7 +88,7 @@ class GitLabAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        logger.info('downloading gitlab repos... [!n]')
+        logger.info('downloading gitlab repos...')
 
         nrm_repos: List[StandardizedRepository] = []
         for nrm_project in standardized_projects:
@@ -144,7 +144,7 @@ class GitLabAdapter(GitAdapter):
                     error_code=2201,
                 )
 
-        logger.info('✓')
+        logger.info('Done downloading gitlab repos!')
         if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
@@ -154,7 +154,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[StandardizedBranch]:
-        logger.info('downloading gitlab branches... [!n]')
+        logger.info('downloading gitlab branches...')
         try:
             branches = [
                 _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
@@ -167,7 +167,7 @@ class GitLabAdapter(GitAdapter):
                 'This is most likely because no repo was in the GitlabProject -- will treat like there are no branches',
             )
             branches = []
-        logger.info('✓')
+        logger.info('Done downloading gitlab branches!')
         return branches
 
     @diagnostics.capture_timing()
@@ -178,7 +178,7 @@ class GitLabAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        logger.info('downloading gitlab commits on included branches... [!n]')
+        logger.info('downloading gitlab commits on included branches...')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -208,14 +208,14 @@ class GitLabAdapter(GitAdapter):
 
                 except Exception as e:
                     logger.info(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
-        logger.info('✓')
+        logger.info('Done downloading gitlab commits on included branches!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        logger.info('downloading gitlab prs... [!n]')
+        logger.info('downloading gitlab prs...')
 
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             logger.info(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
@@ -303,7 +303,7 @@ class GitLabAdapter(GitAdapter):
                         log_as_exception=True,
                     )
 
-    logger.info('✓')
+    logger.info('Done downloading gitlab PRs!')
 
 
 '''

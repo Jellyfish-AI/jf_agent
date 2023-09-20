@@ -139,9 +139,9 @@ def _standardize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client: GithubClient, include_orgs):
-    logger.info('downloading github users... [!n]')
+    logger.info('downloading github users...')
     users = [_standardize_user(user) for org in include_orgs for user in client.get_all_users(org)]
-    logger.info('✓')
+    logger.info('Done downloading github users!')
 
     return users
 
@@ -162,12 +162,12 @@ def _standardize_project(api_org, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
-    logger.info('downloading github projects... [!n]')
+    logger.info('downloading github projects...')
     projects = [
         _standardize_project(client.get_organization_by_name(org), redact_names_and_urls)
         for org in include_orgs
     ]
-    logger.info('✓')
+    logger.info('Done downloading github projects')
 
     if not projects:
         raise ValueError(
@@ -213,7 +213,7 @@ def _standardize_repo(client: GithubClient, org_name, repo, redact_names_and_url
 def get_repos(
     client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
 ):
-    logger.info('downloading github repos... [!n]')
+    logger.info('downloading github repos...')
 
     filters = []
     if include_repos:
@@ -227,7 +227,7 @@ def get_repos(
         for r in client.get_all_repos(org)
         if all(filt(r) for filt in filters)
     ]
-    logger.info('✓')
+    logger.info('Done downloading github repos!')
     if not repos:
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'

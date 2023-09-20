@@ -126,15 +126,11 @@ class BitbucketCloudClient:
                     # so just try in 30 seconds, unless it's already
                     # been too long
                     elif (datetime.utcnow() - start) < timedelta(hours=1):
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, 'Retrying in 30 seconds...',
-                        )
+                        logger.info('Retrying in 30 seconds...')
                         time.sleep(30)
                         continue
                     else:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, error_code=3151
-                        )
+                        agent_logging.log_standard_error(logger, logging.ERROR, error_code=3151)
                 raise
 
     # Handle pagination

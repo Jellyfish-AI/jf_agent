@@ -56,12 +56,12 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_projects(self) -> List[StandardizedProject]:
         # Bitbucket Cloud API doesn't have a way to fetch all top-level projects;
         # instead, need to configure the agent with a specific set of projects to pull
-        logger.info('downloading bitbucket projects... [!n]')
+        logger.info('downloading bitbucket projects...')
         projects = [
             _standardize_project(p, self.config.git_redact_names_and_urls)
             for p in self.config.git_include_projects
         ]
-        logger.info('✓')
+        logger.info('Done downloading Projects!')
 
         return projects
 
@@ -70,7 +70,7 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        logger.info('downloading bitbucket repos... [!n]')
+        logger.info('downloading bitbucket repos...')
 
         repos = []
         for p in standardized_projects:
@@ -144,7 +144,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     _standardize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
                 )
 
-        logger.info('✓')
+        logger.info('Done downloading repos!')
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
@@ -160,7 +160,7 @@ class BitbucketCloudAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        logger.info('downloading bitbucket commits on included branches... [!n]')
+        logger.info('downloading bitbucket commits on included branches...')
         for i, repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -192,14 +192,14 @@ class BitbucketCloudAdapter(GitAdapter):
                             if commit.commit_date < pull_since:
                                 break
 
-        logger.info('✓')
+        logger.info('Done downloading commits on included branches!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        logger.info('downloading bitbucket prs... [!n]')
+        logger.info('downloading bitbucket prs...')
         for i, repo in enumerate(
             tqdm(standardized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
@@ -263,7 +263,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         logger, logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
-        logger.info('✓')
+        logger.info('Done downloading PRs!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
