@@ -54,7 +54,7 @@ class RateLimiter(object):
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 429:
                         # Got rate limited anyway!
-                        agent_logging.log_and_print_error_or_warning(
+                        agent_logging.log_standard_error(
                             logger,
                             logging.ERROR,
                             msg_args=[calls_made, max_calls, realm],
@@ -66,7 +66,7 @@ class RateLimiter(object):
                 f'Rate limiter: exceeded {max_calls} calls in {period_secs} seconds for {realm}!',
             )
             if (sleep_until - start) >= timedelta(seconds=self.timeout_secs):
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger, logging.ERROR, msg_args=[self.timeout_secs], error_code=3020
                 )
                 raise Exception('Rate limit timeout')

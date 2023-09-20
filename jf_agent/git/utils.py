@@ -42,7 +42,7 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
     error_name = type(e).__name__
 
     if log_as_exception:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger,
             logging.ERROR,
             msg_args=[error_name, response_code, action, e],
@@ -50,6 +50,6 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
             exc_info=True,
         )
     else:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.WARNING, msg_args=[error_name, response_code, action], error_code=3141
         )

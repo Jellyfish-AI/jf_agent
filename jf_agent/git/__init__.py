@@ -271,7 +271,7 @@ def get_git_client(
             )
 
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger,
             logging.ERROR,
             msg_args=[config.git_provider, e],
@@ -353,7 +353,7 @@ def load_and_dump_git(
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger,
             logging.ERROR,
             msg_args=[config.git_provider, e],

@@ -226,7 +226,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or 'repository' not in api_pr['destination']
                                 or not api_pr['destination']['repository']
                             ):
-                                agent_logging.log_and_print_error_or_warning(
+                                agent_logging.log_standard_error(
                                     logger, logging.WARN, msg_args=[api_pr['id']], error_code=3030
                                 )
                                 continue
@@ -249,7 +249,7 @@ class BitbucketCloudAdapter(GitAdapter):
 
                         except Exception:
                             # if something happens when normalizing a PR, just keep going with the rest
-                            agent_logging.log_and_print_error_or_warning(
+                            agent_logging.log_standard_error(
                                 logger,
                                 logging.ERROR,
                                 msg_args=[api_pr["id"], repo.id],
@@ -259,7 +259,7 @@ class BitbucketCloudAdapter(GitAdapter):
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
@@ -389,7 +389,7 @@ def _standardize_pr(
         diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3031,
             )
     except requests.exceptions.RetryError:
@@ -403,7 +403,7 @@ def _standardize_pr(
             pass
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3041,
             )
         else:
@@ -411,7 +411,7 @@ def _standardize_pr(
             raise
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3051,
         )
 

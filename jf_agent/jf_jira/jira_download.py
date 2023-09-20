@@ -198,7 +198,7 @@ def download_projects_and_versions(
                 and e.text
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger, logging.ERROR, msg_args=[project_id], error_code=2112,
                 )
                 return False
@@ -259,7 +259,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 ).json()['values']
             except JIRAError as e:
                 if e.status_code == 400:
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, msg_args=[project_id], error_code=2202,
                     )
                     break
@@ -294,7 +294,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                     if e.status_code == 500 or e.status_code == 404:
                         logger.info(f"Couldn't get sprints for board {b['id']}.  Skipping...")
                     elif e.status_code == 400:
-                        agent_logging.log_and_print_error_or_warning(
+                        agent_logging.log_standard_error(
                             logger,
                             logging.ERROR,
                             msg_args=[str(b), str(s_start_at), str(e)],
@@ -346,14 +346,14 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
             # a smaller ask will prevent the server from choking.
             batch_size = int(batch_size / 2)
             error = e
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
             )
 
     # copied logic from jellyfish direct connect
     # don't bail, just skip
     # khardy 2023-03-16
-    agent_logging.log_and_print_error_or_warning(
+    agent_logging.log_standard_error(
         logger,
         logging.WARNING,
         msg_args=[f"{type(error)}", issue_jql, start_at, original_batch_size],
@@ -423,7 +423,7 @@ def download_all_issue_metadata(
 
             except Exception as e:
                 thread_exceptions[thread_num] = e
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.ERROR,
                     msg_args=[thread_num, traceback.format_exc()],
@@ -595,7 +595,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         for i in items:
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger=logger, level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
@@ -654,7 +654,7 @@ def _download_jira_issues_segment(
         q.put(None)
 
     except BaseException as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
         )
         q.put(e)
@@ -745,7 +745,7 @@ def _download_jira_issues_page(
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                         return [], 1
                     elif not get_changelog:
-                        agent_logging.log_and_print_error_or_warning(
+                        agent_logging.log_standard_error(
                             logger, logging.WARNING, msg_args=[search_params], error_code=3062,
                         )
                         return [], 0
@@ -820,7 +820,7 @@ def download_customfieldoptions(jira_connection, project_ids):
                 projectIds=[project_id], expand='projects.issuetypes.fields'
             )
         except JIRAError:
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARNING, error_code=3072, exc_info=False
             )
             return []
@@ -1012,7 +1012,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 )
             except JIRAError as e:
                 if e.status_code == 403:
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, error_code=2122,
                     )
                     return []

@@ -73,7 +73,7 @@ def get_basic_jira_connection(config, creds):
     try:
         return _get_raw_jira_connection(config, creds)
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[e], error_code=2102, exc_info=True
         )
 
@@ -305,7 +305,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
         )
         return {'type': 'Jira', 'status': 'failed'}

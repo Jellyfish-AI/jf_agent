@@ -3,6 +3,7 @@ from functools import wraps
 import logging
 import os
 import sys
+import urllib3
 
 '''
 Guidance on logging/printing in the agent:
@@ -68,8 +69,12 @@ def configure(outdir):
     )
     logfile_handler.setLevel(logging.DEBUG)
 
+    # Silence the urllib3 logger to only emit WARNING level logs,
+    # because the debug level logs are super noisy
+    logging.getLogger(urllib3.__name__).setLevel(logging.WARNING)
+
     logging.basicConfig(
-        level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
+        level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
     )
 
 
@@ -103,7 +108,7 @@ def log_loop_iters(
 
 
 # Mapping of error/warning codes to templated error messages to be called by
-# log_and_print_error_or_warning(). This allows for Jellyfish to better categorize errors/warnings.
+# log_standard_error(). This allows for Jellyfish to better categorize errors/warnings.
 ERROR_MESSAGES = {
     0000: 'An unknown error has occurred. Error message: {}',
     3000: 'Failed to upload file {} to S3 bucket',
@@ -165,7 +170,7 @@ def generate_standard_error_msg(error_code, msg_args=[]):
     return f'[{error_code}] {ERROR_MESSAGES.get(error_code).format(*msg_args)}'
 
 
-def log_and_print_error_or_warning(logger, level, error_code, msg_args=[], exc_info=False):
+def log_standard_error(logger, level, error_code, msg_args=[], exc_info=False):
     '''
     For a failure that should be sent to the logger with an error_code, and also written
     to stdout (for user visibility)

@@ -137,7 +137,7 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
                     msg_args=[total_failed, nrm_project.id, repos_failed_string],
@@ -154,7 +154,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[StandardizedBranch]:
-        logger.info('downloading gitlab branches... ')
+        logger.info('downloading gitlab branches... [!n]')
         try:
             branches = [
                 _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
@@ -178,7 +178,7 @@ class GitLabAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        logger.info('downloading gitlab commits on included branches... ')
+        logger.info('downloading gitlab commits on included branches... [!n]')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -215,7 +215,7 @@ class GitLabAdapter(GitAdapter):
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        logger.info('downloading gitlab prs... ')
+        logger.info('downloading gitlab prs... [!n]')
 
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             logger.info(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')

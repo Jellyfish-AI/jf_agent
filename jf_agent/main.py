@@ -170,6 +170,7 @@ def main():
                     'Exception encountered when trying to generate manifests. '
                     f'This should not affect your agent upload. Exception: {e}',
                 )
+                logger.debug(f'Manifest generation bug: {e}', exc_info=True)
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
@@ -631,7 +632,7 @@ def send_data(config, creds):
             upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
             thread_exceptions.append(e)
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
@@ -658,7 +659,7 @@ def send_data(config, creds):
             # These exceptions ARE NOT handled by the above retry_session retry logic, which handles 500 level errors.
             # Attempt to catch and retry the 104 type error here
             except requests.exceptions.ConnectionError as e:
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
                     msg_args=[filename, repr(e)],
@@ -671,7 +672,7 @@ def send_data(config, creds):
 
         # If we make it out of the while loop without returning, that means
         # we failed to upload the file.
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
         )
 
@@ -721,7 +722,7 @@ def send_data(config, creds):
     if any(thread_exceptions):
         # Run through exceptions and inject them into the agent log
         for exception in thread_exceptions:
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
             )
         logger.info(
