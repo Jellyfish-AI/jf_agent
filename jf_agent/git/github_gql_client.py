@@ -1,12 +1,11 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 import time
 from requests import Session
 import requests
 from requests.utils import default_user_agent
 from typing import Generator
-from jf_agent import agent_logging
 from jf_agent.git.github_gql_utils import datetime_to_gql_str_format, github_gql_format_to_datetime
 
 from jf_agent.session import retry_session

@@ -6,7 +6,6 @@ import shutil
 from jira.exceptions import JIRAError
 from requests.exceptions import RequestException
 
-from jf_agent import agent_logging
 from jf_agent.jf_jira import _get_raw_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient

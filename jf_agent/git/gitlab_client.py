@@ -2,7 +2,6 @@ import gitlab
 import logging
 import requests
 
-from jf_agent import agent_logging
 from jf_agent.git.utils import log_and_print_request_error
 
 logger = logging.getLogger(__name__)

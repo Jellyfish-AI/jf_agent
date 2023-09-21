@@ -1,6 +1,4 @@
 import logging
-import traceback
-from jf_agent import agent_logging
 from jf_agent.config_file_reader import GitConfig
 
 from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter

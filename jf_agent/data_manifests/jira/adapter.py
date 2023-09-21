@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import partial
 import traceback
 from typing import Callable, Generator
-from jf_agent import agent_logging
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
