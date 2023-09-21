@@ -29,6 +29,44 @@ from jf_agent.jf_jira.jira_download import (
 logger = logging.getLogger(__name__)
 
 
+class JFJiraConnection:
+
+    request_count_by_method = {
+        'fields': 0,
+        'resolutions': 0,
+    }
+    jira_connection: JIRA = None
+
+    def __init__(self, config, creds, max_retries=3):
+        self.jira_connection = _get_raw_jira_connection(config, creds, max_retries)
+
+    def fields(self):
+        self.request_count_by_method['fields'] += 1
+        return self.jira_connection.fields()
+
+    def resolutions(self):
+        self.request_count_by_method['resolutions'] += 1
+        return self.jira_connection.resolutions()
+
+    def issue_types(self):
+        self.request_count_by_method['issue_types'] += 1
+        return self.jira_connection.issue_types()
+
+    def issue_link_types(self):
+        self.request_count_by_method['issue_link_types'] += 1
+        return self.jira_connection.issue_link_types()
+
+    def make_call(self, method_name):
+        self.request_count_by_method.setdefault(method_name, 0)
+        self.request_count_by_method[method_name] += 1
+        method = getattr(self.jira_connection, method_name)
+        return method()
+
+    def search_issues(self, jql_str, startAt=0, maxResults=50, validate_query=True, fields=None, expand=None,
+                      json_result=None):
+        return self.jira_connection.search_issues()
+
+
 def _get_raw_jira_connection(config, creds, max_retries=3):
     kwargs = {
         'server': config.jira_url,
@@ -283,7 +321,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.outdir,
                 'jira_worklogs',
                 config.compress_output_files,
-                download_worklogs(jira_connection, all_downloaded_issue_ids),
+                download_worklogs(jira_connection, all_downloaded_issue_ids, endpoint_jira_info),
             )
 
         write_file(
@@ -303,6 +341,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
+        agent_logging.log_and_print(logger, logging.ERROR, f"Failed to download jira data, instead got: {e}")
         agent_logging.log_and_print_error_or_warning(
             logger, logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
         )

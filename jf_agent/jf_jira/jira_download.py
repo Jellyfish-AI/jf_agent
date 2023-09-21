@@ -791,10 +791,10 @@ def _expand_changelog(jira_issues, jira_connection):
 @agent_logging.log_entry_exit(logger)
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
-def download_worklogs(jira_connection, issue_ids):
+def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
     print('downloading jira worklogs... ', end='', flush=True)
     updated = []
-    since = 0
+    since = endpoint_jira_info.get('last_updated', 0)
     while True:
         worklog_ids_json = jira_connection._get_json('worklog/updated', params={'since': since})
         updated_worklog_ids = [v['worklogId'] for v in worklog_ids_json['values']]
