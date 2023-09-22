@@ -143,7 +143,7 @@ def main():
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
         except Exception as e:
-            logger.warning(msg=f"Could not validate client/org creds, moving on. Got {e}",)
+            logger.warning(f"Could not validate client/org creds, moving on. Got {e}")
 
         logger.info(f'Will write output files into {config.outdir}')
         diagnostics.open_file(config.outdir)
@@ -305,7 +305,7 @@ def obtain_creds(config):
     jira_username_pass_missing = bool(not (jira_username and jira_password))
     jira_bearer_token_missing = bool(not jira_bearer_token)
     if config.jira_url and jira_username_pass_missing and jira_bearer_token_missing:
-        logger.warning(
+        logger.error(
             'ERROR: Jira credentials not found. Set environment variables JIRA_USERNAME and JIRA_PASSWORD or JIRA_BEARER_TOKEN.'
         )
         raise BadConfigException()
@@ -350,7 +350,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
             # returned by the endpoint (we'll need this data later)
             slug = git_config.git_instance_slug
             if not git_instance_info.get(slug):
-                logger.info(
+                logger.error(
                     f'ERROR: The Jellyfish API did not return an instance with the git_instance_slug `{slug}` -- '
                     f'please check your configuration or contact Jellyfish'
                 )
@@ -366,7 +366,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
             or not config.git_configs[0].git_instance_slug in git_instance_info
         )
     ):
-        logger.info(
+        logger.error(
             'ERROR: A single Git instance has been configured, but multiple Git instances were returned '
             'from the Jellyfish API -- please contact Jellyfish'
         )
@@ -376,14 +376,14 @@ def obtain_jellyfish_endpoint_info(config, creds):
     if len(config.git_configs) > 1:
         for git_config in config.git_configs:
             if not git_config.git_instance_slug:
-                logger.info(
+                logger.error(
                     'ERROR: Must specify git_instance slug in multi-git mode -- '
                     'please check your configuration or contact Jellyfish'
                 )
                 raise BadConfigException()
 
             if git_config.git_instance_slug not in git_instance_info:
-                logger.info(
+                logger.error(
                     f'ERROR: Invalid `instance_slug` {git_config.git_instance_slug} in configuration. -- '
                     'please check your configuration or contact Jellyfish'
                 )
@@ -403,7 +403,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     )
 
     if not resp.ok:
-        logger.info(
+        logger.error(
             f"ERROR: Couldn't get company info from {base_url}/agent/company "
             f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
         )
@@ -652,7 +652,7 @@ def send_data(config, creds):
                         files={'file': (path_to_obj, f)},
                     )
                     upload_resp.raise_for_status()
-                    logger.info(msg=f'Successfully uploaded {filename}',)
+                    logger.info(f'Successfully uploaded {filename}')
                     return
             # For large file uploads, we run into intermittent 104 errors where the 'peer' (jellyfish)
             # will appear to shut down the session connection.
@@ -725,7 +725,7 @@ def send_data(config, creds):
             agent_logging.log_standard_error(
                 logger, logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
             )
-        logger.info(
+        logger.error(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
         success = False
@@ -736,7 +736,7 @@ def send_data(config, creds):
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
 
     # Log this information before we upload the log file.
-    logger.info(msg=f'Agent run succeeded: {success}')
+    logger.info(f'Agent run succeeded: {success}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
@@ -773,7 +773,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
         data = resp.json()
         logger.info(data.get('message', ''))
     except json.decoder.JSONDecodeError:
-        logger.info(
+        logger.error(
             f'ERROR: Could not parse response with status code {resp.status_code}. Contact an administrator for help.'
         )
         return None
@@ -793,5 +793,5 @@ if __name__ == '__main__':
         if not success:
             sys.exit(1)
     except BadConfigException:
-        logger.info('ERROR: Bad config; see earlier messages')
+        logger.error('ERROR: Bad config; see earlier messages')
         sys.exit(1)

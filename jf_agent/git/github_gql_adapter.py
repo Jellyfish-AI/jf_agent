@@ -62,7 +62,7 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
-        logger.info('downloading github projects...')
+        logger.info('downloading github projects... [!n]')
         projects = []
 
         # NOTE: For github, project equates to a Github organization here!
@@ -75,7 +75,7 @@ class GithubGqlAdapter(GitAdapter):
             projects.append(
                 _standardize_project(organization, self.config.git_redact_names_and_urls,)
             )
-        logger.info('Downloading github projects!')
+        logger.info('✓')
 
         if not projects:
             raise ValueError(
@@ -86,13 +86,13 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
-        logger.info('downloading github users...')
+        logger.info('downloading github users... [!n]')
         users = [
             _standardize_user(user)
             for project_id in self.config.git_include_projects
             for user in self.client.get_users(project_id)
         ]
-        logger.info('Downloading github users!')
+        logger.info('✓')
         return users
 
     @diagnostics.capture_timing()
@@ -240,8 +240,8 @@ class GithubGqlAdapter(GitAdapter):
                                 )
 
                     except Exception as e:
-                        logger.info(traceback.format_exc())
-                        logger.info(
+                        logger.debug(traceback.format_exc())
+                        logger.warning(
                             f':WARN: Got exception for branch {branch_name}: {e}. Skipping...'
                         )
         logger.info('Done downloading commits for included branches!')

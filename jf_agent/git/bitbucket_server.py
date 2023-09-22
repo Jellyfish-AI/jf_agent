@@ -126,9 +126,9 @@ def _standardize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client):
-    logger.info(f'downloading bitbucket users...')
+    logger.info(f'downloading bitbucket users... [!n]')
     users = [_standardize_user(user) for user in client.admin.users]
-    logger.info('Done downloading users!')
+    logger.info('✓')
     return users
 
 
@@ -148,7 +148,7 @@ def _standardize_project(api_project, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client, include_projects, exclude_projects, redact_names_and_urls):
-    logger.info(f'downloading bitbucket projects...')
+    logger.info(f'downloading bitbucket projects... [!n]')
 
     filters = []
     if include_projects:
@@ -161,7 +161,7 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
         for p in client.projects.list()
         if all(filt(p) for filt in filters)
     ]
-    logger.info('Done downloading projects!')
+    logger.info('✓')
     return projects
 
 
@@ -205,7 +205,7 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
 
 @agent_logging.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
-    logger.info(f'downloading bitbucket repositories...')
+    logger.info(f'downloading bitbucket repositories... [!n]')
 
     filters = []
     if include_repos:
@@ -220,7 +220,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
                 api_repo = project.repos[repo['name']]
                 yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
 
-    logger.info('Done downloading repositories!')
+    logger.info('✓')
 
 
 def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_names_and_urls):

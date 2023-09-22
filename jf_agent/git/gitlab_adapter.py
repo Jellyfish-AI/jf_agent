@@ -51,7 +51,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
-        logger.info('downloading gitlab projects...')
+        logger.info('downloading gitlab projects... [!n]')
         projects = []
 
         for project_id in self.config.git_include_projects:
@@ -63,7 +63,7 @@ class GitLabAdapter(GitAdapter):
             projects.append(
                 _standardize_project(group, self.config.git_redact_names_and_urls,)  # are group_ids
             )
-        logger.info('Done downloading gitlab projects!')
+        logger.info('✓')
 
         if not projects:
             raise ValueError(
@@ -74,13 +74,13 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
-        logger.info('downloading gitlab users...')
+        logger.info('downloading gitlab users... [!n]')
         users = [
             _standardize_user(user)
             for project_id in self.config.git_include_projects
             for user in self.client.list_group_members(project_id)
         ]
-        logger.info('Done downloading gitlab users!')
+        logger.info('✓')
         return users
 
     @diagnostics.capture_timing()
@@ -154,7 +154,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[StandardizedBranch]:
-        logger.info('downloading gitlab branches...')
+        logger.info('downloading gitlab branches... [!n]')
         try:
             branches = [
                 _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
@@ -167,7 +167,7 @@ class GitLabAdapter(GitAdapter):
                 'This is most likely because no repo was in the GitlabProject -- will treat like there are no branches',
             )
             branches = []
-        logger.info('Done downloading gitlab branches!')
+        logger.info('✓')
         return branches
 
     @diagnostics.capture_timing()
@@ -603,7 +603,6 @@ def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
     if include_rules_defined and not included:
         if config.git_verbose:
             logger.info(
-                logging.INFO,
                 f"skipping repo {api_repo.id} because it is not included explicitly or implicitly, "
                 f"while include rules are defined...",
             )

@@ -139,9 +139,9 @@ def _standardize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client: GithubClient, include_orgs):
-    logger.info('downloading github users...')
+    logger.info('downloading github users... [!n]')
     users = [_standardize_user(user) for org in include_orgs for user in client.get_all_users(org)]
-    logger.info('Done downloading github users!')
+    logger.info('✓')
 
     return users
 
@@ -162,12 +162,12 @@ def _standardize_project(api_org, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
-    logger.info('downloading github projects...')
+    logger.info('downloading github projects... [!n]')
     projects = [
         _standardize_project(client.get_organization_by_name(org), redact_names_and_urls)
         for org in include_orgs
     ]
-    logger.info('Done downloading github projects')
+    logger.info('✓')
 
     if not projects:
         raise ValueError(
@@ -213,7 +213,7 @@ def _standardize_repo(client: GithubClient, org_name, repo, redact_names_and_url
 def get_repos(
     client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
 ):
-    logger.info('downloading github repos...')
+    logger.info('downloading github repos... [!n]')
 
     filters = []
     if include_repos:
@@ -227,7 +227,7 @@ def get_repos(
         for r in client.get_all_repos(org)
         if all(filt(r) for filt in filters)
     ]
-    logger.info('Done downloading github repos!')
+    logger.info('✓')
     if not repos:
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
@@ -313,7 +313,7 @@ def get_commits_for_included_branches(
                             )
 
                 except Exception as e:
-                    logger.info(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
+                    logger.warning(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
 
 
 def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
@@ -429,6 +429,6 @@ def get_pull_requests(
                         yield _standardize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
             except Exception as e:
-                logger.info(
+                logger.warning(
                     f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...'
                 )

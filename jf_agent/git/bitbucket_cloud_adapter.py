@@ -56,12 +56,12 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_projects(self) -> List[StandardizedProject]:
         # Bitbucket Cloud API doesn't have a way to fetch all top-level projects;
         # instead, need to configure the agent with a specific set of projects to pull
-        logger.info('downloading bitbucket projects...')
+        logger.info('downloading bitbucket projects... [!n]')
         projects = [
             _standardize_project(p, self.config.git_redact_names_and_urls)
             for p in self.config.git_include_projects
         ]
-        logger.info('Done downloading Projects!')
+        logger.info('✓')
 
         return projects
 
@@ -227,7 +227,10 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or not api_pr['destination']['repository']
                             ):
                                 agent_logging.log_standard_error(
-                                    logger, logging.WARN, msg_args=[api_pr['id']], error_code=3030
+                                    logger,
+                                    logging.WARNING,
+                                    msg_args=[api_pr['id']],
+                                    error_code=3030,
                                 )
                                 continue
 
@@ -390,7 +393,7 @@ def _standardize_pr(
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             agent_logging.log_standard_error(
-                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3031,
+                logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3031,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -404,7 +407,7 @@ def _standardize_pr(
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
             agent_logging.log_standard_error(
-                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3041,
+                logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3041,
             )
         else:
             # Some other HTTP error happened; Re-raise
@@ -412,7 +415,7 @@ def _standardize_pr(
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
         agent_logging.log_standard_error(
-            logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3051,
+            logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3051,
         )
 
     # Comments

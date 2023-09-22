@@ -25,18 +25,27 @@ LOG_FILE_NAME = 'jf_agent.log'
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
 def _emit_helper(_self: logging.Handler, record: logging.LogRecord, always_use_newlines=False):
-    special_code = '[!n]'
+    try:
+        special_code = '[!n]'
 
-    msg = _self.format(record)
-    if special_code in msg:
-        msg = msg.replace('[!n]', '')
-        if always_use_newlines:
+        if _self.stream is None:
+            if _self.mode != 'w' or not _self._closed:
+                _self.stream = _self._open()
+
+        msg = _self.format(record)
+        if special_code in msg:
+            msg = msg.replace('[!n]', '')
+            if always_use_newlines:
+                msg += '\n'
+        else:
             msg += '\n'
-    else:
-        msg += '\n'
 
-    _self.stream.write(msg)
-    _self.flush()
+        _self.stream.write(msg)
+        _self.flush()
+    except RecursionError:  # See issue 36272
+        raise
+    except Exception:
+        _self.handleError(record)
 
 
 class CustomStreamHandler(logging.StreamHandler):
@@ -177,11 +186,4 @@ def log_standard_error(logger, level, error_code, msg_args=[], exc_info=False):
     '''
     assert level >= logging.WARNING
     msg = generate_standard_error_msg(error_code=error_code, msg_args=msg_args)
-    if level == logging.WARNING or level == logging.WARN:
-        logger.warn(msg=msg, exc_info=exc_info)
-    elif level == logging.ERROR:
-        logger.error(msg=msg, exc_info=exc_info)
-    elif level == logging.CRITICAL:
-        logger.critical(msg=msg, exc_info=exc_info)
-    else:
-        logger.info(msg=msg, exc_info=exc_info)
+    logger.log(level=level, msg=msg)
