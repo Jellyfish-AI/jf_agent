@@ -82,6 +82,7 @@ ERROR_MESSAGES = {
     'proceeding as though no files were changed',
     3051: 'For PR {} in repo {}, caught UnicodeDecodeError when attempting to decode changes; proceeding as though no files were changed',
     3061: 'Failed to download {} data:\n{}',
+    3071: 'Jira rate limit exceeded, retry {} / {}.  Trying again in {}...',
     3081: 'Got unexpected HTTP 403 for repo {}.  Skipping...',
     3091: 'Github rate limit exceeded.  Trying again in {}...',
     3101: 'Request to {} has failed {} times -- giving up!',
