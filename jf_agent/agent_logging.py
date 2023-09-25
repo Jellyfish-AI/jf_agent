@@ -29,7 +29,7 @@ def _emit_helper(_self: logging.Handler, record: logging.LogRecord, always_use_n
         special_code = '[!n]'
 
         if _self.stream is None:
-            if _self.mode != 'w' or not _self._closed:
+            if isinstance(_self, logging.FileHandler) and (_self.mode != 'w' or not _self._closed):
                 _self.stream = _self._open()
 
         msg = _self.format(record)
