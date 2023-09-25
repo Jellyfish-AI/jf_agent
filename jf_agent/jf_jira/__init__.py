@@ -285,7 +285,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.outdir,
                 'jira_worklogs',
                 config.compress_output_files,
-                download_worklogs(jira_connection, all_downloaded_issue_ids),
+                download_worklogs(jira_connection, all_downloaded_issue_ids, endpoint_jira_info),
             )
 
         write_file(
