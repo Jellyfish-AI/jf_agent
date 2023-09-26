@@ -5,7 +5,8 @@ from typing import Optional, Callable, Any
 from jira import JIRAError
 
 from jf_agent import agent_logging
-from jf_agent.jf_jira.jira_download import logger
+
+logger = logging.getLogger(__name__)
 
 
 def get_wait_time(e: Optional[Exception], retries: int) -> int:
@@ -40,8 +41,11 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs)
         except JIRAError as e:
             if hasattr(e, 'status_code') and e.status_code == 429 and retry < max_retries:
                 wait_time = get_wait_time(e, retries=retry)
-                agent_logging.log_and_print_error_or_warning(
-                    logger, logging.WARNING, msg_args=[retry, max_retries, wait_time], error_code=3071,
+                agent_logging.log_standard_error(
+                    logger,
+                    logging.WARNING,
+                    msg_args=[retry, max_retries, wait_time],
+                    error_code=3071,
                 )
                 time.sleep(wait_time)
                 continue

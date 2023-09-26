@@ -1,16 +1,14 @@
-from concurrent.futures import ThreadPoolExecutor
 import json
-
+import logging
 from dataclasses import dataclass
-from functools import partial
-import traceback
 from typing import Callable, Generator
-from jf_agent import agent_logging
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
 from jf_agent.jf_jira.utils import retry_for_429s
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,11 +35,7 @@ class JiraCloudManifestAdapter:
         page_size = 50
         curs = 0
         while True:
-            page = retry_for_429s(
-                func_endpoint,
-                startAt=curs,
-                maxResults=page_size
-            )
+            page = retry_for_429s(func_endpoint, startAt=curs, maxResults=page_size)
             page_length = len(page)
             # Check if we are at the end of all pages
             if page_length == 0:
@@ -161,10 +155,11 @@ class JiraCloudManifestAdapter:
         except Exception as e:
             # This is unexpected behavior and it should never happen, log the error
             # before returning
-            agent_logging.log_and_print(
+            logger.debug(
                 'Unusual exception encountered when testing auth. '
                 'This should not affect agent uploading. '
-                f'JIRAError was expected but the following error was raised: {e}'
+                f'JIRAError was expected but the following error was raised: {e}',
+                exc_info=True,
             )
             return False
 
@@ -191,7 +186,5 @@ class JiraCloudManifestAdapter:
 
     def _get_jql_search(self, jql_search: str, max_results: int = 0):
         return retry_for_429s(
-            self.jira_connection._get_json,
-            'search',
-            {'jql': jql_search, "maxResults": max_results}
+            self.jira_connection._get_json, 'search', {'jql': jql_search, "maxResults": max_results}
         )

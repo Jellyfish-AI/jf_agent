@@ -117,9 +117,7 @@ class BitbucketCloudClient:
                 if e.response.status_code == 429:
                     if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
                         wait_time = int(e.response.headers["Retry-After"]) + wait_extra
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'Retrying in {wait_time} seconds...'
-                        )
+                        logger.info(f'Retrying in {wait_time} seconds...')
                         time.sleep(wait_time)
                         continue
                     # rate-limited in spite of trying to throttle
@@ -128,15 +126,11 @@ class BitbucketCloudClient:
                     # so just try in 30 seconds, unless it's already
                     # been too long
                     elif (datetime.utcnow() - start) < timedelta(hours=1):
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, 'Retrying in 30 seconds...',
-                        )
+                        logger.info('Retrying in 30 seconds...')
                         time.sleep(30)
                         continue
                     else:
-                        agent_logging.log_and_print_error_or_warning(
-                            logger, logging.ERROR, error_code=3151
-                        )
+                        agent_logging.log_standard_error(logger, logging.ERROR, error_code=3151)
                 raise
 
     # Handle pagination
@@ -151,9 +145,8 @@ class BitbucketCloudClient:
                     page = self.get_json(url, rate_limit_realm)
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404 and ignore404:
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'Caught a 404 for {url} - ignoring',
-                        )
+                        # URLs are potentially sensitive data, so print instead of log!
+                        print(f'Caught a 404 for {url} - ignoring',)
                         return
                     raise
 

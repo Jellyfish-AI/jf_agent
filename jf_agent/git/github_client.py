@@ -49,7 +49,7 @@ class GithubClient:
                 if e.response.status_code not in (403, 404):
                     raise
 
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
                     msg_args=[m["url"], e.response.status_code],
@@ -68,7 +68,7 @@ class GithubClient:
 
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger, logging.WARNING, msg_args=[m["url"]], error_code=3081,
                 )
 
@@ -107,7 +107,7 @@ class GithubClient:
             return raw.json()
         except HTTPError as e:
             if e.response.status_code in (422,):
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
                     msg_args=[e.response.status_code, ref, full_repo_name],
@@ -144,7 +144,7 @@ class GithubClient:
                     raise
 
                 if i >= max_retries:
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
@@ -166,7 +166,7 @@ class GithubClient:
                 # wait longer than that
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
                 # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added.

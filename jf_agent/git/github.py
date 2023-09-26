@@ -39,18 +39,12 @@ def load_and_dump(
     # Logic to help with debugging the scopes that clients have with their API key
     try:
         scopes = git_conn.get_scopes_of_api_token()
-        agent_logging.log_and_print(
-            logger,
-            logging.INFO,
+        logger.debug(
             'Attempting to ingest github data with the following '
             f'scopes for {config.git_instance_slug}: {scopes}',
         )
     except Exception as e:
-        agent_logging.log_and_print(
-            logger,
-            logging.INFO,
-            f'Problem finding scopes for your API key. This should not affect your github agent processing. Error: {e}',
-        )
+        logger.debug(f'Problem finding scopes for your API key. Error: {e}', exc_info=True)
 
     write_file(
         outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
@@ -145,9 +139,9 @@ def _standardize_user(user):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_users(client: GithubClient, include_orgs):
-    print('downloading github users... ', end='', flush=True)
+    logger.info('downloading github users... [!n]')
     users = [_standardize_user(user) for org in include_orgs for user in client.get_all_users(org)]
-    print('✓')
+    logger.info('✓')
 
     return users
 
@@ -168,12 +162,12 @@ def _standardize_project(api_org, redact_names_and_urls):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
-    print('downloading github projects... ', end='', flush=True)
+    logger.info('downloading github projects... [!n]')
     projects = [
         _standardize_project(client.get_organization_by_name(org), redact_names_and_urls)
         for org in include_orgs
     ]
-    print('✓')
+    logger.info('✓')
 
     if not projects:
         raise ValueError(
@@ -219,7 +213,7 @@ def _standardize_repo(client: GithubClient, org_name, repo, redact_names_and_url
 def get_repos(
     client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
 ):
-    print('downloading github repos... ', end='', flush=True)
+    logger.info('downloading github repos... [!n]')
 
     filters = []
     if include_repos:
@@ -233,7 +227,7 @@ def get_repos(
         for r in client.get_all_repos(org)
         if all(filt(r) for filt in filters)
     ]
-    print('✓')
+    logger.info('✓')
     if not repos:
         raise ValueError(
             'No repos found. Make sure your token has appropriate access to GitHub and check your configuration of repos to pull.'
@@ -319,7 +313,7 @@ def get_commits_for_included_branches(
                             )
 
                 except Exception as e:
-                    print(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
+                    logger.warning(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
 
 
 def _get_merge_commit(client: GithubClient, pr, strip_text_content, redact_names_and_urls):
@@ -435,5 +429,6 @@ def get_pull_requests(
                         yield _standardize_pr(client, pr, strip_text_content, redact_names_and_urls)
 
             except Exception as e:
-                print(f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...')
-    print()
+                logger.warning(
+                    f':WARN: Exception getting PRs for repo {repo["name"]}: {e}. Skipping...'
+                )
