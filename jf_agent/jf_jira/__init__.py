@@ -73,7 +73,7 @@ def get_basic_jira_connection(config, creds):
     try:
         return _get_raw_jira_connection(config, creds)
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[e], error_code=2102, exc_info=True
         )
 
@@ -84,6 +84,7 @@ def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
         jira_connection, config.jira_include_fields, config.jira_exclude_fields
     ):
+        # This could potential data that clients do not exposed. Print instead of logging here
         print(f"{f['key']:30}\t{f['name']}")
 
 
@@ -91,6 +92,7 @@ def print_all_jira_fields(config, jira_connection):
 @agent_logging.log_entry_exit(logger)
 def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
     missing_repos = download_missing_repos_found_by_jira(config, creds, issues_to_scan)
+    # This could potential data that clients do not exposed. Print instead of logging here
     print(
         f'\nScanning the "Development" field on the Jira issues revealed {len(missing_repos)} Git repos apparently missing from Jellyfish'
     )
@@ -227,7 +229,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
-                batch_size=2000
+                batch_size=2000,
             )
 
         downloaded_issue_info = download_and_write_issues()
@@ -256,7 +258,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
-                batch_size=2000
+                batch_size=2000,
             )
 
         re_downloaded_issue_info = download_and_write_issues_needing_re_download()
@@ -303,7 +305,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
         )
         return {'type': 'Jira', 'status': 'failed'}

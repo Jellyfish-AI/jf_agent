@@ -31,7 +31,7 @@ def download_users(
     jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
 ):
     if not quiet:
-        print('downloading jira users... ', end='', flush=True)
+        logger.info('downloading jira users...  [!n]')
 
     jira_users = _search_all_users(jira_connection, gdpr_active)
 
@@ -39,8 +39,7 @@ def download_users(
     # results.  If we have seen approximately 1000 results, try
     # searching a different way
     if 950 <= len(jira_users) <= 1000:
-        agent_logging.log_and_print(
-            logger=logger,
+        logger.info(
             level=logging.INFO,
             msg=f'Page limit reached with {len(jira_users)} users, '
             'falling back to search by letter method.',
@@ -76,7 +75,7 @@ def download_users(
         jira_users = filtered_users
 
     if not quiet:
-        print('✓')
+        logger.info('✓')
     return jira_users
 
 
@@ -84,7 +83,7 @@ def download_users(
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_fields(jira_connection, include_fields, exclude_fields):
-    print('downloading jira fields... ', end='', flush=True)
+    logger.info('downloading jira fields... [!n]')
 
     filters = []
     if include_fields:
@@ -94,7 +93,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
     fields = [field for field in jira_connection.fields() if all(filt(field) for filt in filters)]
 
-    print('✓')
+    logger.info('✓')
     return fields
 
 
@@ -102,9 +101,9 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_resolutions(jira_connection):
-    print('downloading jira resolutions... ', end='', flush=True)
+    logger.info('downloading jira resolutions... [!n]')
     result = [r.raw for r in jira_connection.resolutions()]
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -117,7 +116,7 @@ def download_issuetypes(jira_connection, project_ids):
     For issue types that are scoped to projects, only extract the ones
     in the extracted projects.
     '''
-    print('downloading jira issue types... ', end='', flush=True)
+    logger.info('downloading jira issue types...  [!n]',)
     result = []
     for it in jira_connection.issue_types():
         if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
@@ -125,7 +124,7 @@ def download_issuetypes(jira_connection, project_ids):
                 result.append(it.raw)
         else:
             result.append(it.raw)
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -133,9 +132,9 @@ def download_issuetypes(jira_connection, project_ids):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_issuelinktypes(jira_connection):
-    print('downloading jira issue link types... ', end='', flush=True)
+    logger.info('downloading jira issue link types... [!n]')
     result = [lt.raw for lt in jira_connection.issue_link_types()]
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -143,9 +142,9 @@ def download_issuelinktypes(jira_connection):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_priorities(jira_connection):
-    print('downloading jira priorities... ', end='', flush=True)
+    logger.info('downloading jira priorities... [!n]')
     result = [p.raw for p in jira_connection.priorities()]
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -156,7 +155,7 @@ def download_priorities(jira_connection):
 def download_projects_and_versions(
     jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
-    print('downloading jira projects... ', end='', flush=True)
+    logger.info('downloading jira projects... [!n]')
 
     filters = []
     if include_projects:
@@ -199,7 +198,7 @@ def download_projects_and_versions(
                 and e.text
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger, logging.ERROR, msg_args=[project_id], error_code=2112,
                 )
                 return False
@@ -218,19 +217,19 @@ def download_projects_and_versions(
             'No Jira projects found that meet all the provided filters for project and project category. Aborting... '
         )
 
-    print('✓')
+    logger.info('✓')
 
-    print('downloading jira project components... ', end='', flush=True)
+    logger.info('downloading jira project components... [!n]')
     for p in projects:
         p.raw.update({'components': [c.raw for c in jira_connection.project_components(p)]})
-    print('✓')
+    logger.info('✓')
 
-    print('downloading jira versions... ', end='', flush=True)
+    logger.info('downloading jira versions... [!n]')
     result = [
         p.raw.update({'versions': [v.raw for v in jira_connection.project_versions(p)]}) or p.raw
         for p in projects
     ]
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -260,7 +259,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 ).json()['values']
             except JIRAError as e:
                 if e.status_code == 400:
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, msg_args=[project_id], error_code=2202,
                     )
                     break
@@ -293,9 +292,9 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                     # misconfigured; "falied to execute search"; etc.  Just
                     # skip and move on
                     if e.status_code == 500 or e.status_code == 404:
-                        print(f"Couldn't get sprints for board {b['id']}.  Skipping...")
+                        logger.info(f"Couldn't get sprints for board {b['id']}.  Skipping...")
                     elif e.status_code == 400:
-                        agent_logging.log_and_print_error_or_warning(
+                        agent_logging.log_standard_error(
                             logger,
                             logging.ERROR,
                             msg_args=[str(b), str(s_start_at), str(e)],
@@ -347,14 +346,14 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
             # a smaller ask will prevent the server from choking.
             batch_size = int(batch_size / 2)
             error = e
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
             )
 
     # copied logic from jellyfish direct connect
     # don't bail, just skip
     # khardy 2023-03-16
-    agent_logging.log_and_print_error_or_warning(
+    agent_logging.log_standard_error(
         logger,
         logging.WARNING,
         msg_args=[f"{type(error)}", issue_jql, start_at, original_batch_size],
@@ -369,7 +368,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
 def download_all_issue_metadata(
     jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
 ) -> Dict[int, IssueMetadata]:
-    print('downloading issue metadata... ', end='', flush=True)
+    logger.info('downloading issue metadata... [!n]')
 
     # all_project_ids is passed in as a set - need it to be a list so it can be split
     all_project_ids = list(all_project_ids)
@@ -424,7 +423,7 @@ def download_all_issue_metadata(
 
             except Exception as e:
                 thread_exceptions[thread_num] = e
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.ERROR,
                     msg_args=[thread_num, traceback.format_exc()],
@@ -447,7 +446,7 @@ def download_all_issue_metadata(
             any_exception = [e for e in thread_exceptions if e][0]
             raise Exception('Some thread(s) threw exceptions') from any_exception
 
-    print('✓')
+    logger.info('✓')
 
     return all_issue_metadata
 
@@ -484,9 +483,7 @@ def detect_issues_needing_re_download(
     for issue_id_str, issue_key in downloaded_issue_info:
         existing_metadata = issue_metadata_from_jellyfish.get(int(issue_id_str))
         if existing_metadata and issue_key != existing_metadata.key:
-            agent_logging.log_and_print(
-                logger,
-                logging.INFO,
+            logger.info(
                 f'Detected a key change for issue {issue_id_str} ({existing_metadata.key} -> {issue_key})',
             )
             issue_keys_changed.append(existing_metadata.key)
@@ -598,7 +595,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         for i in items:
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger=logger, level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
@@ -636,7 +633,7 @@ def _download_jira_issues_segment(
     download onto the shared queue.
     '''
     start_at = 0
-    agent_logging.log_and_print(logger, logging.INFO, f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
+    logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
     try:
         while start_at < len(jira_issue_ids_segment):
             issues, num_apparently_deleted = _download_jira_issues_page(
@@ -657,7 +654,7 @@ def _download_jira_issues_segment(
         q.put(None)
 
     except BaseException as e:
-        agent_logging.log_and_print_error_or_warning(
+        agent_logging.log_standard_error(
             logger, logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
         )
         q.put(e)
@@ -673,7 +670,7 @@ def _split_id_list(jira_issue_ids_segment: list):
         + 200
     )
     num_pulls = len_issue_ids_string // max_length + 1
-    agent_logging.log_and_print(logger, logging.INFO, f"Splitting the list of issue ids into {num_pulls} portions for server safety")
+    logger.debug(f"Splitting the list of issue ids into {num_pulls} portions for server safety")
 
     issue_ids_array = []
     if num_pulls == 1:
@@ -700,9 +697,7 @@ def _download_jira_issues_page(
     try:
         issue_ids_array = _split_id_list(jira_issue_ids_segment)
     except Exception as e:
-        agent_logging.log_and_print(
-            logger,
-            logging.WARNING,
+        logger.warning(
             f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list",
         )
         issue_ids_array.append(jira_issue_ids_segment)
@@ -732,31 +727,25 @@ def _download_jira_issues_page(
             except Exception as e:
                 if hasattr(e, 'status_code') and e.status_code == 429:
                     if tries >= 5:
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'exhausted 5 tries of ratelmiting'
-                        )
+                        logger.info(f'exhausted 5 tries of ratelmiting')
                         raise
                     if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
                         wait_time = int(e.response.headers["Retry-After"])
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'Retrying in {wait_time} seconds...'
-                        )
+                        logger.info(f'Retrying in {wait_time} seconds...')
                         time.sleep(wait_time)
                     else:
                         tries += 1
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'No retry-after header, retrying in 30 seconds...'
-                        )
+                        logger.info(f'No retry-after header, retrying in 30 seconds...')
                         time.sleep(30)
 
                 batch_size = int(batch_size / 2)
-                agent_logging.log_and_print(logger, logging.WARNING, f"Got {e}, reducing batch size")
+                logger.warning(f"Got {e}, reducing batch size")
                 time.sleep(30)
                 if batch_size == 0:
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                         return [], 1
                     elif not get_changelog:
-                        agent_logging.log_and_print_error_or_warning(
+                        agent_logging.log_standard_error(
                             logger, logging.WARNING, msg_args=[search_params], error_code=3062,
                         )
                         return [], 0
@@ -792,7 +781,7 @@ def _expand_changelog(jira_issues, jira_connection):
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
 def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
-    print('downloading jira worklogs... ', end='', flush=True)
+    logger.info('downloading jira worklogs...  [!n]')
     updated = []
     since = endpoint_jira_info.get('last_updated', 0)
     while True:
@@ -806,7 +795,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
         try:
             worklog_list_json = json_loads(resp)
         except ValueError:
-            print("Couldn't parse JIRA response as JSON: %s", resp.text)
+            logger.info("Couldn't parse JIRA response as JSON: %s", resp.text)
             raise
 
         updated.extend([wl for wl in worklog_list_json if int(wl['issueId']) in issue_ids])
@@ -814,7 +803,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
             break
         since = worklog_ids_json['until']
 
-    print('✓')
+    logger.info('✓')
 
     return {'existing': updated, 'deleted': []}
 
@@ -823,7 +812,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_customfieldoptions(jira_connection, project_ids):
-    print('downloading jira custom field options... ', end='', flush=True)
+    logger.info('downloading jira custom field options... [!n]')
     optionvalues = {}
     for project_id in project_ids:
         try:
@@ -831,7 +820,7 @@ def download_customfieldoptions(jira_connection, project_ids):
                 projectIds=[project_id], expand='projects.issuetypes.fields'
             )
         except JIRAError:
-            agent_logging.log_and_print_error_or_warning(
+            agent_logging.log_standard_error(
                 logger, logging.WARNING, error_code=3072, exc_info=False
             )
             return []
@@ -849,17 +838,17 @@ def download_customfieldoptions(jira_connection, project_ids):
                         optionvalues[field_key] = field['allowedValues']
 
     result = [{'field_key': k, 'raw_json': v} for k, v in optionvalues.items()]
-    print('✓')
+    logger.info('✓')
     return result
 
 
 @diagnostics.capture_timing()
 @agent_logging.log_entry_exit(logger)
 def download_statuses(jira_connection):
-    print('downloading jira statuses... ', end='', flush=True)
+    logger.info('downloading jira statuses... [!n]')
     statuses = jira_connection.statuses()
     result = [{'status_id': status.id, 'raw_json': status.raw} for status in statuses]
-    print('✓')
+    logger.info('✓')
     return result
 
 
@@ -989,7 +978,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
     # cross-reference them with git sources
     is_multi_git_config = len(config.git_configs) > 1
     for git_config in config.git_configs:
-        print(
+        logger.info(
             f'Checking against the {git_config.git_provider} instance {git_config.git_instance_slug} ..'
         )
         if is_multi_git_config:
@@ -1012,7 +1001,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
 
 
 def _get_repos_list_in_jira(issues_to_scan, jira_connection):
-    print('Scanning Jira issues for Git repos...')
+    logger.info('Scanning Jira issues for Git repos...')
     missing_repositories = {}
 
     for issue_id, instance_types in issues_to_scan.items():
@@ -1023,7 +1012,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 )
             except JIRAError as e:
                 if e.status_code == 403:
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, error_code=2122,
                     )
                     return []
@@ -1051,7 +1040,7 @@ def _remove_repos_present_in_git_instance(git_connection, git_config, missing_re
             missing_repositories, get_repos_from_git(git_connection, git_config), git_config
         )
     except Exception as e:
-        print(
+        logger.info(
             f'WARNING: Got an error when trying to cross-reference repos discovered by '
             f'Jira with Git repos: {e}\nSkipping this process and returning all repos '
             f'discovered by Jira...'
@@ -1071,27 +1060,27 @@ def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
         )
     except JIRAError as e:
         if e.status_code == 400:
-            print(
+            logger.info(
                 f"WARNING: received a 400 when requesting development details for issue {issue_id}, "
                 f"likely because it doesn't exist anymore -- skipping"
             )
             return []
         raise
     except Exception as e:
-        print(
+        logger.info(
             f'WARNING: caught {type(e)} exception requesting development details for '
             f'{issue_id} -- skipping'
         )
         return []
 
     if response.get('errors'):
-        print(
+        logger.info(
             f"WARNING: received an error when requesting development details for {issue_id}: {response['errors']}"
         )
 
     detail = response.get('detail', [])
     if not detail:
-        print(f'found no development details for {issue_id}')
+        logger.info(f'found no development details for {issue_id}')
         return []
 
     return detail[0]['repositories']
@@ -1104,7 +1093,7 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
     if not (repos_found_by_jira and git_repos):
         return
 
-    print('comparing repos found by Jira against Git repos to find missing ones...')
+    logger.info('comparing repos found by Jira against Git repos to find missing ones...')
 
     git_repo_names = []
     git_repo_urls = []
@@ -1136,8 +1125,8 @@ def _remove_mismatched_repos(repos_found_by_jira, git_repos, config):
             del repos_found_by_jira[repo['name']]
 
     if len(ignore_repos):
-        print(
+        logger.info(
             '\nJira found the following repos but per your config file, Jellyfish already has access:'
         )
         for repo in ignore_repos:
-            print(f"* {repo[0]:30}\t{repo[1]}")
+            logger.info(f"* {repo[0]:30}\t{repo[1]}")

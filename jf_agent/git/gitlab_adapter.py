@@ -51,7 +51,7 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
-        print('downloading gitlab projects... ', end='', flush=True)
+        logger.info('downloading gitlab projects... [!n]')
         projects = []
 
         for project_id in self.config.git_include_projects:
@@ -63,7 +63,7 @@ class GitLabAdapter(GitAdapter):
             projects.append(
                 _standardize_project(group, self.config.git_redact_names_and_urls,)  # are group_ids
             )
-        print('✓')
+        logger.info('✓')
 
         if not projects:
             raise ValueError(
@@ -74,13 +74,13 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
-        print('downloading gitlab users... ', end='', flush=True)
+        logger.info('downloading gitlab users... [!n]')
         users = [
             _standardize_user(user)
             for project_id in self.config.git_include_projects
             for user in self.client.list_group_members(project_id)
         ]
-        print('✓')
+        logger.info('✓')
         return users
 
     @diagnostics.capture_timing()
@@ -88,7 +88,7 @@ class GitLabAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        print('downloading gitlab repos... ', end='', flush=True)
+        logger.info('downloading gitlab repos...')
 
         nrm_repos: List[StandardizedRepository] = []
         for nrm_project in standardized_projects:
@@ -137,14 +137,14 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                agent_logging.log_and_print_error_or_warning(
+                agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
                     msg_args=[total_failed, nrm_project.id, repos_failed_string],
                     error_code=2201,
                 )
 
-        print('✓')
+        logger.info('Done downloading gitlab repos!')
         if not nrm_repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to GitLab and check your configuration of repos to pull.'
@@ -154,9 +154,9 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[StandardizedBranch]:
-        print('downloading gitlab branches... ', end='', flush=True)
+        logger.info('downloading gitlab branches... [!n]')
         try:
-            return [
+            branches = [
                 _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
                 for api_branch in self.client.list_project_branches(api_repo.id)
             ]
@@ -166,7 +166,9 @@ class GitLabAdapter(GitAdapter):
                 f'pulling branches from repo {api_repo.id}'
                 'This is most likely because no repo was in the GitlabProject -- will treat like there are no branches',
             )
-            return []
+            branches = []
+        logger.info('✓')
+        return branches
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -176,7 +178,7 @@ class GitLabAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        print('downloading gitlab commits on included branches... ', end='', flush=True)
+        logger.info('downloading gitlab commits on included branches...')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -205,18 +207,18 @@ class GitLabAdapter(GitAdapter):
                                 )
 
                 except Exception as e:
-                    print(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
-        print('✓')
+                    logger.info(f':WARN: Got exception for branch {branch}: {e}. Skipping...')
+        logger.info('Done downloading gitlab commits on included branches!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        print('downloading gitlab prs... ', end='', flush=True)
+        logger.info('downloading gitlab prs...')
 
         for i, nrm_repo in enumerate(standardized_repos, start=1):
-            print(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
+            logger.info(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
 
             with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
                 try:
@@ -301,7 +303,7 @@ class GitLabAdapter(GitAdapter):
                         log_as_exception=True,
                     )
 
-    print('✓')
+    logger.info('Done downloading gitlab PRs!')
 
 
 '''
@@ -600,9 +602,7 @@ def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
 
     if include_rules_defined and not included:
         if config.git_verbose:
-            agent_logging.log_and_print(
-                logger,
-                logging.INFO,
+            logger.info(
                 f"skipping repo {api_repo.id} because it is not included explicitly or implicitly, "
                 f"while include rules are defined...",
             )
@@ -610,9 +610,7 @@ def _should_fetch_repo_data(api_repo: GroupProject, config: GitConfig) -> bool:
 
     if exclude_rules_defined and excluded:
         if config.git_verbose:
-            agent_logging.log_and_print(
-                logger,
-                logging.INFO,
+            logger.info(
                 f'skipping repo {api_repo.id} because it is excluded explicitly or implicitly,'
                 f'while exclude rules are defined...',
             )

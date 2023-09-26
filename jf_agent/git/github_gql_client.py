@@ -1,12 +1,11 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 import time
 from requests import Session
 import requests
 from requests.utils import default_user_agent
 from typing import Generator
-from jf_agent import agent_logging
 from jf_agent.git.github_gql_utils import datetime_to_gql_str_format, github_gql_format_to_datetime
 
 from jf_agent.session import retry_session
@@ -163,9 +162,7 @@ class GithubGqlClient:
                         # Add three seconds for gracetime
                         sleep_time = retry_after + 3
 
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
+                logger.warning(
                     f'A secondary rate limit was hit. Sleeping for {sleep_time} seconds. (attempt {attempt_number}/{max_attempts})',
                 )
                 time.sleep(sleep_time)
@@ -189,11 +186,7 @@ class GithubGqlClient:
                 # past. In that case, wait for 5 mins just in case.
                 if sleep_time <= 0:
                     sleep_time = 300
-                agent_logging.log_and_print(
-                    logger,
-                    logging.WARNING,
-                    f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',
-                )
+                logger.warning(f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',)
                 time.sleep(sleep_time)
             finally:
                 attempt_number += 1

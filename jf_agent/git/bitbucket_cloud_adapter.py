@@ -56,12 +56,12 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_projects(self) -> List[StandardizedProject]:
         # Bitbucket Cloud API doesn't have a way to fetch all top-level projects;
         # instead, need to configure the agent with a specific set of projects to pull
-        print('downloading bitbucket projects... ', end='', flush=True)
+        logger.info('downloading bitbucket projects... [!n]')
         projects = [
             _standardize_project(p, self.config.git_redact_names_and_urls)
             for p in self.config.git_include_projects
         ]
-        print('✓')
+        logger.info('✓')
 
         return projects
 
@@ -70,7 +70,7 @@ class BitbucketCloudAdapter(GitAdapter):
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
-        print('downloading bitbucket repos... ', end='', flush=True)
+        logger.info('downloading bitbucket repos...')
 
         repos = []
         for p in standardized_projects:
@@ -91,9 +91,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         and api_repo['uuid'].lower() not in git_include_repos_lowered
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's not in git_include_repos''',
                             )
                         continue
@@ -108,9 +106,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         or api_repo['uuid'].lower() in git_exclude_repos_lowered
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because it's in git_exclude_repos''',
                             )
                         continue
@@ -125,9 +121,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         and repo_project['uuid'] not in self.config.git_include_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
                                 f'''("{repo_project['key']}"/{repo_project['uuid']}) is not in git_include_bbcloud_projects''',
                             )
@@ -139,9 +133,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         or repo_project['uuid'] in self.config.git_exclude_bbcloud_projects
                     ):
                         if self.config.git_verbose:
-                            agent_logging.log_and_print(
-                                logger,
-                                logging.INFO,
+                            logger.info(
                                 f'''Skipping repo "{api_repo['name']}" ({api_repo['uuid']}) because its project '''
                                 f'''("{repo_project['key']}"/{repo_project['uuid']}) is in git_exclude_bbcloud_projects''',
                             )
@@ -152,7 +144,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     _standardize_repo(api_repo, branches, p, self.config.git_redact_names_and_urls)
                 )
 
-        print('✓')
+        logger.info('Done downloading repos!')
         if not repos:
             raise ValueError(
                 'No repos found. Make sure your token has appropriate access to Bitbucket and check your configuration of repos to pull.'
@@ -168,7 +160,7 @@ class BitbucketCloudAdapter(GitAdapter):
         included_branches: dict,
         server_git_instance_info,
     ) -> List[StandardizedCommit]:
-        print('downloading bitbucket commits on included branches... ', end='', flush=True)
+        logger.info('downloading bitbucket commits on included branches...')
         for i, repo in enumerate(standardized_repos, start=1):
             with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
@@ -200,14 +192,14 @@ class BitbucketCloudAdapter(GitAdapter):
                             if commit.commit_date < pull_since:
                                 break
 
-        print('✓')
+        logger.info('Done downloading commits on included branches!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
-        print('downloading bitbucket prs... ', end='', flush=True)
+        logger.info('downloading bitbucket prs...')
         for i, repo in enumerate(
             tqdm(standardized_repos, desc='downloading prs for repos', unit='repos'), start=1
         ):
@@ -220,9 +212,7 @@ class BitbucketCloudAdapter(GitAdapter):
                     api_prs = self.client.get_pullrequests(repo.project.id, repo.id)
 
                     if not api_prs:
-                        agent_logging.log_and_print(
-                            logger, logging.INFO, f'no prs found for repo {repo.id}. Skipping... '
-                        )
+                        logger.info(f'no prs found for repo {repo.id}. Skipping... ')
                         continue
 
                     for api_pr in tqdm(api_prs, desc=f'processing prs for {repo.name}', unit='prs'):
@@ -236,8 +226,11 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or 'repository' not in api_pr['destination']
                                 or not api_pr['destination']['repository']
                             ):
-                                agent_logging.log_and_print_error_or_warning(
-                                    logger, logging.WARN, msg_args=[api_pr['id']], error_code=3030
+                                agent_logging.log_standard_error(
+                                    logger,
+                                    logging.WARNING,
+                                    msg_args=[api_pr['id']],
+                                    error_code=3030,
                                 )
                                 continue
 
@@ -259,7 +252,7 @@ class BitbucketCloudAdapter(GitAdapter):
 
                         except Exception:
                             # if something happens when normalizing a PR, just keep going with the rest
-                            agent_logging.log_and_print_error_or_warning(
+                            agent_logging.log_standard_error(
                                 logger,
                                 logging.ERROR,
                                 msg_args=[api_pr["id"], repo.id],
@@ -269,11 +262,11 @@ class BitbucketCloudAdapter(GitAdapter):
 
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
-                    agent_logging.log_and_print_error_or_warning(
+                    agent_logging.log_standard_error(
                         logger, logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
-        print('✓')
+        logger.info('Done downloading PRs!')
 
     @diagnostics.capture_timing()
     @agent_logging.log_entry_exit(logger)
@@ -399,8 +392,8 @@ def _standardize_pr(
         diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
-            agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3031,
+            agent_logging.log_standard_error(
+                logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3031,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -413,16 +406,16 @@ def _standardize_pr(
             pass
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
-            agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3041,
+            agent_logging.log_standard_error(
+                logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3041,
             )
         else:
             # Some other HTTP error happened; Re-raise
             raise
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
-        agent_logging.log_and_print_error_or_warning(
-            logger, logging.WARN, msg_args=[api_pr["id"], repo.id], error_code=3051,
+        agent_logging.log_standard_error(
+            logger, logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3051,
         )
 
     # Comments
