@@ -44,7 +44,11 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs)
                 agent_logging.log_standard_error(
                     logger,
                     logging.WARNING,
-                    msg_args=[retry, max_retries, wait_time],
+                    # NOTE: Getting the function name here isn't always useful,
+                    # because sometimes we circumvent the JIRA standard library
+                    # and use functions like "get" and "_get_json", but it's still
+                    # better than nothing
+                    msg_args=[f.__name__, retry, max_retries, wait_time],
                     error_code=3071,
                 )
                 time.sleep(wait_time)
