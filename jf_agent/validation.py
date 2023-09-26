@@ -9,6 +9,7 @@ from requests.exceptions import RequestException
 from jf_agent.jf_jira import _get_raw_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
+from jf_agent.jf_jira.utils import retry_for_429s
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ def validate_jira(config, creds):
 
     # test jira project access
     print('==> Testing Jira project permissions...')
-    accessible_projects = [p.key for p in jira_connection.projects()]
+    accessible_projects = [p.key for p in retry_for_429s(jira_connection.projects)]
     print(f'The agent has access to projects {accessible_projects}.')
 
     if config.jira_include_projects:
