@@ -1,8 +1,7 @@
 #!/bin/bash
 
 rollback () {
-    wget https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz
-    tar -zxvf stable.tar.gz --directory ./
+    curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar -xzv --directory ./
     python jf_agent-stable/jf_agent/main.py
 }
 
