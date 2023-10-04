@@ -5,4 +5,6 @@ rollback () {
     python jf_agent-stable/jf_agent/main.py
 }
 
-timeout --preserve-status 10h python jf_agent/main.py || rollback
+TOKEN=$(sed -n 's/JELLYFISH_API_TOKEN=//p' creds.env)
+TIME_LIMIT=$(curl -i -H "Accept: application/json" -H "Content-Type: application/json" -H "Jellyfish-API-Token: $TOKEN" https://app.jellyfish.co/endpoints/agent/time-limit) || 12
+timeout --preserve-status "$TIME_LIMIT"h python jf_agent/main.py || rollback
