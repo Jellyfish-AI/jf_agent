@@ -1,8 +1,10 @@
 #!/bin/bash
 
 rollback () {
-    curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar -xzv --directory ./
-    python jf_agent-stable/jf_agent/main.py
+    curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar xvz --directory ./
+    rm -r jf_agent/
+    mv jf_agent-stable/jf_agent/ jf_agent/
+    python jf_agent/main.py
 }
 
 
