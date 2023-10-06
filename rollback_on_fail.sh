@@ -4,9 +4,8 @@ rollback () {
     curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar xvz --directory ./
     rm -r jf_agent/
     mv jf_agent-stable/jf_agent/ jf_agent/
-    python jf_agent/main.py
+    python jf_agent/main.py "$@"
 }
-
 
 echo "checking for time limit override"
 if [[ -v OVERRIDE_TIME_LIMIT ]]; then
@@ -18,4 +17,4 @@ else
 	echo "Time limit override not detected, retrieved timelimit from Jellyfish: (${TIME_LIMIT})"
 fi
 echo "running agent with timelimit $TIME_LIMIT"
-timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py || echo "encountered error or timeout, rolling back to stable" && rollback
+timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" || echo "encountered error or timeout, rolling back to stable" && rollback "$@"
