@@ -17,4 +17,11 @@ else
 	echo "Time limit override not detected, retrieved timelimit from Jellyfish: (${TIME_LIMIT})"
 fi
 echo "running agent with timelimit $TIME_LIMIT"
-timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" || echo "encountered error or timeout, rolling back to stable" && rollback "$@"
+
+timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" 
+CODE=$?
+
+if [[ $CODE -ne 0 ]]; then
+    echo "encountered error or timeout, rolling back to stable"
+    rollback "$@"
+fi
