@@ -7,7 +7,8 @@ from typing import List
 import urllib3
 import yaml
 
-from jf_agent import VALID_RUN_MODES, BadConfigException, agent_logging
+from jf_agent import VALID_RUN_MODES, BadConfigException
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -154,14 +155,14 @@ def obtain_config(args) -> ValidatedConfig:
     if jira_include_fields:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
-            agent_logging.log_standard_error(
-                logger, logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
+            logging_helper.log_standard_error(
+                logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
-            agent_logging.log_standard_error(
-                logger, logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
+            logging_helper.log_standard_error(
+                logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)

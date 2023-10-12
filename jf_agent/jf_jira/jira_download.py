@@ -18,16 +18,16 @@ import string
 import threading
 from tqdm import tqdm
 
-from jf_agent import diagnostics, agent_logging
 from jf_agent.jf_jira.utils import retry_for_429s
 from jf_agent.util import split
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
 
 # Returns an array of User dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_users(
     jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
 ):
@@ -82,7 +82,7 @@ def download_users(
 
 # Returns an array of Field dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_fields(jira_connection, include_fields, exclude_fields):
     logger.info('downloading jira fields... [!n]')
 
@@ -104,7 +104,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
 # Returns an array of Resolutions dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_resolutions(jira_connection):
     logger.info('downloading jira resolutions... [!n]')
     result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
@@ -113,7 +113,7 @@ def download_resolutions(jira_connection):
 
 # Returns an array of IssueType dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_issuetypes(jira_connection, project_ids):
     '''
     For Jira next-gen projects, issue types can be scoped to projects.
@@ -134,7 +134,7 @@ def download_issuetypes(jira_connection, project_ids):
 
 # Returns an array of LinkType dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_issuelinktypes(jira_connection):
     logger.info('downloading jira issue link types... [!n]')
     result = [lt.raw for lt in retry_for_429s(jira_connection.issue_link_types)]
@@ -144,7 +144,7 @@ def download_issuelinktypes(jira_connection):
 
 # Returns an array of Priority dicts
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_priorities(jira_connection):
     logger.info('downloading jira priorities... [!n]')
     result = [p.raw for p in retry_for_429s(jira_connection.priorities)]
@@ -155,7 +155,7 @@ def download_priorities(jira_connection):
 # Each project has a list of versions.
 # Returns an array of Project dicts, where each one is agumented with an array of associated Version dicts.
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_projects_and_versions(
     jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
 ):
@@ -202,8 +202,8 @@ def download_projects_and_versions(
                 and e.text
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
-                agent_logging.log_standard_error(
-                    logger, logging.ERROR, msg_args=[project_id], error_code=2112,
+                logging_helper.log_standard_error(
+                    logging.ERROR, msg_args=[project_id], error_code=2112,
                 )
                 return False
             else:
@@ -246,7 +246,7 @@ def download_projects_and_versions(
 #   - Array of sprint dicts
 #   - Array of board/sprint links
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
     boards_by_id = {}  # De-dup by id, since the same board might come back from more than one query
     for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
@@ -267,8 +267,8 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                 ).json()['values']
             except JIRAError as e:
                 if e.status_code == 400:
-                    agent_logging.log_standard_error(
-                        logger, logging.ERROR, msg_args=[project_id], error_code=2202,
+                    logging_helper.log_standard_error(
+                        logging.ERROR, msg_args=[project_id], error_code=2202,
                     )
                     break
                 raise
@@ -303,8 +303,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                     if e.status_code == 500 or e.status_code == 404:
                         logger.info(f"Couldn't get sprints for board {b['id']}.  Skipping...")
                     elif e.status_code == 400:
-                        agent_logging.log_standard_error(
-                            logger,
+                        logging_helper.log_standard_error(
                             logging.ERROR,
                             msg_args=[str(b), str(s_start_at), str(e)],
                             error_code=2203,
@@ -356,15 +355,14 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
             # a smaller ask will prevent the server from choking.
             batch_size = int(batch_size / 2)
             error = e
-            agent_logging.log_standard_error(
-                logger, logging.WARNING, msg_args=[batch_size], error_code=3012,
+            logging_helper.log_standard_error(
+                logging.WARNING, msg_args=[batch_size], error_code=3012,
             )
 
     # copied logic from jellyfish direct connect
     # don't bail, just skip
     # khardy 2023-03-16
-    agent_logging.log_standard_error(
-        logger,
+    logging_helper.log_standard_error(
         logging.WARNING,
         msg_args=[f"{type(error)}", issue_jql, start_at, original_batch_size],
         error_code=3092,
@@ -374,7 +372,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_all_issue_metadata(
     jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
 ) -> Dict[int, IssueMetadata]:
@@ -435,11 +433,8 @@ def download_all_issue_metadata(
 
             except Exception as e:
                 thread_exceptions[thread_num] = e
-                agent_logging.log_standard_error(
-                    logger,
-                    logging.ERROR,
-                    msg_args=[thread_num, traceback.format_exc()],
-                    error_code=3032,
+                logging_helper.log_standard_error(
+                    logging.ERROR, msg_args=[thread_num, traceback.format_exc()], error_code=3032,
                 )
 
         threads = [
@@ -464,7 +459,7 @@ def download_all_issue_metadata(
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def detect_issues_needing_sync(
     issue_metadata_from_jira: Dict[int, IssueMetadata],
     issue_metadata_from_jellyfish: Dict[int, IssueMetadata],
@@ -608,8 +603,8 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
         for i in items:
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
-                agent_logging.log_standard_error(
-                    logger=logger, level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
+                logging_helper.log_standard_error(
+                    level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -636,7 +631,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
     return [{**i, 'changelog': _strip_changelog(i['changelog'])} for i in issues]
 
 
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def _download_jira_issues_segment(
     thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
 ):
@@ -667,8 +662,8 @@ def _download_jira_issues_segment(
         q.put(None)
 
     except BaseException as e:
-        agent_logging.log_standard_error(
-            logger, logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
         )
         q.put(e)
 
@@ -762,8 +757,8 @@ def _download_jira_issues_page(
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                         return [], 1
                     elif not get_changelog:
-                        agent_logging.log_standard_error(
-                            logger, logging.WARNING, msg_args=[search_params], error_code=3062,
+                        logging_helper.log_standard_error(
+                            logging.WARNING, msg_args=[search_params], error_code=3062,
                         )
                         return [], 0
                     else:
@@ -796,7 +791,7 @@ def _expand_changelog(jira_issues, jira_connection):
 # that currently exist; 'deleted' gives the list of worklogs that
 # existed at some point previously, but have since been deleted
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
 def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
@@ -832,7 +827,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
 
 # Returns an array of CustomFieldOption items
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_customfieldoptions(jira_connection, project_ids):
     logger.info('downloading jira custom field options... [!n]')
     optionvalues = {}
@@ -844,9 +839,7 @@ def download_customfieldoptions(jira_connection, project_ids):
                 expand='projects.issuetypes.fields',
             )
         except JIRAError:
-            agent_logging.log_standard_error(
-                logger, logging.WARNING, error_code=3072, exc_info=False
-            )
+            logging_helper.log_standard_error(logging.WARNING, error_code=3072, exc_info=False)
             return []
 
         # Custom values are buried deep in the createmeta response:
@@ -867,7 +860,7 @@ def download_customfieldoptions(jira_connection, project_ids):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_statuses(jira_connection):
     logger.info('downloading jira statuses... [!n]')
     statuses = retry_for_429s(jira_connection.statuses)
@@ -993,7 +986,7 @@ def _search_users(
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
     from jf_agent.jf_jira import get_basic_jira_connection
     from jf_agent.git import get_git_client
@@ -1039,8 +1032,8 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
                 )
             except JIRAError as e:
                 if e.status_code == 403:
-                    agent_logging.log_standard_error(
-                        logger, logging.ERROR, error_code=2122,
+                    logging_helper.log_standard_error(
+                        logging.ERROR, error_code=2122,
                     )
                     return []
 

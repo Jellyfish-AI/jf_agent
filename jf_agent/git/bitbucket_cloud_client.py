@@ -7,8 +7,8 @@ from typing import Optional
 import requests
 from requests.utils import default_user_agent
 
-from jf_agent import agent_logging
 from jf_agent.ratelimit import RateLimiter, RateLimitRealmConfig
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ class BitbucketCloudClient:
                         time.sleep(30)
                         continue
                     else:
-                        agent_logging.log_standard_error(logger, logging.ERROR, error_code=3151)
+                        logging_helper.log_standard_error(logging.ERROR, error_code=3151)
                 raise
 
     # Handle pagination

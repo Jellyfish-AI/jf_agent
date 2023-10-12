@@ -21,10 +21,11 @@ from jf_agent.git import (
     pull_since_date_for_repo,
 )
 from jf_agent.git.utils import log_and_print_request_error
-from jf_agent import diagnostics, agent_logging
 from jf_agent.main import JellyfishEndpointInfo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent.config_file_reader import GitConfig
+
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class GithubGqlAdapter(GitAdapter):
         self.repo_has_quiescent_prs_lookup: dict = {}
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
         logger.info('downloading github projects... [!n]')
         projects = []
@@ -84,7 +85,7 @@ class GithubGqlAdapter(GitAdapter):
         return projects
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
         logger.info('downloading github users... [!n]')
         users = [
@@ -96,7 +97,7 @@ class GithubGqlAdapter(GitAdapter):
         return users
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
@@ -192,7 +193,7 @@ class GithubGqlAdapter(GitAdapter):
         return nrm_repos
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_commits_for_included_branches(
         self,
         standardized_repos: List[StandardizedRepository],
@@ -201,7 +202,7 @@ class GithubGqlAdapter(GitAdapter):
     ) -> List[StandardizedCommit]:
         logger.info('downloading github commits on included branches...')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
-            with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+            with logging_helper.log_loop_iters('repo for branch commits', i, 1):
                 pull_since = (
                     pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
@@ -228,9 +229,7 @@ class GithubGqlAdapter(GitAdapter):
                             ),
                             start=1,
                         ):
-                            with agent_logging.log_loop_iters(
-                                logger, 'branch commit inside repo', j, 100
-                            ):
+                            with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
                                 yield _standardize_commit(
                                     api_commit,
                                     nrm_repo,
@@ -247,7 +246,7 @@ class GithubGqlAdapter(GitAdapter):
         logger.info('Done downloading commits for included branches!')
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
@@ -256,7 +255,7 @@ class GithubGqlAdapter(GitAdapter):
         nrm_prs = []
         for i, nrm_repo in enumerate(standardized_repos, start=1):
 
-            with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+            with logging_helper.log_loop_iters('repo for pull requests', i, 1):
                 try:
                     # Check if we flagged this repo as quiescent
                     if self.repo_has_quiescent_prs_lookup[nrm_repo.id]:
@@ -282,7 +281,7 @@ class GithubGqlAdapter(GitAdapter):
                         ),
                         start=1,
                     ):
-                        with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
+                        with logging_helper.log_loop_iters('pr inside repo', j, 10):
                             try:
                                 updated_at = parser.parse(api_pr['updatedAt'])
 

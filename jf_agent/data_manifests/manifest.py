@@ -9,7 +9,7 @@ from typing import Optional, TypeVar
 
 import requests
 
-from jf_agent import agent_logging
+from jf_ingest import logging_helper
 
 
 logger = logging.getLogger(__name__)
