@@ -1,7 +1,7 @@
 #!/bin/bash
 
 rollback () {
-    curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar xvz --directory ./
+    curl -L -o - https://github.com/Jellyfish-AI/jf_agent/archive/refs/tags/stable.tar.gz | tar xz --directory ./
     rm -r jf_agent/
     mv jf_agent-stable/jf_agent/ jf_agent/
     python jf_agent/main.py "$@"
@@ -21,7 +21,7 @@ echo "running agent with timelimit $TIME_LIMIT"
 timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" 
 CODE=$?
 
-if [[ $CODE -ne 0 ]]; then
+if [[ $CODE -ne 0 && -z "${ROLLBACK_OVERRIDE}" ]]; then
     echo "encountered error or timeout, rolling back to stable"
     rollback "$@"
 fi
