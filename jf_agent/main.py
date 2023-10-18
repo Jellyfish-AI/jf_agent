@@ -14,7 +14,6 @@ from time import sleep
 
 import requests
 import json
-import dotenv
 
 from jf_agent import (
     agent_logging,
