@@ -108,7 +108,6 @@ def main():
     parser.add_argument(
         '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
-    parser.add_argument('-e', '--env-file', help='Provide ')
 
     args = parser.parse_args()
     config = obtain_config(args)
@@ -294,7 +293,6 @@ def _get_git_instance_to_creds(git_config):
 
 def obtain_creds(config):
     jellyfish_api_token = os.environ.get('JELLYFISH_API_TOKEN')
-    print(os.environ)
     if not jellyfish_api_token:
         logger.error('ERROR: JELLYFISH_API_TOKEN not found in the environment.')
         raise BadConfigException()
