@@ -1,5 +1,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import dotenv
 import gzip
 import logging
 import os
@@ -96,6 +97,12 @@ def main():
         ),
     )
     parser.add_argument(
+        '-e',
+        '--env-file',
+        type=str,
+        help='File path to a .env credentials file. Useful for running the agent in a local developer context',
+    )
+    parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
     parser.add_argument(
@@ -105,8 +112,10 @@ def main():
 
     args = parser.parse_args()
     config = obtain_config(args)
-    # TODO: Hide this behind the --env-file flag!
-    dotenv.load_dotenv('./creds.env')
+
+    if args.env_file:
+        dotenv.load_dotenv(args.env_file)
+
     creds = obtain_creds(config)
     agent_logging.configure(config.outdir)
 
