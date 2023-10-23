@@ -21,7 +21,7 @@ echo "running agent with timelimit $TIME_LIMIT"
 timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" 
 CODE=$?
 
-if [[ $CODE -ne 0 && -z "${ROLLBACK_OVERRIDE}" ]]; then
+if [[ $CODE -ne 0 && -v ROLLBACK_OVERRIDE ]]; then
     echo "encountered error or timeout, rolling back to stable"
     rollback "$@"
 fi
