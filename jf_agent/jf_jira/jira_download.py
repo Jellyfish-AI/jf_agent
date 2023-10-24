@@ -871,7 +871,7 @@ def download_teams(jira_connection):
             rest_api_version='1.0',
             path='team'
         )
-        teams = jira_connection._get_json('team', base=teams_url)
+        teams = retry_for_429s(jira_connection._get_json('team', base=teams_url))
         logger.info('✓')
         return teams
     except Exception as e:
