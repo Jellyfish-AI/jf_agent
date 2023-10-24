@@ -118,7 +118,6 @@ def main():
     agent_logging.configure(config.outdir)
 
     success = True
-
     if config.run_mode == 'validate':
         logger.info('Validating configuration...')
 
