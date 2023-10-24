@@ -37,7 +37,7 @@ def get_connection():
     creds = PartialCreds()
     # you can test behavior against a live jira instance by setting an email as `jira_username`
     # and storing a generated token in env and retrieving like so:
-    creds.jira_bearer_token = os.environ.get('JIRA_TOKEN')
+    # creds.jira_bearer_token = os.environ.get('JIRA_TOKEN')
 
     # https://test-co.atlassian.net/rest/api/2/serverInfo
     with requests_mock.Mocker() as m:
