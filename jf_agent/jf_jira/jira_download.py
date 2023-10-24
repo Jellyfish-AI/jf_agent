@@ -861,6 +861,26 @@ def download_customfieldoptions(jira_connection, project_ids):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
+def download_teams(jira_connection):
+    logger.info('downloading jira teams... [!n]')
+    server = jira_connection._options['server']
+    try:
+        teams_url = jira_connection.JIRA_BASE_URL.format(
+            server=server,
+            rest_path='teams-api',
+            rest_api_version='1.0',
+            path='team'
+        )
+        teams = jira_connection._get_json('team', base=teams_url)
+        logger.info('✓')
+        return teams
+    except Exception as e:
+        logger.warning(f"Could not fetch teams, instead got {e}")
+        return ""
+
+
+@diagnostics.capture_timing()
+@logging_helper.log_entry_exit(logger)
 def download_statuses(jira_connection):
     logger.info('downloading jira statuses... [!n]')
     statuses = retry_for_429s(jira_connection.statuses)

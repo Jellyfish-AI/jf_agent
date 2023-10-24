@@ -23,6 +23,7 @@ from jf_agent.jf_jira.jira_download import (
     download_worklogs,
     download_statuses,
     download_missing_repos_found_by_jira,
+    download_teams,
     IssueMetadata,
 )
 from jf_ingest import diagnostics, logging_helper
@@ -301,6 +302,13 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             'jira_statuses',
             config.compress_output_files,
             download_statuses(jira_connection),
+        )
+
+        write_file(
+            config.outdir,
+            'jira_teams',
+            config.compress_output_files,
+            download_teams(jira_connection)
         )
 
         return {'type': 'Jira', 'status': 'success'}
