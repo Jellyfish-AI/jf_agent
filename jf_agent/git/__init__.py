@@ -15,7 +15,8 @@ from jf_agent.git.github_client import GithubClient
 from jf_agent.git.gitlab_client import GitLabClient
 from jf_agent.config_file_reader import GitConfig
 
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent import download_and_write_streaming, write_file
+from jf_ingest import logging_helper, diagnostics
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +180,7 @@ class GitAdapter(ABC):
         nrm_repos = None
 
         @diagnostics.capture_timing()
-        @agent_logging.log_entry_exit(logger)
+        @logging_helper.log_entry_exit(logger)
         def get_and_write_repos():
             nonlocal nrm_repos
 
@@ -191,7 +192,7 @@ class GitAdapter(ABC):
         get_and_write_repos()
 
         @diagnostics.capture_timing()
-        @agent_logging.log_entry_exit(logger)
+        @logging_helper.log_entry_exit(logger)
         def download_and_write_commits():
             return download_and_write_streaming(
                 self.outdir,
@@ -209,7 +210,7 @@ class GitAdapter(ABC):
         download_and_write_commits()
 
         @diagnostics.capture_timing()
-        @agent_logging.log_entry_exit(logger)
+        @logging_helper.log_entry_exit(logger)
         def download_and_write_prs():
             return download_and_write_streaming(
                 self.outdir,
@@ -224,7 +225,7 @@ class GitAdapter(ABC):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_git_client(
     config: GitConfig, git_creds: dict, skip_ssl_verification: bool, instance_info: dict = {}
 ):
@@ -271,12 +272,8 @@ def get_git_client(
             )
 
     except Exception as e:
-        agent_logging.log_standard_error(
-            logger,
-            logging.ERROR,
-            msg_args=[config.git_provider, e],
-            error_code=2101,
-            exc_info=True,
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=2101, exc_info=True,
         )
         return
 
@@ -285,7 +282,7 @@ def get_git_client(
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def load_and_dump_git(
     config: GitConfig,
     endpoint_git_instance_info: dict,
@@ -353,12 +350,8 @@ def load_and_dump_git(
             raise ValueError(f'unsupported git provider {config.git_provider}')
 
     except Exception as e:
-        agent_logging.log_standard_error(
-            logger,
-            logging.ERROR,
-            msg_args=[config.git_provider, e],
-            error_code=3061,
-            exc_info=True,
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=3061, exc_info=True,
         )
 
         return {

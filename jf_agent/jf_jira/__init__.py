@@ -5,7 +5,7 @@ import logging
 from jira import JIRA
 from jira.resources import GreenHopperResource
 
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent import download_and_write_streaming, write_file
 from jf_agent.jf_jira.jira_download import (
     download_boards_and_sprints,
     download_customfieldoptions,
@@ -25,6 +25,7 @@ from jf_agent.jf_jira.jira_download import (
     download_missing_repos_found_by_jira,
     IssueMetadata,
 )
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -68,18 +69,18 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_basic_jira_connection(config, creds):
     try:
         return _get_raw_jira_connection(config, creds)
     except Exception as e:
-        agent_logging.log_standard_error(
-            logger, logging.ERROR, msg_args=[e], error_code=2102, exc_info=True
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[e], error_code=2102, exc_info=True
         )
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
         jira_connection, config.jira_include_fields, config.jira_exclude_fields
@@ -89,7 +90,7 @@ def print_all_jira_fields(config, jira_connection):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
     missing_repos = download_missing_repos_found_by_jira(config, creds, issues_to_scan)
     # This could potential data that clients do not exposed. Print instead of logging here
@@ -102,7 +103,7 @@ def print_missing_repos_found_by_jira(config, creds, issues_to_scan):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
     try:
         write_file(
@@ -212,7 +213,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
 
         @diagnostics.capture_timing()
-        @agent_logging.log_entry_exit(logger)
+        @logging_helper.log_entry_exit(logger)
         def download_and_write_issues():
             return download_and_write_streaming(
                 config.outdir,
@@ -241,7 +242,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         )
 
         @diagnostics.capture_timing()
-        @agent_logging.log_entry_exit(logger)
+        @logging_helper.log_entry_exit(logger)
         def download_and_write_issues_needing_re_download():
             return download_and_write_streaming(
                 config.outdir,
@@ -305,7 +306,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
-        agent_logging.log_standard_error(
-            logger, logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
         )
         return {'type': 'Jira', 'status': 'failed'}

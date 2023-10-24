@@ -31,7 +31,7 @@ def get_matching_branches(
 
 
 def log_and_print_request_error(e, action='making request', log_as_exception=False):
-    from jf_agent import agent_logging
+    from jf_ingest import logging_helper
 
     try:
         response_code = e.response_code
@@ -42,14 +42,13 @@ def log_and_print_request_error(e, action='making request', log_as_exception=Fal
     error_name = type(e).__name__
 
     if log_as_exception:
-        agent_logging.log_standard_error(
-            logger,
+        logging_helper.log_standard_error(
             logging.ERROR,
             msg_args=[error_name, response_code, action, e],
             error_code=3131,
             exc_info=True,
         )
     else:
-        agent_logging.log_standard_error(
-            logger, logging.WARNING, msg_args=[error_name, response_code, action], error_code=3141
+        logging_helper.log_standard_error(
+            logging.WARNING, msg_args=[error_name, response_code, action], error_code=3141
         )

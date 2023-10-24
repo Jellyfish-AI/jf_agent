@@ -17,8 +17,9 @@ from jf_agent.git import (
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent import download_and_write_streaming, write_file
 from jf_agent.config_file_reader import GitConfig
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ _repo_redactor = NameRedactor()
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def load_and_dump(
     config: GitConfig,
     outdir: str,
@@ -60,7 +61,7 @@ def load_and_dump(
     api_repos = None
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
@@ -79,7 +80,7 @@ def load_and_dump(
     get_and_write_repos()
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
@@ -100,7 +101,7 @@ def load_and_dump(
     download_and_write_commits()
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
@@ -137,7 +138,7 @@ def _standardize_user(user):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_users(client: GithubClient, include_orgs):
     logger.info('downloading github users... [!n]')
     users = [_standardize_user(user) for org in include_orgs for user in client.get_all_users(org)]
@@ -160,7 +161,7 @@ def _standardize_project(api_org, redact_names_and_urls):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_projects(client: GithubClient, include_orgs, redact_names_and_urls):
     logger.info('downloading github projects... [!n]')
     projects = [
@@ -209,7 +210,7 @@ def _standardize_repo(client: GithubClient, org_name, repo, redact_names_and_url
     )
 
 
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_repos(
     client: GithubClient, include_orgs, include_repos, exclude_repos, redact_names_and_urls
 ):
@@ -275,7 +276,7 @@ def get_commits_for_included_branches(
     redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+        with logging_helper.log_loop_iters('repo for branch commits', i, 1):
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
             )
@@ -305,9 +306,7 @@ def get_commits_for_included_branches(
                         ),
                         start=1,
                     ):
-                        with agent_logging.log_loop_iters(
-                            logger, 'branch commit inside repo', j, 100
-                        ):
+                        with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
                             yield _standardize_commit(
                                 commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
@@ -405,7 +404,7 @@ def get_pull_requests(
     redact_names_and_urls,
 ):
     for i, repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+        with logging_helper.log_loop_iters('repo for pull requests', i, 1):
             pull_since = pull_since_date_for_repo(
                 server_git_instance_info, repo['organization']['login'], repo['id'], 'prs'
             )
@@ -418,7 +417,7 @@ def get_pull_requests(
                     ),
                     start=1,
                 ):
-                    with agent_logging.log_loop_iters(logger, 'pr inside repo', j, 10):
+                    with logging_helper.log_loop_iters('pr inside repo', j, 10):
                         updated_at = parser.parse(pr['updated_at'])
 
                         # PRs are ordered newest to oldest

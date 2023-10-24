@@ -17,7 +17,6 @@ import json
 
 from jf_agent import (
     agent_logging,
-    diagnostics,
     write_file,
     VALID_RUN_MODES,
     JELLYFISH_API_BASE,
@@ -42,6 +41,7 @@ from jf_agent.validation import (
     validate_num_repos,
     ProjectMetadata,
 )
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +404,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def generate_manifests(config, creds, jellyfish_endpoint_info):
     manifests: list[Manifest] = []
     base_url = config.jellyfish_api_base
@@ -534,7 +534,7 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
     download_data_status = []
 
@@ -643,8 +643,8 @@ def send_data(config, creds):
             upload_file(filename, path_to_obj, signed_url)
         except Exception as e:
             thread_exceptions.append(e)
-            agent_logging.log_standard_error(
-                logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+            logging_helper.log_standard_error(
+                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
     def upload_file(filename, path_to_obj, signed_url, local=False):
@@ -670,12 +670,8 @@ def send_data(config, creds):
             # These exceptions ARE NOT handled by the above retry_session retry logic, which handles 500 level errors.
             # Attempt to catch and retry the 104 type error here
             except requests.exceptions.ConnectionError as e:
-                agent_logging.log_standard_error(
-                    logger,
-                    logging.WARNING,
-                    msg_args=[filename, repr(e)],
-                    error_code=3001,
-                    exc_info=True,
+                logging_helper.log_standard_error(
+                    logging.WARNING, msg_args=[filename, repr(e)], error_code=3001, exc_info=True,
                 )
                 retry_count += 1
                 # Back off logic
@@ -683,8 +679,8 @@ def send_data(config, creds):
 
         # If we make it out of the while loop without returning, that means
         # we failed to upload the file.
-        agent_logging.log_standard_error(
-            logger, logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
         )
 
     # Compress any not yet compressed files before sending
@@ -733,8 +729,8 @@ def send_data(config, creds):
     if any(thread_exceptions):
         # Run through exceptions and inject them into the agent log
         for exception in thread_exceptions:
-            agent_logging.log_standard_error(
-                logger, logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
+            logging_helper.log_standard_error(
+                logging.ERROR, error_code=0000, msg_args=[exception], exc_info=True
             )
         logger.error(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'

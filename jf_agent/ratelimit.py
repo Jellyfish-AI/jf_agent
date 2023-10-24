@@ -6,10 +6,9 @@ import logging
 import threading
 import time
 
-import pytz
 import requests
 
-from jf_agent import agent_logging
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +53,8 @@ class RateLimiter(object):
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 429:
                         # Got rate limited anyway!
-                        agent_logging.log_standard_error(
-                            logger,
-                            logging.ERROR,
-                            msg_args=[calls_made, max_calls, realm],
-                            error_code=3010,
+                        logging_helper.log_standard_error(
+                            logging.ERROR, msg_args=[calls_made, max_calls, realm], error_code=3010,
                         )
                     raise
 
@@ -66,8 +62,8 @@ class RateLimiter(object):
                 f'Rate limiter: exceeded {max_calls} calls in {period_secs} seconds for {realm}!',
             )
             if (sleep_until - start) >= timedelta(seconds=self.timeout_secs):
-                agent_logging.log_standard_error(
-                    logger, logging.ERROR, msg_args=[self.timeout_secs], error_code=3020
+                logging_helper.log_standard_error(
+                    logging.ERROR, msg_args=[self.timeout_secs], error_code=3020
                 )
                 raise Exception('Rate limit timeout')
 

@@ -8,8 +8,9 @@ from urllib3.exceptions import MaxRetryError
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent import agent_logging, diagnostics, download_and_write_streaming, write_file
+from jf_agent import download_and_write_streaming, write_file
 from jf_agent.config_file_reader import GitConfig
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ _repo_redactor = NameRedactor()
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def load_and_dump(
     config: GitConfig,
     outdir: str,
@@ -45,7 +46,7 @@ def load_and_dump(
     api_repos = None
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_and_write_repos():
         nonlocal api_repos
         # turn a generator that produces (api_object, dict) pairs into separate lists of API objects and dicts
@@ -64,7 +65,7 @@ def load_and_dump(
     get_and_write_repos()
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def download_and_write_commits():
         return download_and_write_streaming(
             outdir,
@@ -86,7 +87,7 @@ def load_and_dump(
     download_and_write_commits()
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def download_and_write_prs():
         return download_and_write_streaming(
             outdir,
@@ -124,7 +125,7 @@ def _standardize_user(user):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_users(client):
     logger.info(f'downloading bitbucket users... [!n]')
     users = [_standardize_user(user) for user in client.admin.users]
@@ -146,7 +147,7 @@ def _standardize_project(api_project, redact_names_and_urls):
 
 
 @diagnostics.capture_timing()
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_projects(client, include_projects, exclude_projects, redact_names_and_urls):
     logger.info(f'downloading bitbucket projects... [!n]')
 
@@ -203,7 +204,7 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     }
 
 
-@agent_logging.log_entry_exit(logger)
+@logging_helper.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     logger.info(f'downloading bitbucket repositories... [!n]')
 
@@ -253,7 +254,7 @@ def get_commits_for_included_branches(
     verbose,
 ):
     for i, api_repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+        with logging_helper.log_loop_iters('repo for branch commits', i, 1):
             repo = api_repo.get()
             if verbose:
                 logger.info(f"Beginning download of commits for repo {repo}")
@@ -287,9 +288,7 @@ def get_commits_for_included_branches(
                         ),
                         start=1,
                     ):
-                        with agent_logging.log_loop_iters(
-                            logger, 'branch commit inside repo', j, 100
-                        ):
+                        with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
                             if verbose:
                                 tqdm.write(
                                     f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
@@ -331,7 +330,7 @@ def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
 ):
     for i, api_repo in enumerate(api_repos, start=1):
-        with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+        with logging_helper.log_loop_iters('repo for pull requests', i, 1):
             repo = api_repo.get()
             if verbose:
                 logger.info(f"Beginning download of PRs for repo {repo}")

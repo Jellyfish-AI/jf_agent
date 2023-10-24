@@ -7,8 +7,8 @@ from requests import HTTPError, Response
 from requests.utils import default_user_agent
 import time
 
-from jf_agent import agent_logging
 from jf_agent.session import retry_session
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +49,8 @@ class GithubClient:
                 if e.response.status_code not in (403, 404):
                     raise
 
-                agent_logging.log_standard_error(
-                    logger,
-                    logging.WARNING,
-                    msg_args=[m["url"], e.response.status_code],
-                    error_code=3061,
+                logging_helper.log_standard_error(
+                    logging.WARNING, msg_args=[m["url"], e.response.status_code], error_code=3061,
                 )
 
     def get_all_repos(self, org):
@@ -68,8 +65,8 @@ class GithubClient:
 
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
-                agent_logging.log_standard_error(
-                    logger, logging.WARNING, msg_args=[m["url"]], error_code=3081,
+                logging_helper.log_standard_error(
+                    logging.WARNING, msg_args=[m["url"]], error_code=3081,
                 )
 
     def get_branches(self, full_repo):
@@ -107,8 +104,7 @@ class GithubClient:
             return raw.json()
         except HTTPError as e:
             if e.response.status_code in (422,):
-                agent_logging.log_standard_error(
-                    logger,
+                logging_helper.log_standard_error(
                     logging.WARNING,
                     msg_args=[e.response.status_code, ref, full_repo_name],
                     error_code=3121,
@@ -144,8 +140,8 @@ class GithubClient:
                     raise
 
                 if i >= max_retries:
-                    agent_logging.log_standard_error(
-                        logger, logging.ERROR, msg_args=[url, i], error_code=3101,
+                    logging_helper.log_standard_error(
+                        logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
 
@@ -166,8 +162,8 @@ class GithubClient:
                 # wait longer than that
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
-                agent_logging.log_standard_error(
-                    logger, logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
+                logging_helper.log_standard_error(
+                    logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
                 # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added.
                 time.sleep(reset_wait_in_seconds + 2)

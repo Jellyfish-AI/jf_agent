@@ -4,7 +4,7 @@ from typing import Optional, Callable, Any
 
 from jira import JIRAError
 
-from jf_agent import agent_logging
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,7 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs)
         except JIRAError as e:
             if hasattr(e, 'status_code') and e.status_code == 429 and retry < max_retries:
                 wait_time = get_wait_time(e, retries=retry)
-                agent_logging.log_standard_error(
-                    logger,
+                logging_helper.log_standard_error(
                     logging.WARNING,
                     # NOTE: Getting the function name here isn't always useful,
                     # because sometimes we circumvent the JIRA standard library

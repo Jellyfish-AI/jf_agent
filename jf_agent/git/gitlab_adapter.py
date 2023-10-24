@@ -24,9 +24,9 @@ from jf_agent.git.gitlab_client import (
     MissingSourceProjectException,
 )
 from jf_agent.git.utils import log_and_print_request_error
-from jf_agent import diagnostics, agent_logging
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 from jf_agent.config_file_reader import GitConfig
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class GitLabAdapter(GitAdapter):
         self.client = client
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_projects(self) -> List[StandardizedProject]:
         logger.info('downloading gitlab projects... [!n]')
         projects = []
@@ -72,7 +72,7 @@ class GitLabAdapter(GitAdapter):
         return projects
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_users(self) -> List[StandardizedUser]:
         logger.info('downloading gitlab users... [!n]')
         users = [
@@ -84,7 +84,7 @@ class GitLabAdapter(GitAdapter):
         return users
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_repos(
         self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
@@ -137,8 +137,7 @@ class GitLabAdapter(GitAdapter):
                 )
                 total_failed = len(repos_that_failed_to_download)
 
-                agent_logging.log_standard_error(
-                    logger,
+                logging_helper.log_standard_error(
                     logging.WARNING,
                     msg_args=[total_failed, nrm_project.id, repos_failed_string],
                     error_code=2201,
@@ -152,7 +151,7 @@ class GitLabAdapter(GitAdapter):
         return nrm_repos
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_branches(self, api_repo) -> List[StandardizedBranch]:
         logger.info('downloading gitlab branches... [!n]')
         try:
@@ -171,7 +170,7 @@ class GitLabAdapter(GitAdapter):
         return branches
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_commits_for_included_branches(
         self,
         standardized_repos: List[StandardizedRepository],
@@ -180,7 +179,7 @@ class GitLabAdapter(GitAdapter):
     ) -> List[StandardizedCommit]:
         logger.info('downloading gitlab commits on included branches...')
         for i, nrm_repo in enumerate(standardized_repos, start=1):
-            with agent_logging.log_loop_iters(logger, 'repo for branch commits', i, 1):
+            with logging_helper.log_loop_iters('repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
                     server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
                 )
@@ -195,9 +194,7 @@ class GitLabAdapter(GitAdapter):
                             ),
                             start=1,
                         ):
-                            with agent_logging.log_loop_iters(
-                                logger, 'branch commit inside repo', j, 100
-                            ):
+                            with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
                                 yield _standardize_commit(
                                     commit,
                                     nrm_repo,
@@ -211,7 +208,7 @@ class GitLabAdapter(GitAdapter):
         logger.info('Done downloading gitlab commits on included branches!')
 
     @diagnostics.capture_timing()
-    @agent_logging.log_entry_exit(logger)
+    @logging_helper.log_entry_exit(logger)
     def get_pull_requests(
         self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
@@ -220,7 +217,7 @@ class GitLabAdapter(GitAdapter):
         for i, nrm_repo in enumerate(standardized_repos, start=1):
             logger.info(f'downloading prs for repo {nrm_repo.name} ({nrm_repo.id})')
 
-            with agent_logging.log_loop_iters(logger, 'repo for pull requests', i, 1):
+            with logging_helper.log_loop_iters('repo for pull requests', i, 1):
                 try:
                     pull_since = pull_since_date_for_repo(
                         server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'prs'
