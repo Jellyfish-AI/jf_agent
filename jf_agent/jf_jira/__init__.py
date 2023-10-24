@@ -316,7 +316,5 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         return {'type': 'Jira', 'status': 'success'}
 
     except Exception as e:
-        logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[e], error_code=3002, exc_info=True
-        )
+        logger.debug(f"could not download teams, got {e}")
         return {'type': 'Jira', 'status': 'failed'}
