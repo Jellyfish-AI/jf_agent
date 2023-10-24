@@ -875,7 +875,7 @@ def download_teams(jira_connection):
         logger.info('✓')
         return teams
     except Exception as e:
-        logger.warning(f"Could not fetch teams, instead got {e}")
+        logger.debug(f"Could not fetch teams, instead got {e}")
         return ""
 
 
