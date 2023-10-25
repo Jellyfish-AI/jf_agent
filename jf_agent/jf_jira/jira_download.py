@@ -6,7 +6,7 @@ import random
 import re
 import traceback
 import time
-from typing import Dict
+from typing import Dict, Generator, Tuple
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -644,19 +644,18 @@ def _download_jira_issues_segment(
     logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
     try:
         while start_at < len(jira_issue_ids_segment):
-            issues, num_apparently_deleted = _download_jira_issues_page(
+            for issue_batch, num_apparently_deleted in _download_jira_issues_page_batches(
                 jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-            )
+            ):
+                issues_retrieved = len(issue_batch) + num_apparently_deleted
+                start_at += issues_retrieved
+                if issues_retrieved == 0:
+                    break
 
-            issues_retrieved = len(issues) + num_apparently_deleted
-            start_at += issues_retrieved
-            if issues_retrieved == 0:
-                break
+                rows_to_insert = [(int(issue['id']), issue) for issue in issue_batch]
 
-            rows_to_insert = [(int(issue['id']), issue) for issue in issues]
-
-            # TODO: configurable way to scrub things out of raw_issues here before we write them out.
-            q.put(rows_to_insert)
+                # TODO: configurable way to scrub things out of raw_issues here before we write them out.
+                q.put(rows_to_insert)
 
         # sentinel to mark that this thread finished
         q.put(None)
@@ -693,11 +692,12 @@ def _split_id_list(jira_issue_ids_segment: list):
     return issue_ids_array
 
 
-def _download_jira_issues_page(
+def _download_jira_issues_page_batches(
     jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-):
+) -> Generator[Tuple[list, int], None, None]:
     '''
-    Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
+    Make sure you call this with a NEXT call, or as part of a loop!
+    Returns a GENERATOR that yields a tuple: (issues_downloaded, num_issues_apparently_deleted)
     '''
     get_changelog = True
 
@@ -731,7 +731,8 @@ def _download_jira_issues_page(
                     )
                 )
                 tries = 0
-                return _expand_changelog(resp_json['issues'], jira_connection), 0
+                yield (_expand_changelog(resp_json['issues'], jira_connection), 0)
+                break
 
             except Exception as e:
                 if hasattr(e, 'status_code') and e.status_code == 429:
@@ -755,16 +756,20 @@ def _download_jira_issues_page(
                 time.sleep(30)
                 if batch_size == 0:
                     if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
-                        return [], 1
+                        yield ([], 1)
+                        break
                     elif not get_changelog:
                         logging_helper.log_standard_error(
                             logging.WARNING, msg_args=[search_params], error_code=3062,
                         )
-                        return [], 0
+                        yield ([], 0)
+                        break
                     else:
                         get_changelog = False
                         batch_size = 100
                         start_at += 1
+
+    return [], 0
 
 
 # Sometimes the results of issue search has an incomplete changelog.  Fill it in if so.
@@ -866,10 +871,7 @@ def download_teams(jira_connection):
     server = jira_connection._options['server']
     try:
         teams_url = jira_connection.JIRA_BASE_URL.format(
-            server=server,
-            rest_path='teams-api',
-            rest_api_version='1.0',
-            path='team'
+            server=server, rest_path='teams-api', rest_api_version='1.0', path='team'
         )
         teams = retry_for_429s(jira_connection._get_json, 'team', base=teams_url)
         logger.info('✓')
