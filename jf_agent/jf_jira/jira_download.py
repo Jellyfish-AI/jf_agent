@@ -329,11 +329,13 @@ IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
 def get_issues(jira_connection, issue_jql, start_at, batch_size):
     original_batch_size = batch_size
     error = None
+    jql_query = f'{issue_jql} order by id asc'
+    logger.debug(f'Attempting to get issues with the following JQL: {jql_query}')
     while batch_size > 0:
         try:
             api_response = retry_for_429s(
                 jira_connection.search_issues,
-                f'{issue_jql} order by id asc',
+                jql_query,
                 fields=['updated'],
                 startAt=start_at,
                 maxResults=batch_size,
