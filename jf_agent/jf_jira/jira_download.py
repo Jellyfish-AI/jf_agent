@@ -910,7 +910,8 @@ def _search_all_users(jira_connection, gdpr_active):
     start_at = 0
 
     # different jira versions / different times, the way to list all users has changed. Try a few.
-    for q in [None, '', '%', '@']:
+    for q in [None, '', '""', '%', '@']:
+        logger.debug(f'Attempting wild card search with {q}')
         # iterate through pages of results
         while True:
             users = _search_users(
@@ -926,6 +927,7 @@ def _search_all_users(jira_connection, gdpr_active):
 
         # found users; no need to try other query techniques
         if jira_users:
+            logger.debug(f'Found {len(jira_users.keys())} users')
             return list(jira_users.values())
 
     # no users found
