@@ -715,8 +715,9 @@ def _download_jira_issues_page_batches(
     for issue_ids in issue_ids_array:
         tries = 0
         while batch_size > 0:
+            jql_query = f"id in ({','.join(str(iid) for iid in issue_ids)}) order by id asc"
             search_params = {
-                'jql': f"id in ({','.join(str(iid) for iid in issue_ids)}) order by id asc",
+                'jql': jql_query,
                 'fields': field_spec,
                 'expand': ['renderedFields'],
                 'startAt': start_at,
@@ -726,6 +727,8 @@ def _download_jira_issues_page_batches(
                 search_params['expand'].append('changelog')
 
             try:
+                logger.debug(f'Attempting to get issues with the following JQL: {jql_query}')
+
                 # Note: no need to use retry_429s function, this already handles rate-limits
                 resp_json = json_loads(
                     jira_connection._session.post(
