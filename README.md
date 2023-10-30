@@ -26,7 +26,7 @@ Here's how to fix it:
     PATH_TO_BUNDLE=/home/jf_agent/cacert.pem
     OUTPUT_FOLDER=${HERE}/jf_agent_output
     mkdir --parents ${OUTPUT_FOLDER}
-    docker run --rm \
+    docker run -it --rm \
         --mount type=bind,source=${HERE}/my_config.yml,target=/home/jf_agent/config.yml \
         --mount type=bind,source=${OUTPUT_FOLDER},target=/home/jf_agent/output \
         --mount type=bind,source=${HERE}/cacert.pem,target=${PATH_TO_BUNDLE} \
