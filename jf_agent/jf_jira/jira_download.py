@@ -643,19 +643,18 @@ def _download_jira_issues_segment(
     start_at = 0
     logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
     try:
-        while start_at < len(jira_issue_ids_segment):
-            for issue_batch, num_apparently_deleted in _download_jira_issues_page_batches(
-                jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-            ):
-                issues_retrieved = len(issue_batch) + num_apparently_deleted
-                start_at += issues_retrieved
-                if issues_retrieved == 0:
-                    break
+        for issue_batch, num_apparently_deleted in _download_jira_issues_page_batches(
+            jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+        ):
+            issues_retrieved = len(issue_batch) + num_apparently_deleted
+            start_at += issues_retrieved
+            if issues_retrieved == 0:
+                break
 
-                rows_to_insert = [(int(issue['id']), issue) for issue in issue_batch]
+            rows_to_insert = [(int(issue['id']), issue) for issue in issue_batch]
 
-                # TODO: configurable way to scrub things out of raw_issues here before we write them out.
-                q.put(rows_to_insert)
+            # TODO: configurable way to scrub things out of raw_issues here before we write them out.
+            q.put(rows_to_insert)
 
         # sentinel to mark that this thread finished
         q.put(None)
