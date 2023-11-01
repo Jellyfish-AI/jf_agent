@@ -644,18 +644,19 @@ def _download_jira_issues_segment(
     logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
     try:
         while start_at < len(jira_issue_ids_segment):
-            for issue_batch, num_apparently_deleted in _download_jira_issues_page_batches(
+            issues, num_apparently_deleted = _download_jira_issues_page(
                 jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-            ):
-                issues_retrieved = len(issue_batch) + num_apparently_deleted
-                start_at += issues_retrieved
-                if issues_retrieved == 0:
-                    break
+            )
 
-                rows_to_insert = [(int(issue['id']), issue) for issue in issue_batch]
+            issues_retrieved = len(issues) + num_apparently_deleted
+            start_at += issues_retrieved
+            if issues_retrieved == 0:
+                break
 
-                # TODO: configurable way to scrub things out of raw_issues here before we write them out.
-                q.put(rows_to_insert)
+            rows_to_insert = [(int(issue['id']), issue) for issue in issues]
+
+            # TODO: configurable way to scrub things out of raw_issues here before we write them out.
+            q.put(rows_to_insert)
 
         # sentinel to mark that this thread finished
         q.put(None)
@@ -667,109 +668,53 @@ def _download_jira_issues_segment(
         q.put(e)
 
 
-def _split_id_list(jira_issue_ids_segment: list):
-
-    # same logic as `download_all_issue_metadata` for splitting lists of ids
-    max_length = 20000
-    len_issue_ids_string = (
-        len(','.join(str(x) for x in jira_issue_ids_segment))
-        + len(jira_issue_ids_segment) * 2
-        + 200
-    )
-    num_pulls = len_issue_ids_string // max_length + 1
-    logger.debug(f"Splitting the list of issue ids into {num_pulls} portions for server safety")
-
-    issue_ids_array = []
-    if num_pulls == 1:
-        issue_ids_array.append(jira_issue_ids_segment)
-    else:
-        # Over 20K characters - break up issue_ids evenly based on num_pulls
-        n = len(jira_issue_ids_segment) // num_pulls
-        issue_ids_array = [
-            jira_issue_ids_segment[i : i + n] for i in range(0, len(jira_issue_ids_segment), n)
-        ]
-
-    return issue_ids_array
-
-
-def _download_jira_issues_page_batches(
-    jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-) -> Generator[Tuple[list, int], None, None]:
+def _download_jira_issues_page(
+        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+):
     '''
-    Make sure you call this with a NEXT call, or as part of a loop!
-    Returns a GENERATOR that yields a tuple: (issues_downloaded, num_issues_apparently_deleted)
+    Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
     '''
     get_changelog = True
 
-    issue_ids_array = []
-    try:
-        issue_ids_array = _split_id_list(jira_issue_ids_segment)
-    except Exception as e:
-        logger.warning(
-            f"got {e} trying to split up ids for jql 2500 character limit, moving on with normal id list",
-        )
-        issue_ids_array.append(jira_issue_ids_segment)
+    while batch_size > 0:
+        search_params = {
+            'jql': f"id in ({','.join(str(iid) for iid in jira_issue_ids_segment)}) order by id asc",
+            'fields': field_spec,
+            'expand': ['renderedFields'],
+            'startAt': start_at,
+            'maxResults': batch_size,
+        }
+        if get_changelog:
+            search_params['expand'].append('changelog')
 
-    for issue_ids in issue_ids_array:
-        tries = 0
-        while batch_size > 0:
-            search_params = {
-                'jql': f"id in ({','.join(str(iid) for iid in issue_ids)}) order by id asc",
-                'fields': field_spec,
-                'expand': ['renderedFields'],
-                'startAt': start_at,
-                'maxResults': batch_size,
-            }
-            if get_changelog:
-                search_params['expand'].append('changelog')
-
-            try:
-                # Note: no need to use retry_429s function, this already handles rate-limits
-                resp_json = json_loads(
-                    jira_connection._session.post(
-                        url=jira_connection._get_url('search'), data=json.dumps(search_params)
-                    )
+        try:
+            resp_json = json_loads(
+                jira_connection._session.post(
+                    url=jira_connection._get_url('search'), data=json.dumps(search_params)
                 )
-                tries = 0
-                yield (_expand_changelog(resp_json['issues'], jira_connection), 0)
-                break
+            )
+            return _expand_changelog(resp_json['issues'], jira_connection), 0
 
-            except Exception as e:
-                if hasattr(e, 'status_code') and e.status_code == 429:
-                    if tries >= 5:
-                        logger.info(f'exhausted 5 tries of ratelmiting')
-                        raise
-                    if hasattr(e.response, 'headers') and 'Retry-After' in e.response.headers:
-                        wait_time = int(e.response.headers["Retry-After"])
-                        logger.info(f'Retrying in {wait_time} seconds...')
-                        time.sleep(wait_time)
-                    else:
-                        tries += 1
-                        logger.info(f'No retry-after header, retrying in 30 seconds...')
-                        time.sleep(30)
+        except (json.decoder.JSONDecodeError, JIRAError) as e:
+            if hasattr(e, 'status_code') and e.status_code == 429:
+                # This is rate limiting ("Too many requests")
+                raise
 
-                    # Skip the lowering of batch size (below) for rate limit errors.
-                    continue
-
-                batch_size = int(batch_size / 2)
-                logger.warning(f"Got {e}, reducing batch size")
-                time.sleep(30)
-                if batch_size == 0:
-                    if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
-                        yield ([], 1)
-                        break
-                    elif not get_changelog:
-                        logging_helper.log_standard_error(
-                            logging.WARNING, msg_args=[search_params], error_code=3062,
-                        )
-                        yield ([], 0)
-                        break
-                    else:
-                        get_changelog = False
-                        batch_size = 100
-                        start_at += 1
-
-    return [], 0
+            batch_size = int(batch_size / 2)
+            agent_logging.log_and_print_error_or_warning(
+                logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+            )
+            if batch_size == 0:
+                if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
+                    return [], 1
+                elif not get_changelog:
+                    agent_logging.log_and_print_error_or_warning(
+                        logger, logging.WARNING, msg_args=[search_params], error_code=3062,
+                    )
+                    return [], 0
+                else:
+                    get_changelog = False
+                    batch_size = 1
 
 
 # Sometimes the results of issue search has an incomplete changelog.  Fill it in if so.
