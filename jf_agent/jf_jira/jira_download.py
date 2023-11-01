@@ -470,6 +470,8 @@ def detect_issues_needing_sync(
     deleted_issue_ids = set()
 
     for k in issue_metadata_from_jira.keys():
+        missing_issue_ids.add(k)
+        continue
         if k not in issue_metadata_from_jellyfish:
             missing_issue_ids.add(k)
         else:
@@ -545,6 +547,9 @@ def download_necessary_issues(
     random.shuffle(issue_ids_to_download)
     issue_ids_for_threads = list(split(issue_ids_to_download, num_threads_to_use))
 
+    logger.info(
+        f'Attempting to start {num_threads_to_use} to process {issue_ids_to_download} issues in {len(issue_ids_for_threads)} batches'
+    )
     # Make threads to talk to Jira and write batches of issues to the queue
     q = queue.Queue()
     threads = [
@@ -641,23 +646,37 @@ def _download_jira_issues_segment(
     download onto the shared queue.
     '''
     start_at = 0
-    logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
+    logger.info(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
+    issues_processed = 0
     try:
-        for issue_batch, num_apparently_deleted in _download_jira_issues_page_batches(
-            jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
-        ):
+        while True:
+            issue_batch, num_apparently_deleted = next(
+                _download_jira_issues_page_batches(
+                    jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+                )
+            )
+            print(
+                'Start At: ',
+                start_at,
+                '<',
+                len(jira_issue_ids_segment),
+                len(issue_batch),
+                num_apparently_deleted,
+                flush=True,
+            )
             issues_retrieved = len(issue_batch) + num_apparently_deleted
+            issues_processed += issues_retrieved
             start_at += issues_retrieved
             if issues_retrieved == 0:
-                break
+                # Signal that we are done processing data for this thread
+                q.put(None)
+                logger.info(f'Processed {issues_processed}/{len(jira_issue_ids_segment)}')
+                return
 
             rows_to_insert = [(int(issue['id']), issue) for issue in issue_batch]
 
             # TODO: configurable way to scrub things out of raw_issues here before we write them out.
             q.put(rows_to_insert)
-
-        # sentinel to mark that this thread finished
-        q.put(None)
 
     except BaseException as e:
         logging_helper.log_standard_error(
@@ -669,14 +688,14 @@ def _download_jira_issues_segment(
 def _split_id_list(jira_issue_ids_segment: list):
 
     # same logic as `download_all_issue_metadata` for splitting lists of ids
-    max_length = 20000
+    max_length = 2  # 20000
     len_issue_ids_string = (
         len(','.join(str(x) for x in jira_issue_ids_segment))
         + len(jira_issue_ids_segment) * 2
         + 200
     )
     num_pulls = len_issue_ids_string // max_length + 1
-    logger.debug(f"Splitting the list of issue ids into {num_pulls} portions for server safety")
+    logger.info(f"Splitting the list of issue ids into {num_pulls} portions for server safety")
 
     issue_ids_array = []
     if num_pulls == 1:
