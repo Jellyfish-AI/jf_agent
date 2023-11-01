@@ -677,11 +677,12 @@ def _download_jira_issues_page(
     get_changelog = True
 
     while batch_size > 0:
+        ids_to_get = [str(iid) for iid in jira_issue_ids_segment[start_at : start_at + batch_size]]
         search_params = {
-            'jql': f"id in ({','.join(str(iid) for iid in jira_issue_ids_segment)}) order by id asc",
+            'jql': f"id in ({','.join(ids_to_get)}) order by id asc",
             'fields': field_spec,
             'expand': ['renderedFields'],
-            'startAt': start_at,
+            'startAt': 0,
             'maxResults': batch_size,
         }
         if get_changelog:
