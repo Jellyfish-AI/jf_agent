@@ -685,6 +685,7 @@ def _download_jira_issues_page(
             'startAt': 0,
             'maxResults': batch_size,
         }
+        logger.info(f'{search_params=}')
         if get_changelog:
             search_params['expand'].append('changelog')
 
