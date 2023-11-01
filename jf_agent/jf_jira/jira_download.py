@@ -689,8 +689,9 @@ def _download_jira_issues_page(
 
         try:
             resp_json = json_loads(
-                jira_connection._session.post(
-                    url=jira_connection._get_url('search'), data=json.dumps(search_params)
+                retry_for_429s(
+                    jira_connection._session.post,
+                        url=jira_connection._get_url('search'), data=json.dumps(search_params)
                 )
             )
             return _expand_changelog(resp_json['issues'], jira_connection), 0
@@ -701,8 +702,8 @@ def _download_jira_issues_page(
                 raise
 
             batch_size = int(batch_size / 2)
-            agent_logging.log_and_print_error_or_warning(
-                logger, logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+            logging_helper.log_standard_error(
+                logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
             )
             if batch_size == 0:
                 if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
