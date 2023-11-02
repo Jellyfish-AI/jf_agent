@@ -37,7 +37,7 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, debug_req
     for retry in range(max_retries + 1):
         try:
             return f(*args, **kwargs)
-        except JIRAError as e:
+        except Exception as e:
             if hasattr(e, 'status_code') and e.status_code == 429 and retry < max_retries:
                 wait_time = get_wait_time(e, retries=retry)
                 logging_helper.log_standard_error(
