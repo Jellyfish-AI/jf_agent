@@ -93,13 +93,6 @@ def configure(outdir, debug_requests=False):
         # http.client uses `print` directly. Intercept calls and invoke our logger.
         http.client.print = print_to_log
         http.client.HTTPConnection.debuglevel = 1
-        http.client.print = print_to_log
-        http.client.HTTPConnection.debuglevel = 1
-        logging.getLogger(urllib3.__name__).setLevel(logging.DEBUG)
-        logging.getLogger(http.__name__).setLevel(logging.DEBUG)
-        logging.getLogger(http.client.HTTPConnection.__name__).setLevel(logging.DEBUG)
-    else:
-        logging.getLogger(urllib3.__name__).setLevel(logging.WARNING)
 
     logging.basicConfig(
         level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
