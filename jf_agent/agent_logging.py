@@ -60,7 +60,7 @@ class CustomFileHandler(logging.FileHandler):
         _emit_helper(self, record, always_use_newlines=True)
 
 
-def configure(outdir):
+def configure(outdir, debug_requests=False):
 
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
@@ -78,7 +78,21 @@ def configure(outdir):
 
     # Silence the urllib3 logger to only emit WARNING level logs,
     # because the debug level logs are super noisy
-    logging.getLogger(urllib3.__name__).setLevel(logging.WARNING)
+    if debug_requests:
+        import http.client
+
+        http_client_logger = logging.getLogger("http.client")
+        http_client_logger.setLevel(logging.DEBUG)
+        debug_fh = logging.FileHandler('debug.log')
+        debug_fh.setLevel(logging.DEBUG)
+        http_client_logger.addHandler(debug_fh)
+
+        def print_to_log(*args):
+            http_client_logger.debug(" ".join(args))
+
+        # http.client uses `print` directly. Intercept calls and invoke our logger.
+        http.client.print = print_to_log
+        http.client.HTTPConnection.debuglevel = 1
 
     logging.basicConfig(
         level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
