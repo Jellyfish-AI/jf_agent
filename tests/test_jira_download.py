@@ -7,6 +7,8 @@ from jira.resources import Issue as JiraIssue
 
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import get_issues, download_all_issue_metadata
+import http
+http.client.HTTPConnection.debuglevel = 1
 
 
 def get_connection():
@@ -98,6 +100,11 @@ class TestJiraDownload(TestCase):
             context.status_code = 200
             return json.dumps(json_response)
 
+    def server_500(self, request, context):
+        context.status_code = 500
+        context.reason = "Internal server error"
+        return ""
+
     @classmethod
     def setUpClass(cls):
         cls.jira_connection = get_connection()
@@ -144,3 +151,25 @@ class TestJiraDownload(TestCase):
             )
 
         self.assertGreaterEqual(len(issue_metadata), 1)
+
+    def test_debug_http(self):
+        project_ids = ["TC"]
+        earliest_issue_dt = ''
+        num_parallel_threads = 1
+        issue_filter = ''
+
+        with requests_mock.Mocker() as m:
+            m.register_uri('GET', f'{self.URL_BASE}', text=self.server_500)
+            try:
+                issue_metadata = download_all_issue_metadata(
+                    self.jira_connection,
+                    project_ids,
+                    earliest_issue_dt,
+                    num_parallel_threads,
+                    issue_filter,
+                    debug_request=True
+                )
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 500)
+                self.assertEqual(e.response.reason, "Internal server error")
+                self.assertEqual(e.response.text, "")

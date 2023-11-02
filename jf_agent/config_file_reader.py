@@ -45,6 +45,7 @@ ValidatedConfig = namedtuple(
         'run_mode_includes_send',
         'run_mode_is_print_all_jira_fields',
         'run_mode_is_print_apparently_missing_git_repos',
+        'debug_request',
         'jira_url',
         'jira_earliest_issue_dt',
         'jira_issue_download_concurrent_threads',
@@ -113,6 +114,8 @@ def obtain_config(args) -> ValidatedConfig:
     run_mode_is_print_apparently_missing_git_repos = (
         run_mode == 'print_apparently_missing_git_repos'
     )
+
+    debug_request = args.debug_request
 
     try:
         with open(config_file_path, 'r') as yaml_file:
@@ -238,6 +241,7 @@ def obtain_config(args) -> ValidatedConfig:
         run_mode_includes_send,
         run_mode_is_print_all_jira_fields,
         run_mode_is_print_apparently_missing_git_repos,
+        debug_request,
         jira_url,
         jira_earliest_issue_dt,
         jira_issue_download_concurrent_threads,

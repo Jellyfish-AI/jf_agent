@@ -2,9 +2,8 @@ import logging
 import time
 from typing import Optional, Callable, Any
 
-from jira import JIRAError
-
 from jf_ingest import logging_helper
+from jira import JIRAError
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ def get_wait_time(e: Optional[Exception], retries: int) -> int:
         return 5 ** retries
 
 
-def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs) -> Any:
+def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, debug_request=False, **kwargs) -> Any:
     """
     This function allows for us to retry 429s from Jira. There are much more elegant ways of accomplishing
     this, but this is a quick and reasonable approach to doing so.
@@ -53,4 +52,21 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs)
                 time.sleep(wait_time)
                 continue
             else:
-                raise e
+                logger.error(f"Error on attempting to call:\n {getattr(f, '__name__', repr(f))} ")
+                logger.error(f"with args:\n {args}\n {kwargs} ")
+                if debug_request:
+                    return _rerun_with_debug(f, *args, **kwargs)
+                else:
+                    raise e
+
+
+def _rerun_with_debug(f: Callable[..., Any], *args, **kwargs) -> Any:
+    import http
+    http.client.HTTPConnection.debuglevel = 1
+
+    try:
+        f(*args, **kwargs)
+    except Exception as e:
+        logger.error(f"Reran for http debug, failed with exception:\n {e} ")
+        raise e
+

@@ -5,8 +5,7 @@ import math
 import random
 import re
 import traceback
-import time
-from typing import Dict, Generator, Tuple
+from typing import Dict
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -29,12 +28,12 @@ logger = logging.getLogger(__name__)
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_users(
-    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False
+    jira_connection, gdpr_active, quiet=False, required_email_domains=None, is_email_required=False, debug_request=False
 ):
     if not quiet:
         logger.info('downloading jira users...  [!n]')
 
-    jira_users = _search_all_users(jira_connection, gdpr_active)
+    jira_users = _search_all_users(jira_connection, gdpr_active, debug_request=debug_request)
 
     # Some jira instances won't return more than one page of
     # results.  If we have seen approximately 1000 results, try
@@ -83,7 +82,7 @@ def download_users(
 # Returns an array of Field dicts
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_fields(jira_connection, include_fields, exclude_fields):
+def download_fields(jira_connection, include_fields, exclude_fields, debug_request=False):
     logger.info('downloading jira fields... [!n]')
 
     filters = []
@@ -94,7 +93,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
     fields = [
         field
-        for field in retry_for_429s(jira_connection.fields)
+        for field in retry_for_429s(jira_connection.fields, debug_request=debug_request)
         if all(filt(field) for filt in filters)
     ]
 
@@ -105,16 +104,16 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 # Returns an array of Resolutions dicts
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_resolutions(jira_connection):
+def download_resolutions(jira_connection, debug_request=False):
     logger.info('downloading jira resolutions... [!n]')
-    result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    result = [r.raw for r in retry_for_429s(jira_connection.resolutions, debug_request=debug_request)]
     return result
 
 
 # Returns an array of IssueType dicts
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_issuetypes(jira_connection, project_ids):
+def download_issuetypes(jira_connection, project_ids, debug_request=False):
     '''
     For Jira next-gen projects, issue types can be scoped to projects.
     For issue types that are scoped to projects, only extract the ones
@@ -122,7 +121,7 @@ def download_issuetypes(jira_connection, project_ids):
     '''
     logger.info('downloading jira issue types...  [!n]',)
     result = []
-    for it in retry_for_429s(jira_connection.issue_types):
+    for it in retry_for_429s(jira_connection.issue_types, debug_request=debug_request):
         if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
             if it.raw['scope']['project']['id'] in project_ids:
                 result.append(it.raw)
@@ -135,9 +134,9 @@ def download_issuetypes(jira_connection, project_ids):
 # Returns an array of LinkType dicts
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_issuelinktypes(jira_connection):
+def download_issuelinktypes(jira_connection, debug_request=False):
     logger.info('downloading jira issue link types... [!n]')
-    result = [lt.raw for lt in retry_for_429s(jira_connection.issue_link_types)]
+    result = [lt.raw for lt in retry_for_429s(jira_connection.issue_link_types, debug_request=debug_request)]
     logger.info('✓')
     return result
 
@@ -145,9 +144,9 @@ def download_issuelinktypes(jira_connection):
 # Returns an array of Priority dicts
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_priorities(jira_connection):
+def download_priorities(jira_connection, debug_request=False):
     logger.info('downloading jira priorities... [!n]')
-    result = [p.raw for p in retry_for_429s(jira_connection.priorities)]
+    result = [p.raw for p in retry_for_429s(jira_connection.priorities, debug_request=debug_request)]
     logger.info('✓')
     return result
 
@@ -157,7 +156,7 @@ def download_priorities(jira_connection):
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_projects_and_versions(
-    jira_connection, include_projects, exclude_projects, include_categories, exclude_categories
+    jira_connection, include_projects, exclude_projects, include_categories, exclude_categories, debug_request=False
 ):
     logger.info('downloading jira projects... [!n]')
 
@@ -189,9 +188,14 @@ def download_projects_and_versions(
 
         filters.append(_exclude_filter)
 
-    def project_is_accessible(project_id):
+    def project_is_accessible(project_id, debug_request=False):
         try:
-            retry_for_429s(jira_connection.search_issues, f'project = {project_id}', fields=['id'])
+            retry_for_429s(
+                jira_connection.search_issues,
+                f'project = {project_id}',
+                fields=['id'],
+                debug_request=debug_request
+            )
             return True
         except JIRAError as e:
             # Handle zombie projects that appear in the project list
@@ -209,11 +213,11 @@ def download_projects_and_versions(
             else:
                 raise
 
-    all_projects = retry_for_429s(jira_connection.projects)
+    all_projects = retry_for_429s(jira_connection.projects, debug_request=debug_request)
     projects = [
         proj
         for proj in all_projects
-        if all(filt(proj) for filt in filters) and project_is_accessible(proj.id)
+        if all(filt(proj) for filt in filters) and project_is_accessible(proj.id, debug_request=debug_request)
     ]
 
     if not projects:
@@ -226,14 +230,18 @@ def download_projects_and_versions(
     logger.info('downloading jira project components... [!n]')
     for p in projects:
         p.raw.update(
-            {'components': [c.raw for c in retry_for_429s(jira_connection.project_components, p)]}
+            {'components': [c.raw for c in retry_for_429s(
+                jira_connection.project_components,
+                p,
+                debug_request=debug_request
+            )]}
         )
     logger.info('✓')
 
     logger.info('downloading jira versions... [!n]')
     result = []
     for p in projects:
-        versions = retry_for_429s(jira_connection.project_versions, p)
+        versions = retry_for_429s(jira_connection.project_versions, p, debug_request=debug_request)
         p.raw.update({'versions': [v.raw for v in versions]})
         result.append(p.raw)
     logger.info('✓')
@@ -247,7 +255,7 @@ def download_projects_and_versions(
 #   - Array of board/sprint links
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
+def download_boards_and_sprints(jira_connection, project_ids, download_sprints, debug_request=False):
     boards_by_id = {}  # De-dup by id, since the same board might come back from more than one query
     for project_id in tqdm(project_ids, desc='downloading jira boards...', file=sys.stdout):
         b_start_at = 0
@@ -264,6 +272,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         'includePrivate': 'false',
                         'projectKeyOrId': project_id,
                     },
+                    debug_request=debug_request
                 ).json()['values']
             except JIRAError as e:
                 if e.status_code == 400:
@@ -295,6 +304,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
                         startAt=s_start_at,
                         maxResults=50,
                         state='active,closed',
+                        debug_request=debug_request
                     )
                 except JIRAError as e:
                     # JIRA returns 500 errors for various reasons: board is
@@ -326,7 +336,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
 IssueMetadata = namedtuple('IssueMetadata', ('key', 'updated'))
 
 
-def get_issues(jira_connection, issue_jql, start_at, batch_size):
+def get_issues(jira_connection, issue_jql, start_at, batch_size, debug_request=False):
     original_batch_size = batch_size
     error = None
     while batch_size > 0:
@@ -337,6 +347,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
                 fields=['updated'],
                 startAt=start_at,
                 maxResults=batch_size,
+                debug_request=debug_request
             )
             return api_response
         except (JIRAError, KeyError) as e:
@@ -374,7 +385,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_all_issue_metadata(
-    jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter
+    jira_connection, all_project_ids, earliest_issue_dt, num_parallel_threads, issue_filter, debug_request=False
 ) -> Dict[int, IssueMetadata]:
     logger.info('downloading issue metadata... [!n]')
 
@@ -409,7 +420,7 @@ def download_all_issue_metadata(
         if issue_filter:
             issue_jql += f' and {issue_filter}'
         total_num_issues = retry_for_429s(
-            jira_connection.search_issues, issue_jql, fields=['id']
+            jira_connection.search_issues, issue_jql, fields=['id'], debug_request=debug_request
         ).total
         issues_per_thread = math.ceil(total_num_issues / num_parallel_threads)
 
@@ -419,7 +430,7 @@ def download_all_issue_metadata(
             batch_size = 1000
             try:
                 while start_at < min(end_at, total_num_issues):
-                    api_resp = get_issues(jira_connection, issue_jql, start_at, batch_size)
+                    api_resp = get_issues(jira_connection, issue_jql, start_at, batch_size, debug_request=debug_request)
 
                     issue_metadata = {
                         int(iss.id): IssueMetadata(iss.key, parser.parse(iss.fields.updated))
@@ -519,6 +530,7 @@ def download_necessary_issues(
     exclude_fields,
     suggested_batch_size,
     num_parallel_threads,
+    debug_request=False
 ):
     '''
     A generator that yields batches of issues, until we've downloaded all of the issues given by
@@ -537,6 +549,7 @@ def download_necessary_issues(
         expand='renderedFields,changelog',
         startAt=0,
         maxResults=suggested_batch_size,
+        debug_request=debug_request,
     ).maxResults
 
     num_threads_to_use = min(
@@ -557,6 +570,7 @@ def download_necessary_issues(
                 field_spec,
                 actual_batch_size,
                 q,
+                debug_request,
             ],
         )
         for thread_num in range(num_threads_to_use)
@@ -633,7 +647,7 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
 
 @logging_helper.log_entry_exit(logger)
 def _download_jira_issues_segment(
-    thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q
+    thread_num, jira_connection, jira_issue_ids_segment, field_spec, batch_size, q, debug_request=False
 ):
     '''
     Each thread's target function.  Downloads 1/nth of the issues necessary, where
@@ -645,7 +659,7 @@ def _download_jira_issues_segment(
     try:
         while start_at < len(jira_issue_ids_segment):
             issues, num_apparently_deleted = _download_jira_issues_page(
-                jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+                jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size, debug_request=debug_request
             )
 
             issues_retrieved = len(issues) + num_apparently_deleted
@@ -669,7 +683,7 @@ def _download_jira_issues_segment(
 
 
 def _download_jira_issues_page(
-        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size, debug_request=False
 ):
     '''
     Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
@@ -692,10 +706,12 @@ def _download_jira_issues_page(
             resp_json = json_loads(
                 retry_for_429s(
                     jira_connection._session.post,
-                        url=jira_connection._get_url('search'), data=json.dumps(search_params)
+                    url=jira_connection._get_url('search'),
+                    data=json.dumps(search_params),
+                    debug_request=debug_request,
                 )
             )
-            return _expand_changelog(resp_json['issues'], jira_connection), 0
+            return _expand_changelog(resp_json['issues'], jira_connection, debug_request=debug_request), 0
 
         except (json.decoder.JSONDecodeError, JIRAError) as e:
             if hasattr(e, 'status_code') and e.status_code == 429:
@@ -720,7 +736,7 @@ def _download_jira_issues_page(
 
 
 # Sometimes the results of issue search has an incomplete changelog.  Fill it in if so.
-def _expand_changelog(jira_issues, jira_connection):
+def _expand_changelog(jira_issues, jira_connection, debug_request=False):
     for i in jira_issues:
         changelog = getattr(i, 'changelog', None)
         if changelog and changelog.total != changelog.maxResults:
@@ -732,6 +748,7 @@ def _expand_changelog(jira_issues, jira_connection):
                     jira_connection._get_json,
                     f'issue/{i["id"]}/changelog',
                     {'startAt': start_at, 'maxResults': batch_size},
+                    debug_request=debug_request,
                 )['values']
                 changelog.histories.extend(dict2resource(i) for i in more_cls)
                 i['changelog']['histories'].extend(more_cls)
@@ -746,13 +763,13 @@ def _expand_changelog(jira_issues, jira_connection):
 @logging_helper.log_entry_exit(logger)
 # TODO make this happen incrementally -- only pull down the worklogs that have been updated
 # more recently than we've already stored
-def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
+def download_worklogs(jira_connection, issue_ids, endpoint_jira_info, debug_request=False):
     logger.info('downloading jira worklogs...  [!n]')
     updated = []
     since = endpoint_jira_info.get('last_updated', 0)
     while True:
         worklog_ids_json = retry_for_429s(
-            jira_connection._get_json, 'worklog/updated', params={'since': since}
+            jira_connection._get_json, 'worklog/updated', params={'since': since}, debug_request=debug_request
         )
         updated_worklog_ids = [v['worklogId'] for v in worklog_ids_json['values']]
 
@@ -760,6 +777,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
             jira_connection._session.post,
             url=jira_connection._get_url('worklog/list'),
             data=json.dumps({'ids': updated_worklog_ids}),
+            debug_request=debug_request
         )
         try:
             worklog_list_json = json_loads(resp)
@@ -780,7 +798,7 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
 # Returns an array of CustomFieldOption items
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_customfieldoptions(jira_connection, project_ids):
+def download_customfieldoptions(jira_connection, project_ids, debug_request=False):
     logger.info('downloading jira custom field options... [!n]')
     optionvalues = {}
     for project_id in project_ids:
@@ -789,6 +807,7 @@ def download_customfieldoptions(jira_connection, project_ids):
                 jira_connection.createmeta,
                 projectIds=[project_id],
                 expand='projects.issuetypes.fields',
+                debug_request=debug_request,
             )
         except JIRAError:
             logging_helper.log_standard_error(logging.WARNING, error_code=3072, exc_info=False)
@@ -813,14 +832,14 @@ def download_customfieldoptions(jira_connection, project_ids):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_teams(jira_connection):
+def download_teams(jira_connection, debug_request=False):
     logger.info('downloading jira teams... [!n]')
     server = jira_connection._options['server']
     try:
         teams_url = jira_connection.JIRA_BASE_URL.format(
             server=server, rest_path='teams-api', rest_api_version='1.0', path='team'
         )
-        teams = retry_for_429s(jira_connection._get_json, 'team', base=teams_url)
+        teams = retry_for_429s(jira_connection._get_json, 'team', base=teams_url, debug_request=debug_request)
         logger.info('✓')
         return teams
     except Exception as e:
@@ -830,9 +849,9 @@ def download_teams(jira_connection):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_statuses(jira_connection):
+def download_statuses(jira_connection, debug_request=False):
     logger.info('downloading jira statuses... [!n]')
-    statuses = retry_for_429s(jira_connection.statuses)
+    statuses = retry_for_429s(jira_connection.statuses, debug_request=debug_request)
     result = [{'status_id': status.id, 'raw_json': status.raw} for status in statuses]
     logger.info('✓')
     return result
@@ -852,7 +871,7 @@ def _jira_user_key(user_dict):
     return user_dict.get('key', user_dict.get('accountId', 'unknown_key'))
 
 
-def _search_all_users(jira_connection, gdpr_active):
+def _search_all_users(jira_connection, gdpr_active, debug_request=False):
     jira_users = {}
     start_at = 0
 
@@ -862,7 +881,7 @@ def _search_all_users(jira_connection, gdpr_active):
         # iterate through pages of results
         while True:
             users = _search_users(
-                jira_connection, gdpr_active, query=q, start_at=start_at, include_inactive=True
+                jira_connection, gdpr_active, query=q, start_at=start_at, include_inactive=True, debug_request=debug_request
             )
             if not users:
                 # we're done, no more pages
@@ -919,6 +938,7 @@ def _search_users(
     max_results=1000,
     include_active=True,
     include_inactive=False,
+    debug_request=False,
 ):
     if query is None:
         # use new endpoint that doesn't take a query.  This may not exist in some instances.
@@ -927,6 +947,7 @@ def _search_users(
                 jira_connection._get_json,
                 'users/search',
                 {'startAt': start_at, 'maxResults': max_results},
+                debug_request=debug_request
             )
         except JIRAError:
             return []
@@ -941,7 +962,7 @@ def _search_users(
             'includeActive': include_active,
             'includeInactive': include_inactive,
         }
-        return retry_for_429s(jira_connection._get_json, 'user/search', params)
+        return retry_for_429s(jira_connection._get_json, 'user/search', params, debug_request=debug_request)
 
     return [
         u.raw
@@ -952,6 +973,7 @@ def _search_users(
             maxResults=max_results,
             includeInactive=include_inactive,
             includeActive=include_active,
+            debug_request=debug_request,
         )
     ]
 
@@ -964,7 +986,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
 
     # obtain list of repos in jira
     jira_connection = get_basic_jira_connection(config, creds)
-    missing_repositories = _get_repos_list_in_jira(issues_to_scan, jira_connection)
+    missing_repositories = _get_repos_list_in_jira(issues_to_scan, jira_connection, config.debug_request)
 
     # cross-reference them with git sources
     is_multi_git_config = len(config.git_configs) > 1
@@ -991,7 +1013,7 @@ def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
     return result
 
 
-def _get_repos_list_in_jira(issues_to_scan, jira_connection):
+def _get_repos_list_in_jira(issues_to_scan, jira_connection, debug_request=False):
     logger.info('Scanning Jira issues for Git repos...')
     missing_repositories = {}
 
@@ -999,7 +1021,7 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
         for instance_type in instance_types:
             try:
                 repositories = _scan_jira_issue_for_repo_data(
-                    jira_connection, issue_id, instance_type
+                    jira_connection, issue_id, instance_type, debug_request
                 )
             except JIRAError as e:
                 if e.status_code == 403:
@@ -1038,7 +1060,7 @@ def _remove_repos_present_in_git_instance(git_connection, git_config, missing_re
         )
 
 
-def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
+def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type, debug_request=False):
     params = {
         'issueId': issue_id,
         'dataType': 'repository',
@@ -1051,6 +1073,7 @@ def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
             '/rest/dev-status/1.0/issue/detail',
             params,
             base='{server}{path}',
+            debug_request=debug_request,
         )
     except JIRAError as e:
         if e.status_code == 400:

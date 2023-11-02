@@ -84,7 +84,7 @@ def get_basic_jira_connection(config, creds):
 @logging_helper.log_entry_exit(logger)
 def print_all_jira_fields(config, jira_connection):
     for f in download_fields(
-        jira_connection, config.jira_include_fields, config.jira_exclude_fields
+        jira_connection, config.jira_include_fields, config.jira_exclude_fields, config.debug_request
     ):
         # This could potential data that clients do not exposed. Print instead of logging here
         print(f"{f['key']:30}\t{f['name']}")
@@ -112,7 +112,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             'jira_fields',
             config.compress_output_files,
             download_fields(
-                jira_connection, config.jira_include_fields, config.jira_exclude_fields
+                jira_connection, config.jira_include_fields, config.jira_exclude_fields, config.debug_request
             ),
         )
 
@@ -141,36 +141,37 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.jira_gdpr_active,
                 required_email_domains=config.jira_required_email_domains,
                 is_email_required=config.jira_is_email_required,
+                debug_request=config.debug_request,
             ),
         )
         write_file(
             config.outdir,
             'jira_resolutions',
             config.compress_output_files,
-            download_resolutions(jira_connection),
+            download_resolutions(jira_connection, debug_request=config.debug_request),
         )
         write_file(
             config.outdir,
             'jira_issuetypes',
             config.compress_output_files,
-            download_issuetypes(jira_connection, project_ids),
+            download_issuetypes(jira_connection, project_ids, debug_request=config.debug_request),
         )
         write_file(
             config.outdir,
             'jira_linktypes',
             config.compress_output_files,
-            download_issuelinktypes(jira_connection),
+            download_issuelinktypes(jira_connection, debug_request=config.debug_request),
         )
         write_file(
             config.outdir,
             'jira_priorities',
             config.compress_output_files,
-            download_priorities(jira_connection),
+            download_priorities(jira_connection, debug_request=config.debug_request),
         )
 
         def download_and_write_boards_and_sprints():
             boards, sprints, links = download_boards_and_sprints(
-                jira_connection, project_ids, config.jira_download_sprints
+                jira_connection, project_ids, config.jira_download_sprints, debug_request=config.debug_request
             )
             write_file(config.outdir, 'jira_boards', config.compress_output_files, boards)
             write_file(config.outdir, 'jira_sprints', config.compress_output_files, sprints)
@@ -186,6 +187,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             config.jira_earliest_issue_dt,
             config.jira_issue_download_concurrent_threads,
             config.jira_issue_jql,
+            debug_request=config.debug_request,
         )
 
         issue_metadata_from_jellyfish = {
@@ -212,6 +214,11 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
 
         issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
+        print("before:")
+        print(len(issue_ids_to_download))
+        issue_ids_to_download = list(issue_metadata_addl_from_jellyfish)
+        print("after:")
+        print(len(issue_ids_to_download))
 
         @diagnostics.capture_timing()
         @logging_helper.log_entry_exit(logger)
@@ -228,6 +235,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                     config.jira_exclude_fields,
                     config.jira_issue_batch_size,
                     config.jira_issue_download_concurrent_threads,
+                    config.debug_request,
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
@@ -257,6 +265,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                     config.jira_exclude_fields,
                     config.jira_issue_batch_size,
                     config.jira_issue_download_concurrent_threads,
+                    config.debug_request,
                 ),
                 item_id_dict_key='id',
                 addl_info_dict_key='key',
@@ -287,28 +296,28 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.outdir,
                 'jira_worklogs',
                 config.compress_output_files,
-                download_worklogs(jira_connection, all_downloaded_issue_ids, endpoint_jira_info),
+                download_worklogs(jira_connection, all_downloaded_issue_ids, endpoint_jira_info, debug_request=config.debug_request),
             )
 
         write_file(
             config.outdir,
             'jira_customfieldoptions',
             config.compress_output_files,
-            download_customfieldoptions(jira_connection, project_ids),
+            download_customfieldoptions(jira_connection, project_ids, debug_request=config.debug_request),
         )
 
         write_file(
             config.outdir,
             'jira_statuses',
             config.compress_output_files,
-            download_statuses(jira_connection),
+            download_statuses(jira_connection, debug_request=config.debug_request),
         )
         try:
             write_file(
                 config.outdir,
                 'jira_teams',
                 config.compress_output_files,
-                download_teams(jira_connection)
+                download_teams(jira_connection, debug_request=config.debug_request)
             )
         except Exception as e:
             logger.debug(f"Could not download teams, got {e}")

@@ -107,6 +107,9 @@ def main():
     parser.add_argument(
         '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
+    parser.add_argument(
+        '-dr', '--debug-requests', type=bool, default=False, help='turn on verbose http logging on errors'
+    )
 
     args = parser.parse_args()
     config = obtain_config(args)
