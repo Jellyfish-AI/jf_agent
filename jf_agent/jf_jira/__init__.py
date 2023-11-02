@@ -214,11 +214,6 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
         ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
 
         issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
-        print("before:")
-        print(len(issue_ids_to_download))
-        issue_ids_to_download = list(issue_metadata_addl_from_jellyfish)
-        print("after:")
-        print(len(issue_ids_to_download))
 
         @diagnostics.capture_timing()
         @logging_helper.log_entry_exit(logger)
