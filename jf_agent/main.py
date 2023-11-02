@@ -117,15 +117,11 @@ def main():
     args = parser.parse_args()
     config = obtain_config(args)
 
-    if config.debug_http_requests:
-        import http
-        http.client.HTTPConnection.debuglevel = 1
-
     if args.env_file:
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    agent_logging.configure(config.outdir)
+    agent_logging.configure(config.outdir, config.debug_http_requests)
 
     success = True
 
