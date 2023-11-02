@@ -102,6 +102,12 @@ def main():
         help='File path to a .env credentials file. Useful for running the agent in a local developer context',
     )
     parser.add_argument(
+        '-db',
+        '--debug-requests',
+        action='store_true',
+        help='Enable http requests debug logging. WARNING, this is VERY verbose and WILL print out all headers '
+             'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.')
+    parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
     parser.add_argument(
@@ -110,6 +116,10 @@ def main():
 
     args = parser.parse_args()
     config = obtain_config(args)
+
+    if config.debug_http_requests:
+        import http
+        http.client.HTTPConnection.debuglevel = 1
 
     if args.env_file:
         dotenv.load_dotenv(args.env_file)
