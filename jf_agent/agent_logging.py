@@ -82,13 +82,17 @@ def configure(outdir, debug_requests=False):
         import http.client
 
         http_client_logger = logging.getLogger("http.client")
+        http_client_logger.setLevel(logging.DEBUG)
+        debug_fh = logging.FileHandler('debug.log')
+        debug_fh.setLevel(logging.DEBUG)
+        http_client_logger.addHandler(debug_fh)
 
         def print_to_log(*args):
             http_client_logger.debug(" ".join(args))
 
-            # monkey-patch a `print` global into the http.client module; all calls to
-
-        # print() in that module will then use our print_to_log implementation
+        # http.client uses `print` directly. Intercept calls and invoke our logger.
+        http.client.print = print_to_log
+        http.client.HTTPConnection.debuglevel = 1
         http.client.print = print_to_log
         http.client.HTTPConnection.debuglevel = 1
         logging.getLogger(urllib3.__name__).setLevel(logging.DEBUG)
