@@ -80,22 +80,20 @@ def configure(outdir, debug_requests=False):
     # because the debug level logs are super noisy
     if debug_requests:
         import http.client
+        import logging
 
         http_client_logger = logging.getLogger("http.client")
-
+        http_client.logger.setLevel(logging.DEBUG)
+        debug_fh = logging.FileHandler('debug.log')
+        debug_fh.setLevel(logging.DEBUG)
+        debug_logger.addHandler(debug_fh)
+        
         def print_to_log(*args):
             http_client_logger.debug(" ".join(args))
 
-            # monkey-patch a `print` global into the http.client module; all calls to
-
-        # print() in that module will then use our print_to_log implementation
+        # http.client uses `print` directly. Intercept calls and invoke our logger.
         http.client.print = print_to_log
         http.client.HTTPConnection.debuglevel = 1
-        logging.getLogger(urllib3.__name__).setLevel(logging.DEBUG)
-        logging.getLogger(http.__name__).setLevel(logging.DEBUG)
-        logging.getLogger(http.client.HTTPConnection.__name__).setLevel(logging.DEBUG)
-    else:
-        logging.getLogger(urllib3.__name__).setLevel(logging.WARNING)
 
     logging.basicConfig(
         level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
