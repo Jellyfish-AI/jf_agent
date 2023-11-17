@@ -327,7 +327,7 @@ def get_jira_ingest_config(config: ValidatedConfig, creds) -> JiraIngestionConfi
 
             )
     else:
-        raise BadConfigException("Cannot find jira credentials! Skipping auth config.")
+        raise BadConfigException("Cannot find jira credentials!")
 
     ingestion_config = JiraIngestionConfig(
         auth_config=auth_config,
