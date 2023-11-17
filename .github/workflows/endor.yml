@@ -4,6 +4,7 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch: {}
 jobs:
   scan:
     permissions:
@@ -15,10 +16,6 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
-    - name: Install pdm
-      run: pip install --user pdm
-    - name: Convert pdm.lock to requirements.txt
-      run: pdm export -o requirements.txt 
     - name: Endor Labs Scan Pull Request
       if: github.event_name == 'pull_request'
       uses: endorlabs/github-action@v1.1.1
