@@ -15,13 +15,14 @@ from time import sleep
 import requests
 import json
 
+
 from jf_agent import (
     agent_logging,
     write_file,
     VALID_RUN_MODES,
     JELLYFISH_API_BASE,
-    BadConfigException,
 )
+from jf_agent.exception import BadConfigException
 from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
 from jf_agent.data_manifests.manifest import Manifest
@@ -34,6 +35,7 @@ from jf_agent.jf_jira import (
     print_missing_repos_found_by_jira,
 )
 from jf_agent.session import retry_session
+
 from jf_agent.validation import (
     validate_jira,
     validate_git,
@@ -41,6 +43,9 @@ from jf_agent.validation import (
     validate_num_repos,
     ProjectMetadata,
 )
+
+from jf_agent.util import get_company_info
+
 from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
@@ -413,21 +418,11 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @logging_helper.log_entry_exit(logger)
 def generate_manifests(config, creds, jellyfish_endpoint_info):
     manifests: list[Manifest] = []
-    base_url = config.jellyfish_api_base
-    resp = requests.get(
-        f'{base_url}/endpoints/agent/company',
-        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
-    )
 
-    if not resp.ok:
-        logger.error(
-            f"ERROR: Couldn't get company info from {base_url}/agent/company "
-            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
-        )
-        raise BadConfigException()
+    company_info = get_company_info(config,creds)
 
-    company_info = resp.json()
     company_slug = company_info.get('company_slug')
+
     # Create and add Jira Manifest
     if config.jira_url:
         logger.info('Attempting to generate Jira Manifest...')

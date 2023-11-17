@@ -1,4 +1,3 @@
-import sys
 import gzip
 import json
 import jsonstreams
@@ -18,10 +17,6 @@ VALID_RUN_MODES = (
     'print_all_jira_fields',
     'print_apparently_missing_git_repos',
 )
-
-
-class BadConfigException(Exception):
-    pass
 
 
 def write_file(outdir, filename_prefix, compress, results):
