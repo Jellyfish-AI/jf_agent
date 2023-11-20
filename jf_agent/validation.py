@@ -40,14 +40,32 @@ def full_validate(config, creds):
     if config.jira_url and (
             (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
-        ingest_config = get_jira_ingest_config(config, creds)
-        validate_jira(ingest_config)
+        try:
+            ingest_config = get_jira_ingest_config(config, creds)
+            validate_jira(ingest_config)
+
+        # Probably few cases that we would hit an exception here, but we want to catch them if there are any
+        # We will continue to validate git but will indicate Jira config failed.
+        except Exception as e:
+            print(f"Failed to validate Jira due to exception of type {e.__class__.__name__}!")
+
+            # Printing this to stdout rather than logger in case the exception has any sensitive info.
+            print(e)
+
     else:
         logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
 
     # Check for Git configs
     if config.git_configs:
-        validate_git(config, creds)
+        try:
+            git_success = validate_git(config, creds)
+        except Exception as e:
+            print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
+
+            # Printing this to stdout rather than logger in case the exception has any sensitive info.
+            print(e)
+
+
     else:
         logger.info("\nNo Git configs provided, skipping Git validation...")
 

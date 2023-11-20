@@ -117,7 +117,7 @@ def obtain_config(args) -> ValidatedConfig:
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
     run_mode_is_print_apparently_missing_git_repos = (
-        run_mode == 'print_apparently_missing_git_repos'
+            run_mode == 'print_apparently_missing_git_repos'
     )
 
     debug_http_requests = args.debug_requests
@@ -306,26 +306,25 @@ def get_jira_ingest_config(config: ValidatedConfig, creds) -> JiraIngestionConfi
 
     company_slug = company_info.get('company_slug')
 
+    if not config.jira_url:
+        raise BadConfigException("No Jira URL in config!")
 
-    if config.jira_url and (
-            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
-    ):
-        if creds.jira_username and creds.jira_password:
-            auth_config = JiraAuthConfig(
-                company_slug=company_slug,
-                url=config.jira_url,
-                user=creds.jira_username,
-                password=creds.jira_password,
-                bypass_ssl_verification=config.skip_ssl_verification
-            )
-        else:
-            auth_config = JiraAuthConfig(
-                company_slug=company_slug,
-                url=config.jira_url,
-                personal_access_token=creds.jira_bearer_token,
-                bypass_ssl_verification=config.skip_ssl_verification
+    if creds.jira_username and creds.jira_password:
+        auth_config = JiraAuthConfig(
+            company_slug=company_slug,
+            url=config.jira_url,
+            user=creds.jira_username,
+            password=creds.jira_password,
+            bypass_ssl_verification=config.skip_ssl_verification
+        )
+    elif creds.jira_bearer_token:
+        auth_config = JiraAuthConfig(
+            company_slug=company_slug,
+            url=config.jira_url,
+            personal_access_token=creds.jira_bearer_token,
+            bypass_ssl_verification=config.skip_ssl_verification
 
-            )
+        )
     else:
         raise BadConfigException("Cannot find jira credentials!")
 
