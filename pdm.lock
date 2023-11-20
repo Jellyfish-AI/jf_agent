@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform"]
 lock_version = "4.4"
-content_hash = "sha256:a4fe92c67c0d4268f733fbf0cbd586d5ba02b039ac345caaf8e24ee31b91a910"
+content_hash = "sha256:c3e71d22b46f824d2d16eb4c159fc9a3efd41aedf37ff6fdf9e1784408de86e2"
 
 [[package]]
 name = "appdirs"
@@ -690,16 +690,6 @@ dependencies = [
 ]
 files = [
     {file = "stashy-0.7.tar.gz", hash = "sha256:9965aa18509b7576bbd4b068962d9a9a4828cec8ce22ee5a365ddbcebffa09f5"},
-]
-
-[[package]]
-name = "structlog"
-version = "23.2.0"
-requires_python = ">=3.8"
-summary = "Structured Logging for Python"
-files = [
-    {file = "structlog-23.2.0-py3-none-any.whl", hash = "sha256:16a167e87b9fa7fae9a972d5d12805ef90e04857a93eba479d4be3801a6a1482"},
-    {file = "structlog-23.2.0.tar.gz", hash = "sha256:334666b94707f89dbc4c81a22a8ccd34449f0201d5b1ee097a030b577fa8c858"},
 ]
 
 [[package]]
