@@ -3,13 +3,9 @@ import os
 import psutil
 import shutil
 
-from jira.exceptions import JIRAError
-from requests.exceptions import RequestException
-
-from jf_agent.jf_jira import _get_raw_jira_connection
-from jf_agent.jf_jira.jira_download import download_users
+from jf_agent.config_file_reader import get_jira_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
-from jf_agent.jf_jira.utils import retry_for_429s
+from jf_ingest.validation import validate_jira
 
 logger = logging.getLogger(__name__)
 
@@ -34,87 +30,33 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def validate_jira(config, creds):
+def full_validate(config, creds):
     """
-    Validates jira configuration and credentials.
+    Runs the full validation suite.
     """
+    logger.info('Validating configuration...')
 
-    print('\nJira details:')
-    print(f'  URL:      {config.jira_url}')
-    print(f'  Username: {creds.jira_username}')
-    if creds.jira_username and creds.jira_password:
-        print('  Password: **********')
-    elif creds.jira_bearer_token:
-        print('  Token: **********')
-    # test Jira connection
-    try:
-        print('==> Testing Jira connection...')
-        jira_connection = _get_raw_jira_connection(config, creds, max_retries=1)
-        jira_connection.myself()
-    except JIRAError as e:
-        print(e)
+    # Check for Jira credentials
+    if config.jira_url and (
+            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
+    ):
+        ingest_config = get_jira_ingest_config(config, creds)
+        validate_jira(ingest_config)
+    else:
+        logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
 
-        print('Response:')
-        print('  Headers:', e.headers)
-        print('  URL:', e.url)
-        print('  Status Code:', e.status_code)
-        print('  Text:', e.text)
+    # Check for Git configs
+    if config.git_configs:
+        validate_git(config, creds)
+    else:
+        logger.info("\nNo Git configs provided, skipping Git validation...")
 
-        if 'Basic authentication with passwords is deprecated.' in str(e):
-            print(
-                f'Error connecting to Jira instance at {config.jira_url}. Please use a Jira API token, see https://confluence.atlassian.com/cloud/api-tokens-938839638.html.'
-            )
-        else:
-            print(
-                f'Error connecting to Jira instance at {config.jira_url}, please validate your credentials. Error: {e}'
-            )
-        return False
-    except RequestException as e:
-        print(e)
+    # Finally, display memory usage statistics.
+    validate_memory(config)
 
-        # Print debugging information related to the request exception
-        if e.request:
-            print('Request:')
-            print('  URL:', e.request.method, e.request.url)
-            print('  Body:', e.request.body)
-        else:
-            print('RequestException contained no "request" value.')
+    logger.info("\nDone")
 
-        if e.response:
-            print('Response:')
-            print('  Headers:', e.response.headers)
-            print('  URL:', e.response.url)
-            print('  Status Code:', e.response.status_code)
-            print('  Text:', e.response.text)
-        else:
-            print('RequestException contained no "response" value.')
-
-        return False
-    except Exception as e:
-        raise
-
-    # test jira users permission
-    try:
-        print('==> Testing Jira user browsing permissions...')
-        user_count = len(download_users(jira_connection, config.jira_gdpr_active, quiet=True))
-        print(f'The agent is aware of {user_count} Jira users.')
-
-    except Exception as e:
-        print(
-            f'Error downloading users from Jira instance at {config.jira_url}, please verify that this user has the "browse all users" permission. Error: {e}'
-        )
-        return False
-
-    # test jira project access
-    print('==> Testing Jira project permissions...')
-    accessible_projects = [p.key for p in retry_for_429s(jira_connection.projects)]
-    print(f'The agent has access to projects {accessible_projects}.')
-
-    if config.jira_include_projects:
-        for proj in config.jira_include_projects:
-            if proj not in accessible_projects:
-                print(f'Error: Unable to access explicitly-included project {proj}.')
-                return False
+    return True
 
 
 def validate_num_repos(git_configs, creds):
@@ -196,7 +138,7 @@ def validate_git(config, creds):
                     print(f"    -- {repo}")
 
             for repo in git_config.git_include_repos:
-                # Messy: GitLab repos are specified as as ints, not strings
+                # Messy: GitLab repos are specified as ints, not strings
                 if type(repo) == int:
 
                     def comp_func(repo):
@@ -218,7 +160,7 @@ def validate_git(config, creds):
             return False
 
 
-def validate_memory():
+def validate_memory(config):
     """
     Displays memory and disk usage statistics.
     """
@@ -229,8 +171,8 @@ def validate_memory():
             f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)} MB"
         )
 
-        output_dir_size = os.popen('du -hs /home/jf_agent/output/').readlines()[0].split("\t")[0]
-        usage = shutil.disk_usage('/home/jf_agent/output/')
+        output_dir_size = os.popen(f'du -hs {config.outdir}').readlines()[0].split("\t")[0]
+        usage = shutil.disk_usage(config.outdir)
 
         print(
             f'  Disk usage for jf_agent/output: {int(round(usage.used / (1024 ** 3)))} GB / {int(round(usage.total / 1024 ** 3))} GB'

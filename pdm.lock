@@ -3,10 +3,9 @@
 
 [metadata]
 groups = ["default", "dev"]
-cross_platform = true
-static_urls = false
-lock_version = "4.3"
-content_hash = "sha256:dc1a788b6d16cc93e1d2eb131a0cc23e59c13ab5ed57e71ac2b5977b4c49957d"
+strategy = ["cross_platform"]
+lock_version = "4.4"
+content_hash = "sha256:a4fe92c67c0d4268f733fbf0cbd586d5ba02b039ac345caaf8e24ee31b91a910"
 
 [[package]]
 name = "appdirs"
@@ -291,7 +290,7 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.10"
+version = "0.0.24"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 dependencies = [
@@ -299,10 +298,12 @@ dependencies = [
     "psutil>=5.9.6",
     "pytz>=2023.3.post1",
     "requests-mock==1.11.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf-ingest-0.0.10.tar.gz", hash = "sha256:9584feba05c6e51cb0fd61ae6ca1f40d4f30aca46ce97d42fc5861647e110af7"},
-    {file = "jf_ingest-0.0.10-py3-none-any.whl", hash = "sha256:38f6c5615854f868caf565ef9d7000a9d321042d52b27fcfae237b5d0e16acc5"},
+    {file = "jf-ingest-0.0.24.tar.gz", hash = "sha256:dcc13aa36f3b6d4253f2d8dc210542e450faf7d492bd0006c2dc9c803291d739"},
+    {file = "jf_ingest-0.0.24-py3-none-any.whl", hash = "sha256:654d86b55f1b9e16e21dc5e2a76e9bb5fba70248478ecfab19cbf797a78ce4c4"},
 ]
 
 [[package]]
@@ -689,6 +690,16 @@ dependencies = [
 ]
 files = [
     {file = "stashy-0.7.tar.gz", hash = "sha256:9965aa18509b7576bbd4b068962d9a9a4828cec8ce22ee5a365ddbcebffa09f5"},
+]
+
+[[package]]
+name = "structlog"
+version = "23.2.0"
+requires_python = ">=3.8"
+summary = "Structured Logging for Python"
+files = [
+    {file = "structlog-23.2.0-py3-none-any.whl", hash = "sha256:16a167e87b9fa7fae9a972d5d12805ef90e04857a93eba479d4be3801a6a1482"},
+    {file = "structlog-23.2.0.tar.gz", hash = "sha256:334666b94707f89dbc4c81a22a8ccd34449f0201d5b1ee097a030b577fa8c858"},
 ]
 
 [[package]]

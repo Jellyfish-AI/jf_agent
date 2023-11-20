@@ -37,9 +37,7 @@ from jf_agent.jf_jira import (
 from jf_agent.session import retry_session
 
 from jf_agent.validation import (
-    validate_jira,
-    validate_git,
-    validate_memory,
+    full_validate,
     validate_num_repos,
     ProjectMetadata,
 )
@@ -131,28 +129,7 @@ def main():
     success = True
 
     if config.run_mode == 'validate':
-        logger.info('Validating configuration...')
-
-        # Check for Jira credentials
-        if config.jira_url and (
-            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
-        ):
-            validate_jira(config, creds)
-        else:
-            logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
-
-        # Check for Git configs
-        if config.git_configs:
-            validate_git(config, creds)
-        else:
-            logger.info("\nNo Git configs provided, skipping Git validation...")
-
-        # Finally, display memory usage statistics.
-        validate_memory()
-
-        logger.info("\nDone")
-
-        return True
+        full_validate(config, creds)
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
