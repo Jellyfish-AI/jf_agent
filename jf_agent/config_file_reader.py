@@ -7,8 +7,13 @@ from typing import List
 import urllib3
 import yaml
 
-from jf_agent import VALID_RUN_MODES, BadConfigException
+from jf_agent import VALID_RUN_MODES
+from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
+from jf_ingest.jf_jira import JiraIngestionConfig
+from jf_ingest.jf_jira.auth import JiraAuthConfig
+
+from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +117,7 @@ def obtain_config(args) -> ValidatedConfig:
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
     run_mode_is_print_apparently_missing_git_repos = (
-        run_mode == 'print_apparently_missing_git_repos'
+            run_mode == 'print_apparently_missing_git_repos'
     )
 
     debug_http_requests = args.debug_requests
@@ -289,6 +294,69 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 
 
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
+
+
+def get_jira_ingest_config(config: ValidatedConfig, creds) -> JiraIngestionConfig:
+    """
+    Handles converting our agent config to the jf_ingest JiraIngestionConfig
+    shared dataclass.
+    """
+
+    company_info = get_company_info(config,creds)
+
+    company_slug = company_info.get('company_slug')
+
+    if not config.jira_url:
+        raise BadConfigException("No Jira URL in config!")
+
+    if creds.jira_username and creds.jira_password:
+        auth_config = JiraAuthConfig(
+            company_slug=company_slug,
+            url=config.jira_url,
+            user=creds.jira_username,
+            password=creds.jira_password,
+            bypass_ssl_verification=config.skip_ssl_verification
+        )
+    elif creds.jira_bearer_token:
+        auth_config = JiraAuthConfig(
+            company_slug=company_slug,
+            url=config.jira_url,
+            personal_access_token=creds.jira_bearer_token,
+            bypass_ssl_verification=config.skip_ssl_verification
+
+        )
+    else:
+        raise BadConfigException("Cannot find jira credentials!")
+
+    ingestion_config = JiraIngestionConfig(
+        auth_config=auth_config,
+        gdpr_active=config.jira_gdpr_active,
+        exclude_fields=config.jira_exclude_fields,
+        include_fields=config.jira_include_fields,
+        required_email_domains=config.jira_required_email_domains,
+        is_email_required=config.jira_is_email_required,
+        include_projects=config.jira_include_projects,
+        exclude_projects=config.jira_exclude_projects,
+        include_project_categories=config.jira_include_project_categories,
+        exclude_project_categories=config.jira_exclude_project_categories,
+        download_sprints=config.jira_download_sprints,
+        download_worklogs=config.jira_download_worklogs,
+        s3_bucket=None,
+        s3_path=None,
+        upload_to_s3=False,
+        local_file_path=None,
+        company_slug=company_slug,
+        force_search_users_by_letter=False,
+        search_users_by_letter_email_domain=False,
+        earliest_issue_dt=None,
+        issue_download_concurrent_threads=True,
+        issue_jql=None,
+        jellyfish_issue_metadata={},
+        jellyfish_project_ids_to_keys={},
+        work_logs_pull_from=None
+    )
+
+    return ingestion_config
 
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:

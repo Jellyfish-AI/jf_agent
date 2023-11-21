@@ -1,5 +1,11 @@
 from typing import Any, List
 from itertools import islice
+import requests
+
+from jf_agent.exception import BadConfigException
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def split(lst: List[Any], n: int) -> List[List[Any]]:
@@ -19,3 +25,22 @@ def batched(iterable, n: int):
     it = iter(iterable)
     while (batch := tuple(islice(it, n))):
         yield batch
+
+
+def get_company_info(config, creds) -> dict:
+    base_url = config.jellyfish_api_base
+    resp = requests.get(
+        f'{base_url}/endpoints/agent/company',
+        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+    )
+
+    if not resp.ok:
+        logger.error(
+            f"ERROR: Couldn't get company info from {base_url}/agent/company "
+            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
+        )
+        raise BadConfigException()
+
+    company_info = resp.json()
+
+    return company_info
