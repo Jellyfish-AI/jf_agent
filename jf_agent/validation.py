@@ -7,7 +7,7 @@ import requests
 
 from jf_agent.config_file_reader import get_jira_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
-from jf_ingest.validation import validate_jira, GitHealthCheckResult, JiraHealthCheckResult, IngestionHealthCheckResult
+from jf_ingest.validation import validate_jira, GitHealthCheckResult, JiraHealthCheckResult, IngestionHealthCheckResult, IngestionType
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
     Runs the full validation suite.
     """
     logger.info('Validating configuration...')
-
-    healthcheck_result: IngestionHealthCheckResult = IngestionHealthCheckResult()
+    jira_healthcheck_result: JiraHealthCheckResult = None
+    git_healthcheck_result: GitHealthCheckResult = None
 
     # Check for Jira credentials
     if config.jira_url and (
@@ -47,9 +47,7 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
         try:
             ingest_config = get_jira_ingest_config(config, creds)
 
-            jira_healthcheck_result: JiraHealthCheckResult = validate_jira(ingest_config)
-
-            healthcheck_result.jira_healthcheck_result = jira_healthcheck_result
+            jira_healthcheck_result = validate_jira(ingest_config)
 
         # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
         # We will continue to validate git but will indicate Jira config failed.
@@ -65,8 +63,7 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
     # Check for Git configs
     if config.git_configs:
         try:
-            git_healthcheck_result: GitHealthCheckResult = validate_git(config, creds)
-            healthcheck_result.git_healthcheck_result = git_healthcheck_result
+            git_healthcheck_result = validate_git(config, creds)
 
         except Exception as e:
             print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
@@ -81,8 +78,9 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
     # Finally, display memory usage statistics.
     validate_memory(config)
 
-    # Check
-    healthcheck_result.check_and_set_success()
+    healthcheck_result: IngestionHealthCheckResult = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
+                                                                                git_healthcheck_result=git_healthcheck_result,
+                                                                                jira_healthcheck_result=jira_healthcheck_result)
 
     logger.info("\nDone")
 
