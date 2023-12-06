@@ -74,6 +74,7 @@ ValidatedConfig = namedtuple(
         'skip_ssl_verification',
         'send_agent_config',
         'git_max_concurrent',
+        'skip_healthcheck_upload'
     ],
 )
 
@@ -132,6 +133,7 @@ def obtain_config(args) -> ValidatedConfig:
     yaml_conf_global = yaml_config.get('global', {})
     skip_ssl_verification = yaml_conf_global.get('no_verify_ssl', False)
     send_agent_config = yaml_conf_global.get('send_agent_config', False)
+    skip_healthcheck_upload = yaml_conf_global.get('skip_healthcheck_upload', False)
 
     # jira configuration
     jira_config = yaml_config.get('jira', {})
@@ -270,6 +272,7 @@ def obtain_config(args) -> ValidatedConfig:
         skip_ssl_verification,
         send_agent_config,
         git_max_concurrent,
+        skip_healthcheck_upload
     )
 
 
@@ -350,10 +353,12 @@ def get_jira_ingest_config(config: ValidatedConfig, creds) -> JiraIngestionConfi
         search_users_by_letter_email_domain=False,
         earliest_issue_dt=None,
         issue_download_concurrent_threads=True,
-        issue_jql=None,
         jellyfish_issue_metadata={},
         jellyfish_project_ids_to_keys={},
-        work_logs_pull_from=None
+        work_logs_pull_from=None,
+        skip_issues=False,
+        only_issues=False,
+        full_redownload=False
     )
 
     return ingestion_config

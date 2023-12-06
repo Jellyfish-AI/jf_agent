@@ -32,11 +32,12 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds) -> IngestionHealthCheckResult:
+def full_validate(config, creds, skip_upload: bool = False) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
     logger.info('Validating configuration...')
+
     jira_healthcheck_result: JiraHealthCheckResult = None
     git_healthcheck_result: GitHealthCheckResult = None
 
@@ -82,9 +83,13 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
                                                                                 git_healthcheck_result=git_healthcheck_result,
                                                                                 jira_healthcheck_result=jira_healthcheck_result)
 
-    logger.info("\nDone")
 
-    upload_to_s3(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
+    if config.skip_healthcheck_upload:
+        logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
+    else:
+        upload_to_s3(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
+
+    logger.info("\nDone")
 
     return healthcheck_result
 
