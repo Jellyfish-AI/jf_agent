@@ -32,7 +32,7 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds, skip_upload: bool = False) -> IngestionHealthCheckResult:
+def full_validate(config, creds) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
