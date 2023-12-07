@@ -18,6 +18,13 @@ class UnsupportedGitProvider(Exception):
     pass
 
 
+def get_instance_slug(git_config, is_multi_git_config: bool, endpoint_git_instances_info) -> str:
+    if is_multi_git_config:
+        return git_config.git_instance_slug
+    else:
+        instance_info = list(endpoint_git_instances_info.values())[0]
+        return instance_info['slug']
+
 def create_manifests(
     company_slug: str,
     creds: dict,
@@ -31,6 +38,8 @@ def create_manifests(
 
     # Iterate over each git config within the config yaml
     for git_config in git_configs:
+        instance_slug = get_instance_slug(git_config, is_multi_git_config, endpoint_git_instances_info)
+
         if is_multi_git_config:
             instance_slug = git_config.git_instance_slug
             instance_info = endpoint_git_instances_info.get(instance_slug)

@@ -6,8 +6,10 @@ import shutil
 import requests
 
 from jf_agent.config_file_reader import get_jira_ingest_config
+from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 from jf_ingest.validation import validate_jira, GitHealthCheckResult, JiraHealthCheckResult, IngestionHealthCheckResult, IngestionType
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +34,15 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds) -> IngestionHealthCheckResult:
+def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
-    logger.info('Validating configuration...')
 
     jira_healthcheck_result: JiraHealthCheckResult = None
     git_healthcheck_result: GitHealthCheckResult = None
+
+    logger.info('Validating configuration...')
 
     # Check for Jira credentials
     if config.jira_url and (
@@ -64,14 +67,13 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
     # Check for Git configs
     if config.git_configs:
         try:
-            git_healthcheck_result = validate_git(config, creds)
+            git_healthcheck_result = validate_git(config, creds, jellyfish_endpoint_info.git_instance_info)
 
         except Exception as e:
             print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
 
             # Printing this to stdout rather than logger in case the exception has any sensitive info.
             print(e)
-
 
     else:
         logger.info("\nNo Git configs provided, skipping Git validation...")
@@ -82,7 +84,6 @@ def full_validate(config, creds) -> IngestionHealthCheckResult:
     healthcheck_result: IngestionHealthCheckResult = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
                                                                                 git_healthcheck_result=git_healthcheck_result,
                                                                                 jira_healthcheck_result=jira_healthcheck_result)
-
 
     if config.skip_healthcheck_upload:
         logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
@@ -130,16 +131,22 @@ def validate_num_repos(git_configs, creds):
     return metadata_by_project
 
 
-def validate_git(config, creds) -> GitHealthCheckResult:
+def validate_git(config, creds, endpoint_git_instances_info) -> list[GitHealthCheckResult]:
     """
     Validates git config and credentials.
     """
+
     git_configs = config.git_configs
 
-    healthcheck_result = GitHealthCheckResult(successful=True)
+    healthcheck_result_list = []
 
     for i, git_config in enumerate(git_configs, start=1):
+        instance_slug = get_instance_slug(git_config, len(git_configs) > 1, endpoint_git_instances_info)
+
+        healthcheck_result = GitHealthCheckResult(successful=True, instance_slug=instance_slug)
+
         print(f"\nGit details for instance {i}/{len(git_configs)}:")
+        print(f"  Instance slug: {instance_slug}")
         print(f"  Provider: {git_config.git_provider}")
         print(f"  Included projects: {git_config.git_include_projects}")
         if len(git_config.git_exclude_projects) > 0:
@@ -202,7 +209,9 @@ def validate_git(config, creds) -> GitHealthCheckResult:
             print(f"Git connection unsuccessful! Exception: {e}")
             healthcheck_result.successful = False
 
-    return healthcheck_result
+        healthcheck_result_list.append(healthcheck_result)
+
+    return healthcheck_result_list
 
 
 def validate_memory(config):

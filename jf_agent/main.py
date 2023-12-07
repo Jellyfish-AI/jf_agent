@@ -128,16 +128,16 @@ def main():
 
     success = True
 
+    jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
     if config.run_mode == 'validate':
-        full_validate(config, creds)
+        full_validate(config, creds, jellyfish_endpoint_info)
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
 
     else:
-        jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
