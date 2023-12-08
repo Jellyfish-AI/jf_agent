@@ -5,8 +5,7 @@ import math
 import random
 import re
 import traceback
-import time
-from typing import Dict, Generator, Tuple
+from typing import Dict
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -21,6 +20,7 @@ from tqdm import tqdm
 from jf_agent.jf_jira.utils import retry_for_429s
 from jf_agent.util import split
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.utils import retry_for_429s, RewriteJiraSessionHeaders
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +106,10 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_resolutions(jira_connection):
-    logger.info('downloading jira resolutions... [!n]')
-    result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    logger.info("downloading jira resolutions... [!n]")
+    with RewriteJiraSessionHeaders(jira_connection):
+        result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    logger.info("✓")
     return result
 
 
