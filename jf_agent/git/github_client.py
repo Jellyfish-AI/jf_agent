@@ -121,21 +121,29 @@ class GithubClient:
         for i in range(1, max_retries + 1):
             try:
                 result = self.session.get(url)
-
-                # HACK: This appears to happen after we have been
-                # rate-limited when hitting certain URLs, there is
-                # likely a more elegant way to solve this but it takes
-                # about an hour to test each time and it works.
-                if result.status_code == 403:
-                    result = self.session.get(url)
-
                 result.raise_for_status()
                 return result
             except requests.exceptions.HTTPError as e:
-                remaining_ratelimit = e.response.headers.get('X-RateLimit-Remaining')
-                ratelimit_reset = e.response.headers.get('X-RateLimit-Reset')
+                reset_wait_in_seconds = 0
+                # Primary rate limits should take precedence over secondary rate limits
+                remaining_primary_ratelimit = e.response.headers.get('X-RateLimit-Remaining')
+                # The presence of "retry-after" in the headers usually indicates that we've hit a secondary rate limit
+                retryafter_secondary_ratelimit = e.response.headers.get('retry-after')
 
-                if remaining_ratelimit != '0':
+                if remaining_primary_ratelimit == '0':
+                    ratelimit_reset = e.response.headers.get('X-RateLimit-Reset')
+
+                    reset_time = datetime.fromtimestamp(int(ratelimit_reset), pytz.utc)
+                    now = datetime.utcnow().replace(tzinfo=pytz.utc)
+                    reset_wait = reset_time - now
+
+                    reset_wait_in_seconds = reset_wait.total_seconds()
+
+                elif retryafter_secondary_ratelimit:
+                    # It is recommended we wait for at least one minute in this case
+                    reset_wait_in_seconds = max(int(retryafter_secondary_ratelimit), 60)
+
+                else:
                     # We hit a non-rate-limiting-related error.  Don't retry
                     raise
 
@@ -144,13 +152,6 @@ class GithubClient:
                         logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
-
-                # rate-limited!  Sleep until it's ok, then try again
-                reset_time = datetime.fromtimestamp(int(ratelimit_reset), pytz.utc)
-                now = datetime.utcnow().replace(tzinfo=pytz.utc)
-                reset_wait = reset_time - now
-
-                reset_wait_in_seconds = reset_wait.total_seconds()
 
                 # Sometimes github gives a reset time in the
                 # past. In that case, wait for 5 mins just in case.
