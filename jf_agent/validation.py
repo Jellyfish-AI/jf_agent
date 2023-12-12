@@ -141,7 +141,7 @@ def validate_git(config, creds, endpoint_git_instances_info) -> list[GitHealthCh
     healthcheck_result_list = []
 
     for i, git_config in enumerate(git_configs, start=1):
-        instance_slug = get_instance_slug(git_config, len(git_configs) > 1, endpoint_git_instances_info)
+        instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
 
         successful = True
 

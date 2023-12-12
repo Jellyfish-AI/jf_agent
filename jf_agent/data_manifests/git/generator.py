@@ -18,12 +18,16 @@ class UnsupportedGitProvider(Exception):
     pass
 
 
-def get_instance_slug(git_config, is_multi_git_config: bool, endpoint_git_instances_info) -> str:
-    if is_multi_git_config:
+def get_instance_slug(git_config: GitConfig, endpoint_git_instances_info: dict) -> str:
+    """
+    Returns the GitConfig's instance slug.
+    """
+    if git_config.git_instance_slug:
         return git_config.git_instance_slug
     else:
         instance_info = list(endpoint_git_instances_info.values())[0]
         return instance_info['slug']
+
 
 def create_manifests(
     company_slug: str,
@@ -38,17 +42,15 @@ def create_manifests(
 
     # Iterate over each git config within the config yaml
     for git_config in git_configs:
-        instance_slug = get_instance_slug(git_config, is_multi_git_config, endpoint_git_instances_info)
+        instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
 
         if is_multi_git_config:
-            instance_slug = git_config.git_instance_slug
             instance_info = endpoint_git_instances_info.get(instance_slug)
             instance_creds = creds.git_instance_to_creds.get(instance_slug)
         else:
             # support legacy single-git support, which assumes only one available git instance
             instance_info = list(endpoint_git_instances_info.values())[0]
             instance_creds = list(creds.git_instance_to_creds.values())[0]
-            instance_slug: str = instance_info['slug']
 
         try:
             # If the git config doesn't have a git instance, do not generate a manifest
