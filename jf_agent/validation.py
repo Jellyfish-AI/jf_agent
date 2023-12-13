@@ -88,7 +88,7 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
     if config.skip_healthcheck_upload:
         logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
     else:
-        upload_to_s3(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
+        submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
 
     logger.info("\nDone")
 
@@ -250,7 +250,10 @@ def validate_memory(config):
         return False
 
 
-def upload_to_s3(jellyfish_api_base: str, jellyfish_api_token: str, healthcheck_result: IngestionHealthCheckResult) -> None:
+def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_token: str, healthcheck_result: IngestionHealthCheckResult) -> None:
+    """
+    Uploads the given IngestionHealthCheckResult to Jellyfish
+    """
     headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
 
     logger.info(f'Attempting to upload healthcheck result to s3...')
