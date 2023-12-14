@@ -206,12 +206,31 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
 
         (
             missing_issue_ids,
-            _,
+            already_up_to_date_issue_ids,
             out_of_date_issue_ids,
             deleted_issue_ids,
         ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
 
+        logger.debug(
+            f'Up to date: {len(already_up_to_date_issue_ids)}  out of date: {len(out_of_date_issue_ids)}  '
+            f'missing: {len(missing_issue_ids)}  deleted: {len(deleted_issue_ids)}'
+        )
+
         issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
+
+        for fname, vals in [
+            ('dbg_jira_issue_metadata_remote', issue_metadata_from_jira),
+            ('dbg_jira_issue_metadata_jellyfish', issue_metadata_from_jellyfish),
+            ('dbg_jira_issue_metadata_jellyfish_addl', issue_metadata_addl_from_jellyfish),
+            ('dbg_jira_issue_missing_issue_ids', missing_issue_ids),
+            ('dbg_jira_issue_out_of_date_issue_ids', out_of_date_issue_ids),
+            ('dbg_jira_issue_already_up_to_date_issue_ids', already_up_to_date_issue_ids),
+        ]:
+            try:
+                write_file(config.outdir, fname, config.compress_output_files, vals)
+            except Exception:
+                logger.debug(f"Could not write issue metadata for file: {fname}", exc_info=True)
+
 
         @diagnostics.capture_timing()
         @logging_helper.log_entry_exit(logger)
