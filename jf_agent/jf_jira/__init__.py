@@ -211,6 +211,11 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             deleted_issue_ids,
         ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
 
+        logger.debug(
+            f'Up to date: {len(already_up_to_date_issue_ids)}  out of date: {len(out_of_date_issue_ids)}  '
+            f'missing: {len(missing_issue_ids)}  deleted: {len(deleted_issue_ids)}'
+        )
+
         issue_ids_to_download = list(missing_issue_ids.union(out_of_date_issue_ids))
 
         for fname, vals in [
