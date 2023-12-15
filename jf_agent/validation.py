@@ -3,9 +3,13 @@ import os
 import psutil
 import shutil
 
+import requests
+
+from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
-from jf_ingest.validation import validate_jira
+from jf_ingest.validation import validate_jira, GitConnectionHealthCheckResult, JiraConnectionHealthCheckResult, IngestionHealthCheckResult, IngestionType
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +34,14 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds):
+def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
+
+    jira_connection_healthcheck_result: JiraConnectionHealthCheckResult = None
+    git_connection_healthcheck_result: GitConnectionHealthCheckResult = None
+
     logger.info('Validating configuration...')
 
     # Check for Jira credentials
@@ -42,9 +50,9 @@ def full_validate(config, creds):
     ):
         try:
             ingest_config = get_ingest_config(config, creds)
-            validate_jira(ingest_config.jira_config)
+            jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
 
-        # Probably few cases that we would hit an exception here, but we want to catch them if there are any
+        # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
         # We will continue to validate git but will indicate Jira config failed.
         except Exception as e:
             print(f"Failed to validate Jira due to exception of type {e.__class__.__name__}!")
@@ -58,7 +66,8 @@ def full_validate(config, creds):
     # Check for Git configs
     if config.git_configs:
         try:
-            git_success = validate_git(config, creds)
+            git_connection_healthcheck_result = validate_git(config, creds, jellyfish_endpoint_info.git_instance_info)
+
         except Exception as e:
             print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
 
@@ -71,9 +80,18 @@ def full_validate(config, creds):
     # Finally, display memory usage statistics.
     validate_memory(config)
 
+    healthcheck_result: IngestionHealthCheckResult = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
+                                                                                git_connection_healthcheck=git_connection_healthcheck_result,
+                                                                                jira_connection_healthcheck=jira_connection_healthcheck_result)
+
+    if config.skip_healthcheck_upload:
+        logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
+    else:
+        submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
+
     logger.info("\nDone")
 
-    return True
+    return healthcheck_result
 
 
 def validate_num_repos(git_configs, creds):
@@ -112,14 +130,26 @@ def validate_num_repos(git_configs, creds):
     return metadata_by_project
 
 
-def validate_git(config, creds):
+def validate_git(config, creds, endpoint_git_instances_info) -> list[GitConnectionHealthCheckResult]:
     """
     Validates git config and credentials.
     """
+
     git_configs = config.git_configs
 
+    healthcheck_result_list = []
+
     for i, git_config in enumerate(git_configs, start=1):
+        instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
+
+        successful = True
+
+        included_inaccessible_repos_list = git_config.git_include_repos
+
+        accessible_projects_and_repos = {}
+
         print(f"\nGit details for instance {i}/{len(git_configs)}:")
+        print(f"  Instance slug: {instance_slug}")
         print(f"  Provider: {git_config.git_provider}")
         print(f"  Included projects: {git_config.git_include_projects}")
         if len(git_config.git_exclude_projects) > 0:
@@ -140,6 +170,9 @@ def validate_git(config, creds):
             )
 
             project_repo_dict = get_nested_repos_from_git(client, git_config)
+
+            accessible_projects_and_repos = project_repo_dict
+
             all_repos = sum(project_repo_dict.values(), [])
 
             if not all_repos:
@@ -151,30 +184,45 @@ def validate_git(config, creds):
             print("  All projects and repositories available to agent:")
             for project_name, repo_list in project_repo_dict.items():
                 print(f"  -- {project_name}")
+
                 for repo in repo_list:
                     print(f"    -- {repo}")
 
-            for repo in git_config.git_include_repos:
-                # Messy: GitLab repos are specified as ints, not strings
-                if type(repo) == int:
+            included_inaccessible_repos_list = [r for r in included_inaccessible_repos_list if not _check_repo_included(r, all_repos)]
 
-                    def comp_func(repo):
-                        return repo not in all_repos
-
-                else:
-
-                    def comp_func(repo):
-                        return repo.lower() not in set(n.lower() for n in all_repos)
-
-                if comp_func(repo):
-                    print(
-                        f"  WARNING: {repo} is explicitly defined as an included repo, but agent doesn't seem"
-                        f" to see this repository -- possibly missing permissions."
-                    )
+            if included_inaccessible_repos_list:
+                successful = False
+                print(
+                    f"  WARNING: the following repos are explicitly defined as included repos, but agent doesn't seem"
+                    f" to see this repository -- possibly missing permissions."
+                )
+                for inaccessible_repo in included_inaccessible_repos_list:
+                    print(f"    - {inaccessible_repo}")
 
         except Exception as e:
             print(f"Git connection unsuccessful! Exception: {e}")
-            return False
+            successful = False
+
+        healthcheck_result = GitConnectionHealthCheckResult(successful=successful,
+                                                  instance_slug=instance_slug,
+                                                  included_inaccessible_repos=included_inaccessible_repos_list,
+                                                  accessible_projects_and_repos=accessible_projects_and_repos)
+
+        healthcheck_result_list.append(healthcheck_result)
+
+    return healthcheck_result_list
+
+
+def _check_repo_included(repo: str | int, all_repos: list[str]) -> bool:
+    """
+    Takes in a repo and returns whether it is in the given list of accessible repos
+    Handles the gitlab case where repos are specified as ints.
+
+    """
+    if type(repo) == int:
+        return repo in all_repos
+    else:
+        return repo.lower() in set(n.lower() for n in all_repos)
 
 
 def validate_memory(config):
@@ -199,3 +247,22 @@ def validate_memory(config):
     except Exception as e:
         print(f"  ERROR: Could not obtain memory and/or disk usage information. {e}")
         return False
+
+
+def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_token: str, healthcheck_result: IngestionHealthCheckResult) -> None:
+    """
+    Uploads the given IngestionHealthCheckResult to Jellyfish
+    """
+    headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
+
+    logger.info(f'Attempting to upload healthcheck result to s3...')
+
+    r = requests.post(
+        f'{jellyfish_api_base}/endpoints/agent/upload_healthcheck',
+        headers=headers,
+        json=healthcheck_result.to_dict(),
+    )
+
+    r.raise_for_status()
+
+    logger.info(f'Successfully uploaded healthcheck result to s3!')

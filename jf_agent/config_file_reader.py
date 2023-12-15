@@ -73,6 +73,7 @@ ValidatedConfig = namedtuple(
         'skip_ssl_verification',
         'send_agent_config',
         'git_max_concurrent',
+        'skip_healthcheck_upload'
     ],
 )
 
@@ -131,6 +132,7 @@ def obtain_config(args) -> ValidatedConfig:
     yaml_conf_global = yaml_config.get('global', {})
     skip_ssl_verification = yaml_conf_global.get('no_verify_ssl', False)
     send_agent_config = yaml_conf_global.get('send_agent_config', False)
+    skip_healthcheck_upload = yaml_conf_global.get('skip_healthcheck_upload', False)
 
     # jira configuration
     jira_config = yaml_config.get('jira', {})
@@ -269,6 +271,7 @@ def obtain_config(args) -> ValidatedConfig:
         skip_ssl_verification,
         send_agent_config,
         git_max_concurrent,
+        skip_healthcheck_upload
     )
 
 
