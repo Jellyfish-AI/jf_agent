@@ -5,8 +5,8 @@ import shutil
 
 import requests
 
-from jf_agent.config_file_reader import get_jira_ingest_config
 from jf_agent.data_manifests.git.generator import get_instance_slug
+from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 from jf_ingest.validation import validate_jira, GitConnectionHealthCheckResult, JiraConnectionHealthCheckResult, IngestionHealthCheckResult, IngestionType
 
@@ -46,12 +46,11 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
 
     # Check for Jira credentials
     if config.jira_url and (
-            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
+        (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
         try:
-            ingest_config = get_jira_ingest_config(config, creds)
-
-            jira_connection_healthcheck_result = validate_jira(ingest_config)
+            ingest_config = get_ingest_config(config, creds)
+            jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
 
         # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
         # We will continue to validate git but will indicate Jira config failed.

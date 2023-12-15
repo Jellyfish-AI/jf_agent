@@ -68,7 +68,7 @@ dependencies = [
     "click~=8.0.4",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
-    "jf-ingest==0.0.33",
+    "jf-ingest==0.0.36",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
