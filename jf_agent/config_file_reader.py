@@ -7,11 +7,10 @@ from typing import List
 import urllib3
 import yaml
 
-from jf_agent import VALID_RUN_MODES
+from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
-from jf_ingest.jf_jira import JiraIngestionConfig
-from jf_ingest.jf_jira.auth import JiraAuthConfig
+from jf_ingest.config import IngestionConfig, IngestionType, JiraConfig
 
 from jf_agent.util import get_company_info
 
@@ -117,7 +116,7 @@ def obtain_config(args) -> ValidatedConfig:
     run_mode_includes_send = run_mode in ('download_and_send', 'send_only')
     run_mode_is_print_all_jira_fields = run_mode == 'print_all_jira_fields'
     run_mode_is_print_apparently_missing_git_repos = (
-            run_mode == 'print_apparently_missing_git_repos'
+        run_mode == 'print_apparently_missing_git_repos'
     )
 
     debug_http_requests = args.debug_requests
@@ -296,64 +295,84 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
-def get_jira_ingest_config(config: ValidatedConfig, creds) -> JiraIngestionConfig:
+def get_ingest_config(config: ValidatedConfig, creds) -> IngestionConfig:
     """
-    Handles converting our agent config to the jf_ingest JiraIngestionConfig
+    Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
     """
 
-    company_info = get_company_info(config,creds)
+    company_info = get_company_info(config, creds)
 
     company_slug = company_info.get('company_slug')
 
     if not config.jira_url:
         raise BadConfigException("No Jira URL in config!")
 
-    if creds.jira_username and creds.jira_password:
-        auth_config = JiraAuthConfig(
-            company_slug=company_slug,
-            url=config.jira_url,
-            user=creds.jira_username,
-            password=creds.jira_password,
-            bypass_ssl_verification=config.skip_ssl_verification
-        )
-    elif creds.jira_bearer_token:
-        auth_config = JiraAuthConfig(
-            company_slug=company_slug,
-            url=config.jira_url,
-            personal_access_token=creds.jira_bearer_token,
-            bypass_ssl_verification=config.skip_ssl_verification
-
-        )
-    else:
+    if (not creds.jira_username and not creds.jira_password) and not creds.jira_bearer_token:
         raise BadConfigException("Cannot find jira credentials!")
 
-    ingestion_config = JiraIngestionConfig(
-        auth_config=auth_config,
+    jira_config: JiraConfig = JiraConfig(
+        company_slug=company_slug,
+        #
+        # Auth Info
+        url=config.jira_url,
+        user=creds.jira_username if creds.jira_username else "",
+        password=creds.jira_password if creds.jira_password else "",
+        bypass_ssl_verification=config.skip_ssl_verification,
+        personal_access_token=creds.jira_bearer_token if creds.jira_bearer_token else "",
+        #
+        # Server Info
         gdpr_active=config.jira_gdpr_active,
+        #
+        # Fields Info
         exclude_fields=config.jira_exclude_fields,
         include_fields=config.jira_include_fields,
+        #
+        # User Info
         required_email_domains=config.jira_required_email_domains,
         is_email_required=config.jira_is_email_required,
+        #
+        # Projects Info
         include_projects=config.jira_include_projects,
         exclude_projects=config.jira_exclude_projects,
         include_project_categories=config.jira_include_project_categories,
         exclude_project_categories=config.jira_exclude_project_categories,
+        #
+        # Sprints/Boards Info
         download_sprints=config.jira_download_sprints,
-        download_worklogs=config.jira_download_worklogs,
-        s3_bucket=None,
-        s3_path=None,
-        upload_to_s3=False,
-        local_file_path=None,
-        company_slug=company_slug,
-        force_search_users_by_letter=False,
-        search_users_by_letter_email_domain=False,
-        earliest_issue_dt=None,
-        issue_download_concurrent_threads=True,
-        issue_jql=None,
+        #
+        # Issues
+        full_redownload=False,
+        earliest_issue_dt=config.jira_earliest_issue_dt
+        if config.jira_earliest_issue_dt
+        else datetime.min,  # TODO: Double check this is safe for a real agent run...
+        issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
+        # TODO: The metadata/lookup table has to come from the Jellyfish Server
         jellyfish_issue_metadata={},
         jellyfish_project_ids_to_keys={},
-        work_logs_pull_from=None
+        skip_issues=False,
+        only_issues=False,
+        #
+        # worklogs
+        download_worklogs=config.jira_download_worklogs,
+        # Potentially solidify this with the issues date, or pull from
+        # TODO: Move this in from downloaders
+        work_logs_pull_from=None,  # work_logs_pull_from=self.get_updated_max(),
+        # Jira Ingest Feature Flags
+        # TODO: Generate from launchdarkly
+        feature_flags={},
+    )
+
+    ingestion_config = IngestionConfig(
+        company_slug=company_slug,
+        upload_to_s3=False,
+        # TODO: Maybe we set this, although the constructor can handle them being null
+        local_file_path=None,
+        timestamp=None,
+        jira_config=jira_config,
+        jellyfish_api_token=creds.jellyfish_api_token,
+        jellyfish_api_base=JELLYFISH_API_BASE,
+        ingest_type=IngestionType.AGENT,
     )
 
     return ingestion_config
