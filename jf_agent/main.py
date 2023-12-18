@@ -130,8 +130,16 @@ def main():
 
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
-    if config.run_mode == 'validate':
+    logger.info("Running ingestion healthcheck validation!")
+
+    try:
         full_validate(config, creds, jellyfish_endpoint_info)
+    except Exception as err:
+        logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
+
+    if config.run_mode == 'validate':
+        # We will now run this on every run, so this is just a catch to make sure the logic flows correctly.
+        pass
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
