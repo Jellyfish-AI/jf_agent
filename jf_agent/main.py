@@ -10,7 +10,6 @@ from collections import namedtuple
 from glob import glob
 from pathlib import Path
 import sys
-from time import sleep
 
 import requests
 import json
@@ -34,7 +33,6 @@ from jf_agent.jf_jira import (
     load_and_dump_jira,
     print_missing_repos_found_by_jira,
 )
-from jf_agent.session import retry_session
 
 from jf_agent.validation import (
     full_validate,
@@ -42,7 +40,7 @@ from jf_agent.validation import (
     ProjectMetadata,
 )
 
-from jf_agent.util import get_company_info
+from jf_agent.util import get_company_info, upload_file
 
 from jf_ingest import diagnostics, logging_helper
 
@@ -626,48 +624,13 @@ def send_data(config, creds):
 
     def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
-            upload_file(filename, path_to_obj, signed_url)
+            upload_file(filename, path_to_obj, signed_url, config_outdir=config.outdir)
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
                 logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
-    def upload_file(filename, path_to_obj, signed_url, local=False):
-        filepath = filename if local else f'{config.outdir}/{filename}'
-
-        total_retries = 5
-        retry_count = 0
-        while total_retries >= retry_count:
-            try:
-                with open(filepath, 'rb') as f:
-                    # If successful, returns HTTP status code 204
-                    session = retry_session()
-                    upload_resp = session.post(
-                        signed_url['url'],
-                        data=signed_url['fields'],
-                        files={'file': (path_to_obj, f)},
-                    )
-                    upload_resp.raise_for_status()
-                    logger.info(f'Successfully uploaded {filename}')
-                    return
-            # For large file uploads, we run into intermittent 104 errors where the 'peer' (jellyfish)
-            # will appear to shut down the session connection.
-            # These exceptions ARE NOT handled by the above retry_session retry logic, which handles 500 level errors.
-            # Attempt to catch and retry the 104 type error here
-            except requests.exceptions.ConnectionError as e:
-                logging_helper.log_standard_error(
-                    logging.WARNING, msg_args=[filename, repr(e)], error_code=3001, exc_info=True,
-                )
-                retry_count += 1
-                # Back off logic
-                sleep(1 * retry_count)
-
-        # If we make it out of the while loop without returning, that means
-        # we failed to upload the file.
-        logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
-        )
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -726,21 +689,21 @@ def send_data(config, creds):
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
-        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
+        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True, config_outdir=config.outdir)
 
     # Log this information before we upload the log file.
     logger.info(f'Agent run succeeded: {success}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
-    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
+    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'], config_outdir=config.outdir)
 
     if success:
         # creating .done file, only on success
         done_file_path = f'{os.path.join(config.outdir, ".done")}'
         Path(done_file_path).touch()
         done_file_dict = get_signed_url(['.done'])['.done']
-        upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+        upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'], config_outdir=config.outdir)
 
     return success
 

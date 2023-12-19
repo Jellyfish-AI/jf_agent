@@ -10,9 +10,13 @@ from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 from jf_ingest.validation import validate_jira, GitConnectionHealthCheckResult, JiraConnectionHealthCheckResult, IngestionHealthCheckResult, IngestionType
 
+from jf_agent.util import upload_file
+
+from jf_agent import write_file
 
 logger = logging.getLogger(__name__)
 
+HEALTHCHECK_JSON_FILENAME = "healthcheck.json"
 
 # NOTE: Pretty much all 'logging' calls here should use PRINT
 # and not logger.info. Logger.info will log to stdout AND
@@ -84,10 +88,16 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
                                                                                 git_connection_healthcheck=git_connection_healthcheck_result,
                                                                                 jira_connection_healthcheck=jira_connection_healthcheck_result)
 
+    config_outdir = config.outdir
+
+    with open(f'{config_outdir}/{HEALTHCHECK_JSON_FILENAME}', 'w') as outfile:
+        outfile.write(healthcheck_result.to_json())
+
     if config.skip_healthcheck_upload:
         logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
     else:
-        submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, healthcheck_result)
+        pass
+        submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir)
 
     logger.info("\nDone")
 
@@ -249,20 +259,46 @@ def validate_memory(config):
         return False
 
 
-def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_token: str, healthcheck_result: IngestionHealthCheckResult) -> None:
+def get_healthcheck_signed_urls(jellyfish_api_base: str, jellyfish_api_token: str, files: list[str]):
+    headers = {'Jellyfish-API-Token': jellyfish_api_token}
+
+    payload = {'files': files}
+
+    r = requests.post(
+        f'{jellyfish_api_base}/endpoints/agent/healthcheck/signed-url',
+        headers=headers,
+        json=payload,
+    )
+    r.raise_for_status()
+
+    return r.json()['signed_urls']
+
+
+def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str) -> None:
     """
     Uploads the given IngestionHealthCheckResult to Jellyfish
     """
-    headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
 
     logger.info(f'Attempting to upload healthcheck result to s3...')
 
-    r = requests.post(
-        f'{jellyfish_api_base}/endpoints/agent/upload_healthcheck',
-        headers=headers,
-        json=healthcheck_result.to_dict(),
-    )
+    agent_log_filename = 'jf_agent.log'
 
-    r.raise_for_status()
+    signed_urls = get_healthcheck_signed_urls(jellyfish_api_base=jellyfish_api_base,
+                                              jellyfish_api_token=jellyfish_api_token,
+                                              files=[HEALTHCHECK_JSON_FILENAME, agent_log_filename])
+
+
+    # Uploading healthcheck.json
+
+    healthcheck_signed_url = signed_urls[HEALTHCHECK_JSON_FILENAME]
+
+    upload_file(HEALTHCHECK_JSON_FILENAME, healthcheck_signed_url['s3_path'], healthcheck_signed_url['url'], config_outdir=config_outdir)
+
+    # Uploading jf_agent.log
+
+    logfile_signed_url = signed_urls[agent_log_filename]
+
+    upload_file(agent_log_filename, logfile_signed_url['s3_path'], logfile_signed_url['url'], config_outdir=config_outdir)
 
     logger.info(f'Successfully uploaded healthcheck result to s3!')
+
