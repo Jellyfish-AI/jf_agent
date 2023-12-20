@@ -202,15 +202,41 @@ def main():
 
             diagnostics.capture_outdir_size(config.outdir)
 
-            # Kills the sys_diag_collector thread
+
+        except Exception as err:
+            logger.error(f"Encountered error during agent run! {err}")
+
+            # We need to close this before we send data
+            # Otherwise we'll send a .fuse_hidden file (temp file)
+            diagnostics.close_file()
+
+            # Kills the sys_diag_collector thread.
+            # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-        finally:
-            diagnostics.close_file()
+            success &= potentially_send_data(config, creds, successful=False)
 
+            return False
+
+    diagnostics.close_file()
+
+    # Kills the sys_diag_collector thread
+    sys_diag_done_event.set()
+    sys_diag_collector.join()
+
+    diagnostics.close_file()
+
+    success &= potentially_send_data(config, creds, successful=True)
+
+    logger.info('Done!')
+
+    return success
+
+
+def potentially_send_data(config, creds, successful=True) -> bool:
     if config.run_mode_includes_send:
-        success &= send_data(config, creds)
+        successful &= send_data(config, creds, successful)
     else:
         logger.info(
             f'\nSkipping send_data because run_mode is "{config.run_mode}"\n'
@@ -218,10 +244,7 @@ def main():
             f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"'
         )
 
-    logger.info('Done!')
-
-    return success
-
+    return successful
 
 UserProvidedCreds = namedtuple(
     'UserProvidedCreds',
@@ -605,7 +628,7 @@ def _download_git_data(
     )
 
 
-def send_data(config, creds):
+def send_data(config, creds, successful=True):
     _, timestamp = os.path.split(config.outdir)
 
     def get_signed_url(files):
@@ -676,7 +699,6 @@ def send_data(config, creds):
     for t in threads:
         t.join()
 
-    success = True
     if any(thread_exceptions):
         # Run through exceptions and inject them into the agent log
         for exception in thread_exceptions:
@@ -686,7 +708,7 @@ def send_data(config, creds):
         logger.error(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
-        success = False
+        successful = False
 
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
@@ -694,20 +716,20 @@ def send_data(config, creds):
         upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True, config_outdir=config.outdir)
 
     # Log this information before we upload the log file.
-    logger.info(f'Agent run succeeded: {success}')
+    logger.info(f'Agent run succeeded: {successful}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
     upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'], config_outdir=config.outdir)
 
-    if success:
+    if successful:
         # creating .done file, only on success
         done_file_path = f'{os.path.join(config.outdir, ".done")}'
         Path(done_file_path).touch()
         done_file_dict = get_signed_url(['.done'])['.done']
         upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'], config_outdir=config.outdir)
 
-    return success
+    return successful
 
 
 def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):
