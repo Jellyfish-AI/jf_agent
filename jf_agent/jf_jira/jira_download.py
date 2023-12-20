@@ -381,7 +381,9 @@ def download_all_issue_metadata(
     logger.info('downloading issue metadata... [!n]')
 
     # all_project_ids is passed in as a set - need it to be a list so it can be split
+    # randomize order so that we don't always hit the same projects first
     all_project_ids = list(all_project_ids)
+    random.shuffle(all_project_ids)
 
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
