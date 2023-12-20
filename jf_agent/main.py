@@ -406,24 +406,26 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
 
     company_slug = company_info.get('company_slug')
 
+    # temporarily disable Jira manifests
+
     # Create and add Jira Manifest
-    if config.jira_url:
-        logger.info('Attempting to generate Jira Manifest...')
-        try:
-            jira_manifest = create_jira_manifest(
-                company_slug=company_slug, config=config, creds=creds
-            )
-            if jira_manifest:
-                logger.info('Successfully created Jira Manifest')
-                manifests.append(jira_manifest)
-            else:
-                logger.warning('create_jira_manifest returned a None Type.')
-        except Exception as e:
-            logger.debug(
-                f'Error encountered when generating jira manifest. Error: {e}', exc_info=True
-            )
-    else:
-        logger.info('No Jira config detected, skipping Jira manifest generation')
+    # if config.jira_url:
+    #     logger.info('Attempting to generate Jira Manifest...')
+    #     try:
+    #         jira_manifest = create_jira_manifest(
+    #             company_slug=company_slug, config=config, creds=creds
+    #         )
+    #         if jira_manifest:
+    #             logger.info('Successfully created Jira Manifest')
+    #             manifests.append(jira_manifest)
+    #         else:
+    #             logger.warning('create_jira_manifest returned a None Type.')
+    #     except Exception as e:
+    #         logger.debug(
+    #             f'Error encountered when generating jira manifest. Error: {e}', exc_info=True
+    #         )
+    # else:
+    #     logger.info('No Jira config detected, skipping Jira manifest generation')
 
     if config.git_configs:
         try:
