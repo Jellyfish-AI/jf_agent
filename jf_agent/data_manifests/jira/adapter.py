@@ -6,7 +6,7 @@ from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
-from jf_ingest.utils import retry_for_429s, RewriteJiraSessionHeaders
+from jf_ingest.utils import retry_for_429s
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +65,7 @@ class JiraCloudManifestAdapter:
 
     def get_resolutions_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
-        with RewriteJiraSessionHeaders(self.jira_connection):
-            return len(retry_for_429s(self.jira_connection.resolutions))
+        return len(retry_for_429s(self.jira_connection.resolutions))
 
     def get_issue_types_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
