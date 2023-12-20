@@ -202,17 +202,29 @@ def main():
 
             diagnostics.capture_outdir_size(config.outdir)
 
+
+        except Exception as err:
+            logger.error(f"Encountered error during agent run! {err}")
+
+            # We need to close this before we send data
+            # Otherwise we'll send a .fuse_hidden file (temp file)
+            diagnostics.close_file()
+
             # Kills the sys_diag_collector thread
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-        except Exception as err:
-            logger.error(f"Encountered error during agent run! {err}")
             success &= potentially_send_data(config, creds, successful=False)
+
             return False
 
-        finally:
-            diagnostics.close_file()
+    diagnostics.close_file()
+
+    # Kills the sys_diag_collector thread
+    sys_diag_done_event.set()
+    sys_diag_collector.join()
+
+    diagnostics.close_file()
 
     success &= potentially_send_data(config, creds, successful=True)
 
