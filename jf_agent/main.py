@@ -72,7 +72,6 @@ def main():
     )
     parser.add_argument(
         '-od',
-        '-od',
         '--prev-output-dir',
         nargs='?',
         help='Path to directory containing already-downloaded files',
