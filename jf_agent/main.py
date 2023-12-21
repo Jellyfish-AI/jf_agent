@@ -72,6 +72,7 @@ def main():
     )
     parser.add_argument(
         '-od',
+        '-od',
         '--prev-output-dir',
         nargs='?',
         help='Path to directory containing already-downloaded files',
@@ -153,6 +154,14 @@ def main():
 
     elif args.from_failure:
         error_and_timeout_free = False
+        old_files = os.listdir(args.output_basedir)
+        files = sorted(old_files, reverse=True)
+        previous_run_file = files[0]
+        print("Files:", files)
+        print('Previous run file:', previous_run_file)
+
+        config.outdir = os.path.join(args.output_basedir, previous_run_file)
+
 
     else:
         try:
