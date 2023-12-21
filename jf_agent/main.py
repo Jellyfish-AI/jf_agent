@@ -122,9 +122,8 @@ def main():
         help='To be run with -m send-only. Indicates that we have had a failure '
              'but we will try to send the data anyways, but will *not* try to redownload.')
 
-
     args = parser.parse_args()
-    print(args.from_failure)
+
     config = obtain_config(args)
 
     if args.env_file:
@@ -139,8 +138,9 @@ def main():
 
     logger.info("Running ingestion healthcheck validation!")
 
+    # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
+    # to try to upload failed data.
     error_and_timeout_free = True
-
 
     if config.run_mode == 'validate':
         try:
@@ -156,16 +156,24 @@ def main():
         error_and_timeout_free = False
         old_files = os.listdir(args.output_basedir)
         files = sorted(old_files, reverse=True)
-        previous_run_file = files[0]
-        print("Files:", files)
-        print('Previous run file:', previous_run_file)
 
-        config.outdir = os.path.join(args.output_basedir, previous_run_file)
+        # This needs to be the second on the list
+        # Since we'll have already created a first one for * this * run
+        # And the timestamps won't line up
+        if len(files) < 2:
+            logger.error('No previous directory to mount, cannot send data post-failure!')
+            return False
 
+        previous_run_file = files[1]
+
+        config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
+
+        logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
     else:
         try:
             full_validate(config, creds, jellyfish_endpoint_info)
+            pass
         except Exception as err:
             logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
 
@@ -191,7 +199,6 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
-            print(1/0)
 
             try:
                 generate_manifests(
