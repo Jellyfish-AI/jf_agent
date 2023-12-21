@@ -253,8 +253,6 @@ def main():
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-            #success &= potentially_send_data(config, creds, successful=False)
-
             return False
 
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
