@@ -114,8 +114,15 @@ def main():
     parser.add_argument(
         '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
+    parser.add_argument(
+        '-f',
+        '--from-failure',
+        action='store_true',
+        help='To be run with -m send-only. Indicates that we have had a failure '
+             'but we will try to send the data anyways, but will *not* try to redownload.')
 
     args = parser.parse_args()
+
     config = obtain_config(args)
 
     if args.env_file:
@@ -130,20 +137,45 @@ def main():
 
     logger.info("Running ingestion healthcheck validation!")
 
-    try:
-        full_validate(config, creds, jellyfish_endpoint_info)
-    except Exception as err:
-        logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
+    # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
+    # to try to upload failed data.
+    error_and_timeout_free = True
 
     if config.run_mode == 'validate':
-        # We will now run this on every run, so this is just a catch to make sure the logic flows correctly.
-        pass
+        try:
+            full_validate(config, creds, jellyfish_endpoint_info)
+        except Exception as err:
+            logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         pass
 
+    elif args.from_failure:
+        error_and_timeout_free = False
+        old_files = os.listdir(args.output_basedir)
+        files = sorted(old_files, reverse=True)
+
+        # This needs to be the second on the list
+        # Since we'll have already created a first one for * this * run
+        # And the timestamps won't line up
+        if len(files) < 2:
+            logger.error('No previous directory to mount, cannot send data post-failure!')
+            return False
+
+        previous_run_file = files[1]
+
+        config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
+
+        logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
+
     else:
+        try:
+            full_validate(config, creds, jellyfish_endpoint_info)
+            pass
+        except Exception as err:
+            logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
+
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
@@ -166,6 +198,7 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
+
             try:
                 generate_manifests(
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
@@ -201,6 +234,11 @@ def main():
                 )
 
             diagnostics.capture_outdir_size(config.outdir)
+            diagnostics.close_file()
+
+            # Kills the sys_diag_collector thread
+            sys_diag_done_event.set()
+            sys_diag_collector.join()
 
 
         except Exception as err:
@@ -215,19 +253,9 @@ def main():
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-            success &= potentially_send_data(config, creds, successful=False)
-
             return False
 
-    diagnostics.close_file()
-
-    # Kills the sys_diag_collector thread
-    sys_diag_done_event.set()
-    sys_diag_collector.join()
-
-    diagnostics.close_file()
-
-    success &= potentially_send_data(config, creds, successful=True)
+    success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
     logger.info('Done!')
 
