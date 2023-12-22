@@ -73,7 +73,7 @@ ValidatedConfig = namedtuple(
         'skip_ssl_verification',
         'send_agent_config',
         'git_max_concurrent',
-        'skip_healthcheck_upload'
+        'skip_healthcheck_upload',
     ],
 )
 
@@ -271,7 +271,7 @@ def obtain_config(args) -> ValidatedConfig:
         skip_ssl_verification,
         send_agent_config,
         git_max_concurrent,
-        skip_healthcheck_upload
+        skip_healthcheck_upload,
     )
 
 
@@ -370,7 +370,7 @@ def get_ingest_config(config: ValidatedConfig, creds) -> IngestionConfig:
         company_slug=company_slug,
         upload_to_s3=False,
         # TODO: Maybe we set this, although the constructor can handle them being null
-        local_file_path=None,
+        local_file_path=config.outdir,
         timestamp=None,
         jira_config=jira_config,
         jellyfish_api_token=creds.jellyfish_api_token,

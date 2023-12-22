@@ -26,7 +26,7 @@ from jf_agent.data_manifests.jira.generator import create_manifest as create_jir
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
 from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config
+from jf_agent.config_file_reader import get_ingest_config, obtain_config
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
@@ -43,6 +43,7 @@ from jf_agent.validation import (
 from jf_agent.util import get_company_info, upload_file
 
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,8 @@ def main():
         '--debug-requests',
         action='store_true',
         help='Enable http requests debug logging. WARNING, this is VERY verbose and WILL print out all headers '
-             'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.')
+        'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.',
+    )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
@@ -119,7 +121,8 @@ def main():
         '--from-failure',
         action='store_true',
         help='To be run with -m send-only. Indicates that we have had a failure '
-             'but we will try to send the data anyways, but will *not* try to redownload.')
+        'but we will try to send the data anyways, but will *not* try to redownload.',
+    )
 
     args = parser.parse_args()
 
@@ -145,7 +148,9 @@ def main():
         try:
             full_validate(config, creds, jellyfish_endpoint_info)
         except Exception as err:
-            logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
 
     elif config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
@@ -174,7 +179,9 @@ def main():
             full_validate(config, creds, jellyfish_endpoint_info)
             pass
         except Exception as err:
-            logger.error(f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}")
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
 
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
@@ -226,9 +233,7 @@ def main():
                     jellyfish_endpoint_info.git_instance_info,
                     jellyfish_endpoint_info.jf_options,
                 )
-
                 success = all(s['status'] == 'success' for s in download_data_status)
-
                 write_file(
                     config.outdir, 'status', config.compress_output_files, download_data_status
                 )
@@ -239,7 +244,6 @@ def main():
             # Kills the sys_diag_collector thread
             sys_diag_done_event.set()
             sys_diag_collector.join()
-
 
         except Exception as err:
             logger.error(f"Encountered error during agent run! {err}")
@@ -273,6 +277,7 @@ def potentially_send_data(config, creds, successful=True) -> bool:
         )
 
     return successful
+
 
 UserProvidedCreds = namedtuple(
     'UserProvidedCreds',
@@ -453,7 +458,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
 def generate_manifests(config, creds, jellyfish_endpoint_info):
     manifests: list[Manifest] = []
 
-    company_info = get_company_info(config,creds)
+    company_info = get_company_info(config, creds)
 
     company_slug = company_info.get('company_slug')
 
@@ -580,7 +585,19 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
-        download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
+        if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
+            logger.info(
+                f'Using JF Ingest to download data because use_jf_ingest_for_jira was set to {endpoint_jira_info.get("use_jf_ingest_for_jira", False)}'
+            )
+            ingest_config = get_ingest_config(config, creds)
+            if load_and_push_jira_to_s3(ingest_config):
+                download_data_status.append({'type': 'Jira', 'status': 'success'})
+            else:
+                download_data_status.append({'type': 'Jira', 'status': 'failed'})
+        else:
+            download_data_status.append(
+                load_and_dump_jira(config, endpoint_jira_info, jira_connection)
+            )
 
     if len(config.git_configs) == 0:
         return download_data_status
@@ -684,7 +701,6 @@ def send_data(config, creds, successful=True):
                 logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
-
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
         logger.info(f'Compressing {fname}')
@@ -741,21 +757,34 @@ def send_data(config, creds, successful=True):
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
-        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True, config_outdir=config.outdir)
+        upload_file(
+            'config.yml',
+            config_file_dict['s3_path'],
+            config_file_dict['url'],
+            local=True,
+            config_outdir=config.outdir,
+        )
 
     # Log this information before we upload the log file.
     logger.info(f'Agent run succeeded: {successful}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
-    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'], config_outdir=config.outdir)
+    upload_file(
+        agent_logging.LOG_FILE_NAME,
+        log_file_dict['s3_path'],
+        log_file_dict['url'],
+        config_outdir=config.outdir,
+    )
 
     if successful:
         # creating .done file, only on success
         done_file_path = f'{os.path.join(config.outdir, ".done")}'
         Path(done_file_path).touch()
         done_file_dict = get_signed_url(['.done'])['.done']
-        upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'], config_outdir=config.outdir)
+        upload_file(
+            '.done', done_file_dict['s3_path'], done_file_dict['url'], config_outdir=config.outdir
+        )
 
     return successful
 
