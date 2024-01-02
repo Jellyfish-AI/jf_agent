@@ -589,7 +589,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             logger.info(
                 f'Using JF Ingest to download data because use_jf_ingest_for_jira was set to {endpoint_jira_info.get("use_jf_ingest_for_jira", False)}'
             )
-            ingest_config = get_ingest_config(config, creds)
+            ingest_config = get_ingest_config(config, creds, endpoint_jira_info)
             if load_and_push_jira_to_s3(ingest_config):
                 download_data_status.append({'type': 'Jira', 'status': 'success'})
             else:
