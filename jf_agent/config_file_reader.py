@@ -1,6 +1,7 @@
 from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime, date
+import json
 import logging
 import os
 from typing import List
@@ -10,7 +11,7 @@ import yaml
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
-from jf_ingest.config import IngestionConfig, IngestionType, JiraConfig
+from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraConfig
 
 from jf_agent.util import get_company_info
 
@@ -73,7 +74,7 @@ ValidatedConfig = namedtuple(
         'skip_ssl_verification',
         'send_agent_config',
         'git_max_concurrent',
-        'skip_healthcheck_upload'
+        'skip_healthcheck_upload',
     ],
 )
 
@@ -271,7 +272,7 @@ def obtain_config(args) -> ValidatedConfig:
         skip_ssl_verification,
         send_agent_config,
         git_max_concurrent,
-        skip_healthcheck_upload
+        skip_healthcheck_upload,
     )
 
 
@@ -298,7 +299,7 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
-def get_ingest_config(config: ValidatedConfig, creds) -> IngestionConfig:
+def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) -> IngestionConfig:
     """
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
@@ -348,11 +349,14 @@ def get_ingest_config(config: ValidatedConfig, creds) -> IngestionConfig:
         full_redownload=False,
         earliest_issue_dt=config.jira_earliest_issue_dt
         if config.jira_earliest_issue_dt
-        else datetime.min,  # TODO: Double check this is safe for a real agent run...
+        else datetime.min,
         issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
-        # TODO: The metadata/lookup table has to come from the Jellyfish Server
-        jellyfish_issue_metadata={},
-        jellyfish_project_ids_to_keys={},
+        jellyfish_issue_metadata=IssueMetadata.from_json(
+            endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
+        ),
+        jellyfish_project_ids_to_keys=json.loads(
+            endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
+        ),
         skip_issues=False,
         only_issues=False,
         #
@@ -368,13 +372,13 @@ def get_ingest_config(config: ValidatedConfig, creds) -> IngestionConfig:
 
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
-        upload_to_s3=False,
+        upload_to_s3=config.run_mode_includes_send,
         # TODO: Maybe we set this, although the constructor can handle them being null
-        local_file_path=None,
-        timestamp=None,
+        local_file_path=config.outdir,
+        timestamp=os.path.split(config.outdir)[1],
         jira_config=jira_config,
         jellyfish_api_token=creds.jellyfish_api_token,
-        jellyfish_api_base=JELLYFISH_API_BASE,
+        jellyfish_api_base=config.jellyfish_api_base,
         ingest_type=IngestionType.AGENT,
     )
 

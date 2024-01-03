@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform"]
 lock_version = "4.4"
-content_hash = "sha256:d713b5762cfb02c857e7ff77c23fb9c2541fad3fb4f7ebbe78e0d872bf31b81a"
+content_hash = "sha256:cfcd5043c9547bad0f3a50126baf9600b6a4d05536eea86386d1cd99bdca6de1"
 
 [[package]]
 name = "appdirs"
@@ -290,7 +290,7 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.36"
+version = "0.0.45"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 dependencies = [
@@ -303,8 +303,8 @@ dependencies = [
     "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf-ingest-0.0.36.tar.gz", hash = "sha256:f0d7f6c95aae4a7fb9ab5fc0004d63a9e5560a02ff1c3f86e0bcb19e8a359d44"},
-    {file = "jf_ingest-0.0.36-py3-none-any.whl", hash = "sha256:2c37f2ac8e0466f348cae42263c56901582791a5865543353d4e458cee86da27"},
+    {file = "jf-ingest-0.0.45.tar.gz", hash = "sha256:2c20d011b49e2c979b80e476144f6fd901ba387f7b10388802f536dbdd20e830"},
+    {file = "jf_ingest-0.0.45-py3-none-any.whl", hash = "sha256:557f924256276e01af5890b2ef4771c0b842c15ff0efb3bf6dd217faba619c0b"},
 ]
 
 [[package]]
