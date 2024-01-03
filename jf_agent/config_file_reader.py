@@ -372,13 +372,13 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
 
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
-        upload_to_s3=False,
+        upload_to_s3=config.run_mode_includes_send,
         # TODO: Maybe we set this, although the constructor can handle them being null
         local_file_path=config.outdir,
-        timestamp=None,
+        timestamp=os.path.split(config.outdir)[1],
         jira_config=jira_config,
         jellyfish_api_token=creds.jellyfish_api_token,
-        jellyfish_api_base=JELLYFISH_API_BASE,
+        jellyfish_api_base=config.jellyfish_api_base,
         ingest_type=IngestionType.AGENT,
     )
 

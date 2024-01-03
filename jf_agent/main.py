@@ -205,7 +205,9 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
-
+            ingest_config = get_ingest_config(
+                config=config, creds=creds, endpoint_jira_info=jellyfish_endpoint_info.jira_info
+            )
             try:
                 generate_manifests(
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
@@ -229,6 +231,7 @@ def main():
                 download_data_status = download_data(
                     config,
                     creds,
+                    ingest_config,
                     jellyfish_endpoint_info.jira_info,
                     jellyfish_endpoint_info.git_instance_info,
                     jellyfish_endpoint_info.jf_options,
@@ -577,7 +580,9 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
+def download_data(
+    config, creds, ingest_config, endpoint_jira_info, endpoint_git_instances_info, jf_options
+):
     download_data_status = []
 
     if config.jira_url:
@@ -589,7 +594,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             logger.info(
                 f'Using JF Ingest to download data because use_jf_ingest_for_jira was set to {endpoint_jira_info.get("use_jf_ingest_for_jira", False)}'
             )
-            ingest_config = get_ingest_config(config, creds, endpoint_jira_info)
             if load_and_push_jira_to_s3(ingest_config):
                 download_data_status.append({'type': 'Jira', 'status': 'success'})
             else:
@@ -722,6 +726,11 @@ def send_data(config, creds, successful=True):
     # get the full file paths for each of the immediate
     # subdirectories (we're assuming only a single level)
     for directory in directories:
+        # SKIP OVER THE JIRA DIRECTORY, WHICH IS UPLOADED VIA JF INGEST
+        # TODO: The GIT directories will also be uploaded via ingest,
+        # but for now they are handled via this 'legacy' way
+        if directory.lower() == 'jira':
+            continue
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
