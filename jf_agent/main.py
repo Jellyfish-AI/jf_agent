@@ -44,6 +44,7 @@ from jf_agent.util import get_company_info, upload_file
 
 from jf_ingest import diagnostics, logging_helper
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
+from jf_ingest.config import IngestionType
 
 logger = logging.getLogger(__name__)
 
@@ -683,10 +684,10 @@ def send_data(config, creds, successful=True):
     def get_signed_url(files):
         base_url = config.jellyfish_api_base
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-        payload = {'files': files}
+        payload = {'files': files, 'ingestType': IngestionType.AGENT}
 
         r = requests.post(
-            f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}',
+            f'{base_url}/endpoints/ingest/signed-url?timestamp={timestamp}',
             headers=headers,
             json=payload,
         )
