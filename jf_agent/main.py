@@ -176,13 +176,6 @@ def main():
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
     else:
-        try:
-            full_validate(config, creds, jellyfish_endpoint_info)
-            pass
-        except Exception as err:
-            logger.error(
-                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
-            )
 
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
