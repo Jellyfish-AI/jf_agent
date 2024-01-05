@@ -20,7 +20,7 @@ from tqdm import tqdm
 from jf_agent.jf_jira.utils import retry_for_429s
 from jf_agent.util import split
 from jf_ingest import diagnostics, logging_helper
-from jf_ingest.utils import retry_for_429s, RewriteJiraSessionHeaders
+from jf_ingest.utils import retry_for_429s
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +107,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 @logging_helper.log_entry_exit(logger)
 def download_resolutions(jira_connection):
     logger.info("downloading jira resolutions... [!n]")
-    with RewriteJiraSessionHeaders(jira_connection):
-        result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
     logger.info("✓")
     return result
 

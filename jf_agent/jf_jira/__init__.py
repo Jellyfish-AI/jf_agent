@@ -38,6 +38,7 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
         'options': {
             'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
             'verify': not config.skip_ssl_verification,
+            "headers": {"Accept": "application/json;q=1.0, */*;q=0.9", 'Content-Type': 'application/json'},
         },
     }
     if creds.jira_username and creds.jira_password:
@@ -52,8 +53,9 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
             'Authorization': f'Bearer {creds.jira_bearer_token}',
             'Cache-Control': 'no-cache',
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            'Accept': "application/json;q=1.0, */*;q=0.9",
             'X-Atlassian-Token': 'no-check',
+
         }
     else:
         raise RuntimeError(
