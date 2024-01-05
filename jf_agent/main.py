@@ -1,5 +1,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import traceback
 import dotenv
 import gzip
 import logging
@@ -588,10 +589,17 @@ def download_data(
             logger.info(
                 f'Using JF Ingest to download data because use_jf_ingest_for_jira was set to {endpoint_jira_info.get("use_jf_ingest_for_jira", False)}'
             )
-            if load_and_push_jira_to_s3(ingest_config):
-                download_data_status.append({'type': 'Jira', 'status': 'success'})
-            else:
-                download_data_status.append({'type': 'Jira', 'status': 'failed'})
+            try:
+                success = load_and_push_jira_to_s3(ingest_config)
+            except Exception as e:
+                logger.error(
+                    f'Exception encountered when trying to download JIRA data. Exception: {e}'
+                )
+                logger.debug(traceback.format_exc())
+                success = False
+
+            success_status = 'success' if success else 'failed'
+            download_data_status.append({'type': 'Jira', 'status': success_status})
         else:
             download_data_status.append(
                 load_and_dump_jira(config, endpoint_jira_info, jira_connection)
