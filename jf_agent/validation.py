@@ -48,24 +48,20 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
 
     logger.info('Validating configuration...')
 
-    # Check for Jira credentials
-    if config.jira_url and (
-        (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
-    ):
-        try:
-            ingest_config = get_ingest_config(config, creds)
+    try:
+        ingest_config = get_ingest_config(config, creds, jellyfish_endpoint_info.jira_info)
+        if ingest_config.jira_config:
             jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
+        else:
+            print("No Jira config found, skipping Jira validation...")
 
-        # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
-        # We will continue to validate git but will indicate Jira config failed.
-        except Exception as e:
-            print(f"Failed to validate Jira due to exception of type {e.__class__.__name__}!")
+    # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
+    # We will continue to validate git but will indicate Jira config failed.
+    except Exception as e:
+        print(f"Failed to validate Jira due to exception of type {e.__class__.__name__}!")
 
-            # Printing this to stdout rather than logger in case the exception has any sensitive info.
-            print(e)
-
-    else:
-        logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
+        # Printing this to stdout rather than logger in case the exception has any sensitive info.
+        print(e)
 
     # Check for Git configs
     if config.git_configs:

@@ -4,7 +4,7 @@ from datetime import datetime, date
 import json
 import logging
 import os
-from typing import List
+from typing import List, Optional
 import urllib3
 import yaml
 
@@ -309,66 +309,62 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
 
     company_slug = company_info.get('company_slug')
 
-    if not config.jira_url:
-        raise BadConfigException("No Jira URL in config!")
-
-    if (not creds.jira_username and not creds.jira_password) and not creds.jira_bearer_token:
-        raise BadConfigException("Cannot find jira credentials!")
-
-    jira_config: JiraConfig = JiraConfig(
-        company_slug=company_slug,
-        #
-        # Auth Info
-        url=config.jira_url,
-        user=creds.jira_username if creds.jira_username else "",
-        password=creds.jira_password if creds.jira_password else "",
-        bypass_ssl_verification=config.skip_ssl_verification,
-        personal_access_token=creds.jira_bearer_token if creds.jira_bearer_token else "",
-        #
-        # Server Info
-        gdpr_active=config.jira_gdpr_active,
-        #
-        # Fields Info
-        exclude_fields=config.jira_exclude_fields,
-        include_fields=config.jira_include_fields,
-        #
-        # User Info
-        required_email_domains=config.jira_required_email_domains,
-        is_email_required=config.jira_is_email_required,
-        #
-        # Projects Info
-        include_projects=config.jira_include_projects,
-        exclude_projects=config.jira_exclude_projects,
-        include_project_categories=config.jira_include_project_categories,
-        exclude_project_categories=config.jira_exclude_project_categories,
-        #
-        # Sprints/Boards Info
-        download_sprints=config.jira_download_sprints,
-        #
-        # Issues
-        full_redownload=False,
-        earliest_issue_dt=config.jira_earliest_issue_dt
-        if config.jira_earliest_issue_dt
-        else datetime.min,
-        issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
-        jellyfish_issue_metadata=IssueMetadata.from_json(
-            endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
-        ),
-        jellyfish_project_ids_to_keys=json.loads(
-            endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
-        ),
-        skip_issues=False,
-        only_issues=False,
-        #
-        # worklogs
-        download_worklogs=config.jira_download_worklogs,
-        # Potentially solidify this with the issues date, or pull from
-        # TODO: Move this in from downloaders
-        work_logs_pull_from=None,  # work_logs_pull_from=self.get_updated_max(),
-        # Jira Ingest Feature Flags
-        # TODO: Generate from launchdarkly
-        feature_flags={},
-    )
+    jira_config: Optional[JiraConfig] = None
+    if config.jira_url and ((creds.jira_username and creds.jira_password) or creds.jira_bearer_token):
+        jira_config: JiraConfig = JiraConfig(
+            company_slug=company_slug,
+            #
+            # Auth Info
+            url=config.jira_url,
+            user=creds.jira_username if creds.jira_username else "",
+            password=creds.jira_password if creds.jira_password else "",
+            bypass_ssl_verification=config.skip_ssl_verification,
+            personal_access_token=creds.jira_bearer_token if creds.jira_bearer_token else "",
+            #
+            # Server Info
+            gdpr_active=config.jira_gdpr_active,
+            #
+            # Fields Info
+            exclude_fields=config.jira_exclude_fields,
+            include_fields=config.jira_include_fields,
+            #
+            # User Info
+            required_email_domains=config.jira_required_email_domains,
+            is_email_required=config.jira_is_email_required,
+            #
+            # Projects Info
+            include_projects=config.jira_include_projects,
+            exclude_projects=config.jira_exclude_projects,
+            include_project_categories=config.jira_include_project_categories,
+            exclude_project_categories=config.jira_exclude_project_categories,
+            #
+            # Sprints/Boards Info
+            download_sprints=config.jira_download_sprints,
+            #
+            # Issues
+            full_redownload=False,
+            earliest_issue_dt=config.jira_earliest_issue_dt
+            if config.jira_earliest_issue_dt
+            else datetime.min,
+            issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
+            jellyfish_issue_metadata=IssueMetadata.from_json(
+                endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
+            ),
+            jellyfish_project_ids_to_keys=json.loads(
+                endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
+            ),
+            skip_issues=False,
+            only_issues=False,
+            #
+            # worklogs
+            download_worklogs=config.jira_download_worklogs,
+            # Potentially solidify this with the issues date, or pull from
+            # TODO: Move this in from downloaders
+            work_logs_pull_from=None,  # work_logs_pull_from=self.get_updated_max(),
+            # Jira Ingest Feature Flags
+            # TODO: Generate from launchdarkly
+            feature_flags={},
+        )
 
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
