@@ -580,7 +580,7 @@ def download_data(
 ):
     download_data_status = []
 
-    if config.jira_url:
+    if config.jira_url and ingest_config.jira_config:
         logger.info('Obtained Jira configuration, attempting download...',)
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
