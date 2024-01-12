@@ -46,6 +46,18 @@ exclude = '''
 )
 '''
 
+[tool.pdm]
+[[tool.pdm.source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "requests-mock",
+    "pytest>=7.4.0",
+]
+
 [project]
 name = "jf_agent"
 version = "0.0.1"
@@ -68,23 +80,11 @@ dependencies = [
     "click~=8.0.4",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
-    "jf-ingest==0.0.45",
+    "jf-ingest==0.0.50",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
-
-[tool.pdm]
-[[tool.pdm.source]]
-url = "https://pypi.python.org/simple"
-verify_ssl = true
-name = "pypi"
-
-[tool.pdm.dev-dependencies]
-dev = [
-    "requests-mock",
-    "pytest>=7.4.0",
-]
 
 [build-system]
 requires = ["pdm-backend"]
