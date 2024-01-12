@@ -200,9 +200,6 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
-            ingest_config = get_ingest_config(
-                config=config, creds=creds, endpoint_jira_info=jellyfish_endpoint_info.jira_info
-            )
             try:
                 generate_manifests(
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
@@ -226,7 +223,6 @@ def main():
                 download_data_status = download_data(
                     config,
                     creds,
-                    ingest_config,
                     jellyfish_endpoint_info.jira_info,
                     jellyfish_endpoint_info.git_instance_info,
                     jellyfish_endpoint_info.jf_options,
@@ -575,31 +571,33 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_data(
-    config, creds, ingest_config, endpoint_jira_info, endpoint_git_instances_info, jf_options
-):
+def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
     download_data_status = []
 
-    if config.jira_url and ingest_config.jira_config:
+    if config.jira_url:
         logger.info('Obtained Jira configuration, attempting download...',)
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
         if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
-            logger.info(
-                f'Using JF Ingest to download data because use_jf_ingest_for_jira was set to {endpoint_jira_info.get("use_jf_ingest_for_jira", False)}'
-            )
             try:
+                logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+                ingest_config = get_ingest_config(
+                    config=config, creds=creds, endpoint_jira_info=endpoint_jira_info
+                )
                 success = load_and_push_jira_to_s3(ingest_config)
+                success_status_str = 'success' if success else 'failed'
+                download_data_status.append({'type': 'Jira', 'status': success_status_str})
             except Exception as e:
                 logger.error(
                     f'Exception encountered when trying to download JIRA data. Exception: {e}'
                 )
                 logger.debug(traceback.format_exc())
-                success = False
+                logger.info(f'Rolling back and using load_and_dump_jira to ingest data')
 
-            success_status = 'success' if success else 'failed'
-            download_data_status.append({'type': 'Jira', 'status': success_status})
+                download_data_status.append(
+                    load_and_dump_jira(config, endpoint_jira_info, jira_connection)
+                )
         else:
             download_data_status.append(
                 load_and_dump_jira(config, endpoint_jira_info, jira_connection)
