@@ -310,7 +310,9 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
     company_slug = company_info.get('company_slug')
 
     jira_config: Optional[JiraConfig] = None
-    if config.jira_url and ((creds.jira_username and creds.jira_password) or creds.jira_bearer_token):
+    if config.jira_url and (
+        (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
+    ):
         jira_config: JiraConfig = JiraConfig(
             company_slug=company_slug,
             #
@@ -369,6 +371,8 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
         upload_to_s3=config.run_mode_includes_send,
+        # ALWAYS save locally for Agent runs!
+        save_locally=True,
         # TODO: Maybe we set this, although the constructor can handle them being null
         local_file_path=config.outdir,
         timestamp=os.path.split(config.outdir)[1],
