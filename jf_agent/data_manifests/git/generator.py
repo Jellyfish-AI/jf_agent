@@ -127,12 +127,12 @@ def create_manifests(
                     )
                 )
         except UnsupportedGitProvider as e:
-            logger.warning(
+            logger.debug(
                 'Unsupported Git Provider exception encountered. '
                 f'This shouldn\'t affect your agent upload. Error: {e}',
             )
         except Exception as e:
-            logger.warning(
+            logger.debug(
                 'An exception happened when creating manifest. This shouldn\'t affect your agent upload. '
                 f'Exception: {e}',
             )
