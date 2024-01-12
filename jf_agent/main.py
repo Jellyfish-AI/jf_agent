@@ -205,7 +205,7 @@ def main():
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
                 )
             except Exception as e:
-                logger.warning(
+                logger.debug(
                     'Exception encountered when trying to generate manifests. '
                     f'This should not affect your agent upload. Exception: {e}',
                 )
