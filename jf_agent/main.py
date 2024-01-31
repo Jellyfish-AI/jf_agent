@@ -15,7 +15,6 @@ import sys
 import requests
 import json
 
-
 from jf_agent import (
     agent_logging,
     write_file,
@@ -134,7 +133,7 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    agent_logging.configure(config.outdir, config.debug_http_requests)
+    logging_config = agent_logging.configure(config.outdir, config.debug_http_requests)
 
     success = True
 
@@ -177,7 +176,6 @@ def main():
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
     else:
-
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
@@ -213,7 +211,9 @@ def main():
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    config,
+                    creds,
+                    args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(config, creds, issues_to_scan)
@@ -238,6 +238,8 @@ def main():
             # Kills the sys_diag_collector thread
             sys_diag_done_event.set()
             sys_diag_collector.join()
+            # Let the logging queue finish up, if needed
+            agent_logging.close_out(logging_config)
 
         except Exception as err:
             logger.error(f"Encountered error during agent run! {err}")
@@ -250,6 +252,8 @@ def main():
             # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
             sys_diag_done_event.set()
             sys_diag_collector.join()
+            # Let the logging queue finish up, if needed
+            agent_logging.close_out(logging_config)
 
             return False
 
@@ -489,10 +493,13 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             )
         except Exception as e:
             logger.debug(
-                f'Error encountered when generating git manifests. Error: {e}', exc_info=True,
+                f'Error encountered when generating git manifests. Error: {e}',
+                exc_info=True,
             )
     else:
-        logger.info('No Git Configuration detection, skipping Git manifests generation',)
+        logger.info(
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
 
     logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
@@ -575,7 +582,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
-        logger.info('Obtained Jira configuration, attempting download...',)
+        logger.info(
+            'Obtained Jira configuration, attempting download...',
+        )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -609,7 +618,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
-
         if jf_options.get('normalize_project_distribution', False):
             try:
                 metadata_by_project = validate_num_repos(
@@ -702,7 +710,10 @@ def send_data(config, creds, successful=True):
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
-                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+                logging.ERROR,
+                msg_args=[filename],
+                error_code=3000,
+                exc_info=True,
             )
 
     # Compress any not yet compressed files before sending
@@ -739,7 +750,8 @@ def send_data(config, creds, successful=True):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread,
+            args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]

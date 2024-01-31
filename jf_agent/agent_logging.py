@@ -1,7 +1,11 @@
 import logging
+from logging import LogRecord
 import os
 import sys
-import urllib3
+from logging.handlers import QueueHandler, QueueListener
+from queue import Queue
+from dataclasses import dataclass
+from typing import List
 
 '''
 Guidance on logging/printing in the agent:
@@ -19,6 +23,7 @@ e.g., function names, iteration counts
 '''
 
 LOG_FILE_NAME = 'jf_agent.log'
+
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
@@ -60,21 +65,45 @@ class CustomFileHandler(logging.FileHandler):
         _emit_helper(self, record, always_use_newlines=True)
 
 
-def configure(outdir, debug_requests=False):
+class CustomerQueueHandler(QueueHandler):
+    def handle(self, record: LogRecord) -> None:
+        print('-------- handling a record off the queue --------')
+        print(record)
+        print('-------------------------------------------------')
 
+
+@dataclass
+class AgentLoggingConfig:
+    level: str
+    datefmt: str
+    handlers: List[str]
+    listener: QueueListener
+
+
+def configure(outdir: str, debug_requests=False) -> AgentLoggingConfig:
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     stdout_handler = CustomStreamHandler(stream=sys.stdout)
     stdout_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
     stdout_handler.setLevel(logging.INFO)
 
+    # logging in agent.log and those sent to the queue should be identical
+    file_and_queue_formatter = logging.Formatter(
+        fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s'
+    )
+
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
     logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
-    logfile_handler.setFormatter(
-        logging.Formatter(fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s')
-    )
+    logfile_handler.setFormatter(file_and_queue_formatter)
     logfile_handler.setLevel(logging.DEBUG)
+
+    log_queue = Queue(-1)  # no size bound
+    log_queue_handler = CustomerQueueHandler(log_queue)
+    log_queue_handler.setFormatter(file_and_queue_formatter)
+    log_queue_handler.setLevel(logging.DEBUG)
+    queue_listener = QueueListener(log_queue, log_queue_handler, respect_handler_level=True)
+    queue_listener.start()
 
     # Silence the urllib3 logger to only emit WARNING level logs,
     # because the debug level logs are super noisy
@@ -94,6 +123,22 @@ def configure(outdir, debug_requests=False):
         http.client.print = print_to_log
         http.client.HTTPConnection.debuglevel = 1
 
-    logging.basicConfig(
-        level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', handlers=[logfile_handler, stdout_handler]
+    config = AgentLoggingConfig(
+        level=logging.DEBUG,
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[logfile_handler, stdout_handler, log_queue_handler],
+        listener=queue_listener,
     )
+
+    logging.basicConfig(
+        level=config.level,
+        datefmt=config.datefmt,
+        handlers=config.handlers,
+    )
+
+    return config
+
+
+def close_out(config: AgentLoggingConfig) -> None:
+    config.listener.enqueue_sentinel()  # tell the listener to stop
+    config.listener.queue.join()  # wait for queue to finish up
