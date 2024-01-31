@@ -27,21 +27,24 @@ LOG_FILE_NAME = 'jf_agent.log'
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
+def _standardize_log_msg(msg: str, always_use_newlines=False):
+    special_code = '[!n]'
+    if special_code in msg:
+        msg = msg.replace('[!n]', '')
+        if always_use_newlines:
+            msg += '\n'
+    else:
+        msg += '\n'
+    return msg
+
+
 def _emit_helper(_self: logging.Handler, record: logging.LogRecord, always_use_newlines=False):
     try:
-        special_code = '[!n]'
-
         if _self.stream is None:
             if isinstance(_self, logging.FileHandler) and (_self.mode != 'w' or not _self._closed):
                 _self.stream = _self._open()
 
-        msg = _self.format(record)
-        if special_code in msg:
-            msg = msg.replace('[!n]', '')
-            if always_use_newlines:
-                msg += '\n'
-        else:
-            msg += '\n'
+        msg = _standardize_log_msg(_self.format(record))
 
         _self.stream.write(msg)
         _self.flush()
@@ -67,8 +70,9 @@ class CustomFileHandler(logging.FileHandler):
 
 class CustomerQueueHandler(QueueHandler):
     def handle(self, record: LogRecord) -> None:
+        msg = _standardize_log_msg(self.format(record))
         print('-------- handling a record off the queue --------')
-        print(record)
+        print(msg)
         print('-------------------------------------------------')
 
 
@@ -140,5 +144,4 @@ def configure(outdir: str, debug_requests=False) -> AgentLoggingConfig:
 
 
 def close_out(config: AgentLoggingConfig) -> None:
-    config.listener.enqueue_sentinel()  # tell the listener to stop
-    config.listener.queue.join()  # wait for queue to finish up
+    config.listener.stop()

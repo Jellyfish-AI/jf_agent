@@ -233,17 +233,13 @@ def main():
                 )
 
             diagnostics.capture_outdir_size(config.outdir)
-            diagnostics.close_file()
-
-            # Kills the sys_diag_collector thread
-            sys_diag_done_event.set()
-            sys_diag_collector.join()
-            # Let the logging queue finish up, if needed
-            agent_logging.close_out(logging_config)
 
         except Exception as err:
             logger.error(f"Encountered error during agent run! {err}")
+            agent_logging.close_out(logging_config)
+            return False
 
+        finally:
             # We need to close this before we send data
             # Otherwise we'll send a .fuse_hidden file (temp file)
             diagnostics.close_file()
@@ -252,14 +248,11 @@ def main():
             # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
             sys_diag_done_event.set()
             sys_diag_collector.join()
-            # Let the logging queue finish up, if needed
-            agent_logging.close_out(logging_config)
-
-            return False
 
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
     logger.info('Done!')
+    agent_logging.close_out(logging_config)
 
     return success
 
