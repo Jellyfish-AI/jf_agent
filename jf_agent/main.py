@@ -20,6 +20,7 @@ from jf_agent import (
     write_file,
     VALID_RUN_MODES,
     JELLYFISH_API_BASE,
+    JELLYFISH_WEBHOOK_BASE,
 )
 from jf_agent.exception import BadConfigException
 from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
@@ -89,6 +90,16 @@ def main():
         ),
     )
     parser.add_argument(
+        '--jellyfish-webhook-base',
+        default=JELLYFISH_WEBHOOK_BASE,
+        help=(
+            f'For Jellyfish developers: override for JELLYFISH_WEBHOOK_BASE (which defaults to {JELLYFISH_WEBHOOK_BASE}) '
+            "-- if you're running the Jellyfish webhook service locally you might use: "
+            "http://localhost:4999 (if running the agent container with --network host) or "
+            "http://172.17.0.1:4999 (if running the agent container with --network bridge)"
+        ),
+    )
+    parser.add_argument(
         '-ius',
         '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
@@ -133,7 +144,12 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    logging_config = agent_logging.configure(config.outdir, config.debug_http_requests)
+    logging_config = agent_logging.configure(
+        config.outdir,
+        config.jellyfish_webhook_base,
+        creds.jellyfish_api_token,
+        config.debug_http_requests,
+    )
 
     success = True
 

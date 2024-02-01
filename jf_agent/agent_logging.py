@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import logging
 from logging import LogRecord
 import os
@@ -5,7 +6,9 @@ import sys
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from dataclasses import dataclass
-from typing import List
+from typing import Any, List, Union
+import requests
+from jf_agent.util import temp_disable_request_loggers
 
 '''
 Guidance on logging/printing in the agent:
@@ -68,12 +71,60 @@ class CustomFileHandler(logging.FileHandler):
         _emit_helper(self, record, always_use_newlines=True)
 
 
-class CustomerQueueHandler(QueueHandler):
-    def handle(self, record: LogRecord) -> None:
-        msg = _standardize_log_msg(self.format(record))
-        print('-------- handling a record off the queue --------')
-        print(msg)
-        print('-------------------------------------------------')
+class CustomQueueListener(QueueListener):
+    _jf_sentinel = -1
+
+    def handle(self, record: Union[LogRecord, int]) -> None:
+        if record is self._jf_sentinel:
+            for handler in self.handlers:
+                handler.handle(record)
+                return
+        return super().handle(record)
+
+
+class CustomQueueHandler(QueueHandler):
+    def __init__(self, queue: Queue[Any], webhook_base: str, api_token: str) -> None:
+        super().__init__(queue)
+        self.webhook_base = webhook_base
+        self.api_token = api_token
+        self.messages_to_send = []
+        self.last_message_send_time = datetime.now()
+        # Indication that logging has finished and we should send whatever is left in the current batch.
+        self._sentinel = -1
+        self.initiated_at = datetime.strftime(datetime.now(), '%Y-%m-%d-%H-%M-%S')
+
+    def post_logs_to_jellyfish(self) -> bool:
+        headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
+        url = self.webhook_base + '/agent-logs'
+        with temp_disable_request_loggers():
+            resp = requests.post(url, json={'logs': self.messages_to_send}, headers=headers)
+        return resp.ok
+
+    def handle(self, record: Union[logging.LogRecord, int]) -> None:
+        now = datetime.now()
+
+        if record is not self._sentinel:
+            msg = _standardize_log_msg(self.format(record))
+            self.messages_to_send.append(
+                {
+                    'message': msg,
+                    'timestamp': int(
+                        datetime.strptime(
+                            record.asctime + '000', '%Y-%m-%d %H:%M:%S,%f'
+                        ).timestamp()
+                    ),
+                    'initiated_at': self.initiated_at,
+                }
+            )
+
+        if (
+            record is self._sentinel
+            or len(self.messages_to_send) >= 100
+            or now - self.last_message_send_time > timedelta(minutes=5)
+        ):
+            self.post_logs_to_jellyfish()
+            self.messages_to_send = []
+            self.last_message_send_time = now
 
 
 @dataclass
@@ -84,7 +135,9 @@ class AgentLoggingConfig:
     listener: QueueListener
 
 
-def configure(outdir: str, debug_requests=False) -> AgentLoggingConfig:
+def configure(
+    outdir: str, webhook_base: str, api_token: str, debug_requests=False
+) -> AgentLoggingConfig:
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     stdout_handler = CustomStreamHandler(stream=sys.stdout)
@@ -103,10 +156,10 @@ def configure(outdir: str, debug_requests=False) -> AgentLoggingConfig:
     logfile_handler.setLevel(logging.DEBUG)
 
     log_queue = Queue(-1)  # no size bound
-    log_queue_handler = CustomerQueueHandler(log_queue)
+    log_queue_handler = CustomQueueHandler(log_queue, webhook_base, api_token)
     log_queue_handler.setFormatter(file_and_queue_formatter)
     log_queue_handler.setLevel(logging.DEBUG)
-    queue_listener = QueueListener(log_queue, log_queue_handler, respect_handler_level=True)
+    queue_listener = CustomQueueListener(log_queue, log_queue_handler, respect_handler_level=True)
     queue_listener.start()
 
     # Silence the urllib3 logger to only emit WARNING level logs,
@@ -144,4 +197,6 @@ def configure(outdir: str, debug_requests=False) -> AgentLoggingConfig:
 
 
 def close_out(config: AgentLoggingConfig) -> None:
+    # send a custom sentinel so the final log batch sends, then stop the listener
+    config.listener.queue.put(-1)
     config.listener.stop()
