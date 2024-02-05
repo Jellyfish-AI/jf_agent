@@ -106,9 +106,8 @@ class CustomQueueHandler(QueueHandler):
         if resp.ok:
             self.messages_to_send = []
             self.last_message_send_time = now
-            if self.create_stream:
+            if self.create_stream and resp.json()['stream_created']:
                 self.create_stream = False
-        return resp.ok
 
     def handle(self, record: Union[logging.LogRecord, int]) -> None:
         now = datetime.now()
