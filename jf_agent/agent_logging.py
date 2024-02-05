@@ -92,12 +92,22 @@ class CustomQueueHandler(QueueHandler):
         # Indication that logging has finished and we should send whatever is left in the current batch.
         self._sentinel = -1
         self.initiated_at = datetime.strftime(datetime.now(), '%Y-%m-%d-%H-%M-%S')
+        self.create_stream = True
 
-    def post_logs_to_jellyfish(self) -> bool:
+    def post_logs_to_jellyfish(self, now: datetime) -> bool:
         headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
         url = self.webhook_base + '/agent-logs'
         with temp_disable_request_loggers():
-            resp = requests.post(url, json={'logs': self.messages_to_send}, headers=headers)
+            resp = requests.post(
+                url,
+                json={'logs': self.messages_to_send, 'create_stream': self.create_stream},
+                headers=headers,
+            )
+        if resp.ok:
+            self.messages_to_send = []
+            self.last_message_send_time = now
+            if self.create_stream:
+                self.create_stream = False
         return resp.ok
 
     def handle(self, record: Union[logging.LogRecord, int]) -> None:
@@ -112,6 +122,7 @@ class CustomQueueHandler(QueueHandler):
                         datetime.strptime(
                             record.asctime + '000', '%Y-%m-%d %H:%M:%S,%f'
                         ).timestamp()
+                        * 1000
                     ),
                     'initiated_at': self.initiated_at,
                 }
@@ -122,9 +133,7 @@ class CustomQueueHandler(QueueHandler):
             or len(self.messages_to_send) >= 100
             or now - self.last_message_send_time > timedelta(minutes=5)
         ):
-            self.post_logs_to_jellyfish()
-            self.messages_to_send = []
-            self.last_message_send_time = now
+            self.post_logs_to_jellyfish(now)
 
 
 @dataclass
