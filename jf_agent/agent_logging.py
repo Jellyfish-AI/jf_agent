@@ -75,7 +75,7 @@ class CustomQueueListener(QueueListener):
     _jf_sentinel = -1
 
     def handle(self, record: Union[LogRecord, int]) -> None:
-        if record is self._jf_sentinel:
+        if record == self._jf_sentinel:
             for handler in self.handlers:
                 handler.handle(record)
                 return
