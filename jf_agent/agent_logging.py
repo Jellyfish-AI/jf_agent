@@ -112,7 +112,7 @@ class CustomQueueHandler(QueueHandler):
     def handle(self, record: Union[logging.LogRecord, int]) -> None:
         now = datetime.now()
 
-        if record is not self._sentinel:
+        if record != self._sentinel:
             msg = _standardize_log_msg(self.format(record))
             self.messages_to_send.append(
                 {
@@ -128,7 +128,7 @@ class CustomQueueHandler(QueueHandler):
             )
 
         if (
-            record is self._sentinel
+            record == self._sentinel
             or len(self.messages_to_send) >= 100
             or now - self.last_message_send_time > timedelta(minutes=5)
         ):
