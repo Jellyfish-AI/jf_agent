@@ -3,12 +3,12 @@ import logging
 from logging import LogRecord
 import os
 import sys
+import json
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from dataclasses import dataclass
 from typing import Any, List, Union
-import requests
-from jf_agent.util import temp_disable_request_loggers
+from http.client import HTTPConnection, HTTPSConnection
 
 '''
 Guidance on logging/printing in the agent:
@@ -85,6 +85,8 @@ class CustomQueueListener(QueueListener):
 class CustomQueueHandler(QueueHandler):
     def __init__(self, queue: Queue[Any], webhook_base: str, api_token: str) -> None:
         super().__init__(queue)
+        if not webhook_base.startswith('https://') and not webhook_base.startswith('http://'):
+            raise ValueError('No protocol provided in jellyfish webhook base.')
         self.webhook_base = webhook_base
         self.api_token = api_token
         self.messages_to_send = []
@@ -94,19 +96,36 @@ class CustomQueueHandler(QueueHandler):
         self.initiated_at = datetime.strftime(datetime.now(), '%Y-%m-%d-%H-%M-%S')
         self.create_stream = True
 
+    def get_connection(self):
+        '''establish an HTTP[S] connection to the jellyfish webhook service'''
+        secure = self.webhook_base.startswith('https://')
+        conn = (
+            HTTPSConnection(self.webhook_base[8:])
+            if secure
+            else HTTPConnection(self.webhook_base[7:])
+        )
+        return conn
+
     def post_logs_to_jellyfish(self, now: datetime) -> bool:
+        '''post a list of log data to the jellyfish webhook service. we are using the lower-level
+        HTTP[S]Client as opposed to something like the requests library as these clients do not do
+        any logging. generating logs at this point will send us into an infinite loop.'''
+
         headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
-        url = self.webhook_base + '/agent-logs'
-        with temp_disable_request_loggers():
-            resp = requests.post(
-                url,
-                json={'logs': self.messages_to_send, 'create_stream': self.create_stream},
-                headers=headers,
-            )
-        if resp.ok:
+        conn = self.get_connection()
+        conn.request(
+            "POST",
+            "/agent-logs",
+            body=json.dumps({'logs': self.messages_to_send, 'create_stream': self.create_stream}),
+            headers=headers,
+        )
+        resp = conn.getresponse()
+
+        if resp.status == 200:
+            resp_data = json.loads(resp.read().decode())
             self.messages_to_send = []
             self.last_message_send_time = now
-            if self.create_stream and resp.json()['stream_created']:
+            if self.create_stream and resp_data.get(['stream_created'], False):
                 self.create_stream = False
 
     def handle(self, record: Union[logging.LogRecord, int]) -> None:

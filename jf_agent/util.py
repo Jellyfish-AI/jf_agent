@@ -93,25 +93,3 @@ def upload_file(filename, path_to_obj, signed_url, config_outdir, local=False):
         error_code=3000,
         exc_info=True,
     )
-
-
-@contextmanager
-def temp_disable_request_loggers():
-    target_loggers = [
-        "urllib3.util.retry",
-        "urllib3.util",
-        "urllib3",
-        "urllib3.connection",
-        "urllib3.response",
-        "urllib3.connectionpool",
-        "urllib3.poolmanager",
-        "requests",
-    ]
-    for name in target_loggers:
-        logging.getLogger(name).disabled = True
-
-    try:
-        yield
-    finally:
-        for name in target_loggers:
-            logging.getLogger(name).disabled = True
