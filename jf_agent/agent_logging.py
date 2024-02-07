@@ -9,6 +9,7 @@ from queue import Queue
 from dataclasses import dataclass
 from typing import Any, List, Union
 from http.client import HTTPConnection, HTTPSConnection
+from urllib.parse import urlparse
 
 '''
 Guidance on logging/printing in the agent:
@@ -95,13 +96,25 @@ class CustomQueueHandler(QueueHandler):
         self._sentinel = -1
         self.initiated_at = datetime.strftime(datetime.now(), '%Y-%m-%d-%H-%M-%S')
         self.create_stream = True
+        self.webhook_path = '/agent-logs'
+        self.secure = True
+        self.post_errors = 0
+        self.post_error_threshold = 10
+        self._set_webhook_url()
+
+    def _set_webhook_url(self):
+        parsed = urlparse(self.webhook_base)
+        self.secure = parsed.scheme == 'https'
+        if parsed.path:
+            self.webhook_path = parsed.path + self.webhook_path
+        self.webhook_base = parsed.scheme + '://' + parsed.netloc
 
     def get_connection(self):
         '''establish an HTTP[S] connection to the jellyfish webhook service'''
-        secure = self.webhook_base.startswith('https://')
+
         conn = (
             HTTPSConnection(self.webhook_base[8:])
-            if secure
+            if self.secure
             else HTTPConnection(self.webhook_base[7:])
         )
         return conn
@@ -113,12 +126,27 @@ class CustomQueueHandler(QueueHandler):
 
         headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
         conn = self.get_connection()
-        conn.request(
-            "POST",
-            "/agent-logs",
-            body=json.dumps({'logs': self.messages_to_send, 'create_stream': self.create_stream}),
-            headers=headers,
-        )
+        try:
+            conn.request(
+                "POST",
+                self.webhook_path,
+                body=json.dumps(
+                    {'logs': self.messages_to_send, 'create_stream': self.create_stream}
+                ),
+                headers=headers,
+            )
+        except:
+            self.post_errors += 1
+            if self.post_errors < self.post_error_threshold:
+                print(
+                    'Error: could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.'
+                )
+            elif self.post_errors == self.post_error_threshold:
+                print(
+                    'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.'
+                )
+            return
+
         resp = conn.getresponse()
 
         if resp.status == 200:
@@ -146,7 +174,10 @@ class CustomQueueHandler(QueueHandler):
                 }
             )
 
-        if (
+        if self.post_errors >= self.post_error_threshold:
+            self.messages_to_send = []
+
+        elif (
             record == self._sentinel
             or len(self.messages_to_send) >= 100
             or now - self.last_message_send_time > timedelta(minutes=5)
