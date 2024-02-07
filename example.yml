@@ -31,7 +31,7 @@ jira:
   # not change it (regular, day-to-day runs of the agent will only pull issues
   # that have been created or updated since the last run).  Comment out or omit
   # to pull all issues into Jellyfish.
-  earliest_issue_dt: 2021-01-01
+  earliest_issue_dt: 2023-01-01
 
   # The number of concurrent threads the agent will use for downloading issue data.
   # It's unusual, but some Jira instances can be overwhelmed by more than one or
