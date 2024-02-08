@@ -131,10 +131,7 @@ class CustomQueueHandler(QueueHandler):
                 "POST",
                 self.webhook_path,
                 body=json.dumps(
-                    {
-                        'logs': self.messages_to_send,
-                        'create_stream': self.create_stream,
-                    }
+                    {'logs': self.messages_to_send, 'create_stream': self.create_stream}
                 ),
                 headers=headers,
             )
