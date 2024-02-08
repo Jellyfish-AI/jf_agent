@@ -131,7 +131,10 @@ class CustomQueueHandler(QueueHandler):
                 "POST",
                 self.webhook_path,
                 body=json.dumps(
-                    {'logs': self.messages_to_send, 'create_stream': self.create_stream}
+                    {
+                        'logs': self.messages_to_send,
+                        'create_stream': self.create_stream,
+                    }
                 ),
                 headers=headers,
             )
@@ -173,6 +176,7 @@ class CustomQueueHandler(QueueHandler):
                     'initiated_at': self.initiated_at,
                 }
             )
+            self.messages_to_send.sort(lambda x: x['timestamp'])
 
         if self.post_errors >= self.post_error_threshold:
             self.messages_to_send = []
