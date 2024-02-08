@@ -15,12 +15,12 @@ import sys
 import requests
 import json
 
-
 from jf_agent import (
     agent_logging,
     write_file,
     VALID_RUN_MODES,
     JELLYFISH_API_BASE,
+    JELLYFISH_WEBHOOK_BASE,
 )
 from jf_agent.exception import BadConfigException
 from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
@@ -90,6 +90,16 @@ def main():
         ),
     )
     parser.add_argument(
+        '--jellyfish-webhook-base',
+        default=JELLYFISH_WEBHOOK_BASE,
+        help=(
+            f'For Jellyfish developers: override for JELLYFISH_WEBHOOK_BASE (which defaults to {JELLYFISH_WEBHOOK_BASE}) '
+            "-- if you're running the Jellyfish webhook service locally you might use: "
+            "http://localhost:4999 (if running the agent container with --network host) or "
+            "http://172.17.0.1:4999 (if running the agent container with --network bridge)"
+        ),
+    )
+    parser.add_argument(
         '-ius',
         '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
@@ -134,7 +144,12 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    agent_logging.configure(config.outdir, config.debug_http_requests)
+    logging_config = agent_logging.configure(
+        config.outdir,
+        config.jellyfish_webhook_base,
+        creds.jellyfish_api_token,
+        config.debug_http_requests,
+    )
 
     success = True
 
@@ -177,7 +192,6 @@ def main():
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
     else:
-
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
@@ -213,7 +227,9 @@ def main():
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    config,
+                    creds,
+                    args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(config, creds, issues_to_scan)
@@ -233,15 +249,13 @@ def main():
                 )
 
             diagnostics.capture_outdir_size(config.outdir)
-            diagnostics.close_file()
-
-            # Kills the sys_diag_collector thread
-            sys_diag_done_event.set()
-            sys_diag_collector.join()
 
         except Exception as err:
             logger.error(f"Encountered error during agent run! {err}")
+            agent_logging.close_out(logging_config)
+            return False
 
+        finally:
             # We need to close this before we send data
             # Otherwise we'll send a .fuse_hidden file (temp file)
             diagnostics.close_file()
@@ -251,11 +265,10 @@ def main():
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-            return False
-
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
     logger.info('Done!')
+    agent_logging.close_out(logging_config)
 
     return success
 
@@ -489,10 +502,13 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             )
         except Exception as e:
             logger.debug(
-                f'Error encountered when generating git manifests. Error: {e}', exc_info=True,
+                f'Error encountered when generating git manifests. Error: {e}',
+                exc_info=True,
             )
     else:
-        logger.info('No Git Configuration detection, skipping Git manifests generation',)
+        logger.info(
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
 
     logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
@@ -575,7 +591,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
-        logger.info('Obtained Jira configuration, attempting download...',)
+        logger.info(
+            'Obtained Jira configuration, attempting download...',
+        )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -609,7 +627,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
-
         if jf_options.get('normalize_project_distribution', False):
             try:
                 metadata_by_project = validate_num_repos(
@@ -702,7 +719,10 @@ def send_data(config, creds, successful=True):
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
-                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+                logging.ERROR,
+                msg_args=[filename],
+                error_code=3000,
+                exc_info=True,
             )
 
     # Compress any not yet compressed files before sending
@@ -739,7 +759,8 @@ def send_data(config, creds, successful=True):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread,
+            args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]

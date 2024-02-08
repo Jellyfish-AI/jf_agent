@@ -2,6 +2,7 @@ from time import sleep
 from typing import Any, List
 from itertools import islice
 import requests
+from contextlib import contextmanager
 
 from jf_agent.exception import BadConfigException
 
@@ -28,7 +29,7 @@ def batched(iterable, n: int):
     if n < 1:
         raise ValueError('n must be at least one')
     it = iter(iterable)
-    while (batch := tuple(islice(it, n))):
+    while batch := tuple(islice(it, n)):
         yield batch
 
 
@@ -75,7 +76,10 @@ def upload_file(filename, path_to_obj, signed_url, config_outdir, local=False):
         # Attempt to catch and retry the 104 type error here
         except requests.exceptions.ConnectionError as e:
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[filename, repr(e)], error_code=3001, exc_info=True,
+                logging.WARNING,
+                msg_args=[filename, repr(e)],
+                error_code=3001,
+                exc_info=True,
             )
             retry_count += 1
             # Back off logic
@@ -84,5 +88,8 @@ def upload_file(filename, path_to_obj, signed_url, config_outdir, local=False):
     # If we make it out of the while loop without returning, that means
     # we failed to upload the file.
     logging_helper.log_standard_error(
-        logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+        logging.ERROR,
+        msg_args=[filename],
+        error_code=3000,
+        exc_info=True,
     )
