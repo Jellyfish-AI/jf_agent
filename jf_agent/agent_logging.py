@@ -95,11 +95,11 @@ class CustomQueueHandler(QueueHandler):
         # Indication that logging has finished and we should send whatever is left in the current batch.
         self._sentinel = -1
         self.initiated_at = datetime.strftime(datetime.now(), '%Y-%m-%d-%H-%M-%S')
-        self.create_stream = True
         self.webhook_path = '/agent-logs'
         self.secure = True
         self.post_errors = 0
         self.post_error_threshold = 10
+        self.batches_sent = 0
         self._set_webhook_url()
 
     def _set_webhook_url(self):
@@ -131,7 +131,7 @@ class CustomQueueHandler(QueueHandler):
                 "POST",
                 self.webhook_path,
                 body=json.dumps(
-                    {'logs': self.messages_to_send, 'create_stream': self.create_stream}
+                    {'logs': self.messages_to_send, 'create_stream': self.batches_sent == 0}
                 ),
                 headers=headers,
             )
@@ -150,11 +150,9 @@ class CustomQueueHandler(QueueHandler):
         resp = conn.getresponse()
 
         if resp.status == 200:
-            resp_data = json.loads(resp.read().decode())
+            self.batches_sent += 1
             self.messages_to_send = []
             self.last_message_send_time = now
-            if self.create_stream and resp_data.get('stream_created', False):
-                self.create_stream = False
 
     def handle(self, record: Union[logging.LogRecord, int]) -> None:
         now = datetime.now()
