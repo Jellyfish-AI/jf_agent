@@ -11,7 +11,7 @@ import yaml
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
-from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraConfig
+from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
 
 from jf_agent.util import get_company_info
 
@@ -168,17 +168,13 @@ def obtain_config(args) -> ValidatedConfig:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[list(missing_required_fields)],
-                error_code=2132,
+                logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[list(excluded_required_fields)],
-                error_code=2142,
+                logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
@@ -316,11 +312,13 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
 
     company_slug = company_info.get('company_slug')
 
-    jira_config: Optional[JiraConfig] = None
+    jira_config: Optional[JiraDownloadConfig] = None
+    # In the jellyfish API we are offsetting this value by x1000 and + 1, so we need to do the inverse here
+    work_logs_timestamp = int((endpoint_jira_info.get('last_updated', 1) - 1) / 1000)
     if config.jira_url and (
         (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
-        jira_config: JiraConfig = JiraConfig(
+        jira_config: JiraDownloadConfig = JiraDownloadConfig(
             company_slug=company_slug,
             #
             # Auth Info
@@ -367,9 +365,9 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
             #
             # worklogs
             download_worklogs=config.jira_download_worklogs,
-            # Potentially solidify this with the issues date, or pull from
-            # TODO: Move this in from downloaders
-            work_logs_pull_from=None,  # work_logs_pull_from=self.get_updated_max(),
+            # we are passed the raw unix timestamp for work logs, but jf_ingest
+            # expects a datetime. Do a quick conversion here
+            work_logs_pull_from=datetime.fromtimestamp(work_logs_timestamp),
             # Jira Ingest Feature Flags
             # TODO: Generate from launchdarkly
             feature_flags={},
