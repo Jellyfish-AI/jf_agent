@@ -314,7 +314,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
 
     jira_config: Optional[JiraDownloadConfig] = None
     # In the jellyfish API we are offsetting this value by x1000 and + 1, so we need to do the inverse here
-    work_logs_timestamp = int(endpoint_jira_info.get('last_updated', 1) / 1000) - 1
+    work_logs_timestamp = int((endpoint_jira_info.get('last_updated', 1) - 1) / 1000)
     if config.jira_url and (
         (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
