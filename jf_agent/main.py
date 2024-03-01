@@ -227,9 +227,7 @@ def main():
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config,
-                    creds,
-                    args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
                 )
                 if issues_to_scan:
                     print_missing_repos_found_by_jira(config, creds, issues_to_scan)
@@ -502,13 +500,10 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             )
         except Exception as e:
             logger.debug(
-                f'Error encountered when generating git manifests. Error: {e}',
-                exc_info=True,
+                f'Error encountered when generating git manifests. Error: {e}', exc_info=True,
             )
     else:
-        logger.info(
-            'No Git Configuration detection, skipping Git manifests generation',
-        )
+        logger.info('No Git Configuration detection, skipping Git manifests generation',)
 
     logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
@@ -591,9 +586,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
-        logger.info(
-            'Obtained Jira configuration, attempting download...',
-        )
+        logger.info('Obtained Jira configuration, attempting download...',)
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -612,6 +605,21 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 )
                 logger.debug(traceback.format_exc())
                 logger.info(f'Rolling back and using load_and_dump_jira to ingest data')
+                jf_ingest_files = f'{config.outdir}/jira'
+                try:
+                    if os.path.isdir(jf_ingest_files):
+                        logger.debug(
+                            f'JF Ingest files were detected at {jf_ingest_files}, attempting to remove them now'
+                        )
+                        shutil.rmtree(jf_ingest_files)
+                        logger.debug(f'Successfully removed left over JF Ingest files')
+                    else:
+                        logger.debug(f'No JF Ingest files were detected at {jf_ingest_files}')
+                except Exception as e:
+                    # Extreme precaution, wrap the above file operations in a try catch block
+                    logger.debug(
+                        f'Error encountered when attempting to remove JF Ingest files: {e}'
+                    )
 
                 download_data_status.append(
                     load_and_dump_jira(config, endpoint_jira_info, jira_connection)
@@ -719,10 +727,7 @@ def send_data(config, creds, successful=True):
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
-                logging.ERROR,
-                msg_args=[filename],
-                error_code=3000,
-                exc_info=True,
+                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
 
     # Compress any not yet compressed files before sending
@@ -759,8 +764,7 @@ def send_data(config, creds, successful=True):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread,
-            args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]
