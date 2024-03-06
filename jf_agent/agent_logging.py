@@ -28,6 +28,8 @@ e.g., function names, iteration counts
 
 LOG_FILE_NAME = 'jf_agent.log'
 
+logger = logging.getLogger(__name__)
+
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
@@ -249,10 +251,14 @@ def configure(
         handlers=config.handlers,
     )
 
+    logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')
+
     return config
 
 
 def close_out(config: AgentLoggingConfig) -> None:
     # send a custom sentinel so the final log batch sends, then stop the listener
+    logger.info('Closing the agent log stream.')
     config.listener.queue.put(-1)
     config.listener.stop()
+    logger.info('Log stream stopped.')
