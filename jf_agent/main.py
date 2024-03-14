@@ -161,19 +161,7 @@ def main():
     # to try to upload failed data.
     error_and_timeout_free = True
 
-    if config.run_mode == 'validate':
-        try:
-            full_validate(config, creds, jellyfish_endpoint_info)
-        except Exception as err:
-            logger.error(
-                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
-            )
-
-    elif config.run_mode == 'send_only':
-        # Importantly, don't overwrite the already-existing diagnostics file
-        pass
-
-    elif args.from_failure:
+    if args.from_failure:
         error_and_timeout_free = False
         old_files = os.listdir(args.output_basedir)
         files = sorted(old_files, reverse=True)
@@ -191,7 +179,15 @@ def main():
 
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
-    else:
+    elif not config.run_mode == 'send_only':
+        # Importantly, don't overwrite the already-existing diagnostics file
+        try:
+            full_validate(config, creds, jellyfish_endpoint_info)
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
+
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
