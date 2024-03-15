@@ -281,27 +281,18 @@ def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_toke
     """
     Uploads the given IngestionHealthCheckResult to Jellyfish
     """
-
     logger.info(f'Attempting to upload healthcheck result to s3...')
-
     agent_log_filename = 'jf_agent.log'
-
     signed_urls = get_healthcheck_signed_urls(jellyfish_api_base=jellyfish_api_base,
                                               jellyfish_api_token=jellyfish_api_token,
                                               files=[HEALTHCHECK_JSON_FILENAME, agent_log_filename])
 
-
     # Uploading healthcheck.json
-
     healthcheck_signed_url = signed_urls[HEALTHCHECK_JSON_FILENAME]
-
     upload_file(HEALTHCHECK_JSON_FILENAME, healthcheck_signed_url['s3_path'], healthcheck_signed_url['url'], config_outdir=config_outdir)
 
     # Uploading jf_agent.log
-
     logfile_signed_url = signed_urls[agent_log_filename]
-
     upload_file(agent_log_filename, logfile_signed_url['s3_path'], logfile_signed_url['url'], config_outdir=config_outdir)
-
+    
     logger.info(f'Successfully uploaded healthcheck result to s3!')
-

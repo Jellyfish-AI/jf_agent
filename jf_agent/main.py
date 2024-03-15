@@ -152,10 +152,7 @@ def main():
     )
 
     success = True
-
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-
-    logger.info("Running ingestion healthcheck validation!")
 
     # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
     # to try to upload failed data.
@@ -184,6 +181,7 @@ def main():
         try:
             # Run Jira validation from JF ingest by default.
             # Unless in validate mode, temporarily skip Git until we cut the validation over to JF ingest
+            logger.info("Running ingestion healthcheck validation!")
             full_validate(config, creds, jellyfish_endpoint_info, skip_git=config.run_mode != 'validate')
         except Exception as err:
             logger.error(
