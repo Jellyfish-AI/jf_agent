@@ -44,7 +44,7 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = False, skip_git: bool = False) -> IngestionHealthCheckResult:
+def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = False, skip_git: bool = False, upload: bool = True) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
@@ -88,7 +88,7 @@ def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = Fals
     # Finally, display memory usage statistics.
     validate_memory(config)
 
-    healthcheck_result: IngestionHealthCheckResult = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
+    healthcheck_result = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
                                                                                 git_connection_healthcheck=git_connection_healthcheck_result,
                                                                                 jira_connection_healthcheck=jira_connection_healthcheck_result)
 
@@ -97,10 +97,10 @@ def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = Fals
     with open(f'{config_outdir}/{HEALTHCHECK_JSON_FILENAME}', 'w') as outfile:
         outfile.write(healthcheck_result.to_json())
 
-    if config.skip_healthcheck_upload:
-        logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
-    else:
+    if upload:
         submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir)
+    else:
+        logger.info("This healthcheck report will not be uploaded.")
 
     logger.info("\nDone")
 

@@ -176,13 +176,21 @@ def main():
 
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
+    elif config.run_mode == 'validate':
+        try:
+            full_validate(config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload)
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
+
     elif not config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         try:
             # Run Jira validation from JF ingest by default.
-            # Unless in validate mode, temporarily skip Git until we cut the validation over to JF ingest
+            # Temporarily skip Git until we cut the validation over to JF ingest
             logger.info("Running ingestion healthcheck validation!")
-            full_validate(config, creds, jellyfish_endpoint_info, skip_git=config.run_mode != 'validate')
+            full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
         except Exception as err:
             logger.error(
                 f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
