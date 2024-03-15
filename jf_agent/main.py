@@ -182,7 +182,9 @@ def main():
     elif not config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
         try:
-            full_validate(config, creds, jellyfish_endpoint_info)
+            # Run Jira validation from JF ingest by default.
+            # Unless in validate mode, temporarily skip Git until we cut the validation over to JF ingest
+            full_validate(config, creds, jellyfish_endpoint_info, skip_git=config.run_mode != 'validate')
         except Exception as err:
             logger.error(
                 f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"

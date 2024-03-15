@@ -8,7 +8,13 @@ import requests
 from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
-from jf_ingest.validation import validate_jira, GitConnectionHealthCheckResult, JiraConnectionHealthCheckResult, IngestionHealthCheckResult, IngestionType
+from jf_ingest.validation import (
+    validate_jira, 
+    GitConnectionHealthCheckResult, 
+    JiraConnectionHealthCheckResult, 
+    IngestionHealthCheckResult, 
+    IngestionType
+)
 
 from jf_agent.util import upload_file
 
@@ -38,7 +44,7 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthCheckResult:
+def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = False, skip_git: bool = False) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
@@ -50,10 +56,11 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
 
     try:
         ingest_config = get_ingest_config(config, creds, jellyfish_endpoint_info.jira_info)
-        if ingest_config.jira_config:
+        if ingest_config.jira_config and not skip_jira:
             jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
         else:
-            print("No Jira config found, skipping Jira validation...")
+            msg = 'Skipping Jira Validation.'
+            logger.info(f"{'' if skip_jira else 'No Jira config found'}. " + msg)
 
     # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
     # We will continue to validate git but will indicate Jira config failed.
@@ -64,7 +71,7 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
         print(e)
 
     # Check for Git configs
-    if config.git_configs:
+    if config.git_configs and not skip_git:
         try:
             git_connection_healthcheck_result = validate_git(config, creds, jellyfish_endpoint_info.git_instance_info)
 
@@ -75,7 +82,8 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
             print(e)
 
     else:
-        logger.info("\nNo Git configs provided, skipping Git validation...")
+        msg = 'Skipping Git Validation.'
+        logger.info(f"{'' if skip_git else 'No Git config found'}. " + msg)
 
     # Finally, display memory usage statistics.
     validate_memory(config)
@@ -92,7 +100,6 @@ def full_validate(config, creds, jellyfish_endpoint_info) -> IngestionHealthChec
     if config.skip_healthcheck_upload:
         logger.info("skip_healthcheck_upload is set to True, this healthcheck report will NOT be uploaded!")
     else:
-        pass
         submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir)
 
     logger.info("\nDone")
