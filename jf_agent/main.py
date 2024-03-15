@@ -178,7 +178,9 @@ def main():
 
     elif config.run_mode == 'validate':
         try:
-            full_validate(config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload)
+            full_validate(
+                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
+            )
         except Exception as err:
             logger.error(
                 f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"

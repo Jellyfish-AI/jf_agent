@@ -9,11 +9,11 @@ from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 from jf_ingest.validation import (
-    validate_jira, 
-    GitConnectionHealthCheckResult, 
-    JiraConnectionHealthCheckResult, 
-    IngestionHealthCheckResult, 
-    IngestionType
+    validate_jira,
+    GitConnectionHealthCheckResult,
+    JiraConnectionHealthCheckResult,
+    IngestionHealthCheckResult,
+    IngestionType,
 )
 
 from jf_agent.util import upload_file
@@ -44,7 +44,14 @@ class ProjectMetadata:
         return f'project {self.project_name} accessible with {self.valid_creds} containing {self.num_repos} repos'
 
 
-def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = False, skip_git: bool = False, upload: bool = True) -> IngestionHealthCheckResult:
+def full_validate(
+    config,
+    creds,
+    jellyfish_endpoint_info,
+    skip_jira: bool = False,
+    skip_git: bool = False,
+    upload: bool = True,
+) -> IngestionHealthCheckResult:
     """
     Runs the full validation suite.
     """
@@ -73,7 +80,9 @@ def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = Fals
     # Check for Git configs
     if config.git_configs and not skip_git:
         try:
-            git_connection_healthcheck_result = validate_git(config, creds, jellyfish_endpoint_info.git_instance_info)
+            git_connection_healthcheck_result = validate_git(
+                config, creds, jellyfish_endpoint_info.git_instance_info
+            )
 
         except Exception as e:
             print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
@@ -88,9 +97,11 @@ def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = Fals
     # Finally, display memory usage statistics.
     validate_memory(config)
 
-    healthcheck_result = IngestionHealthCheckResult(ingestion_type=IngestionType.AGENT,
-                                                                                git_connection_healthcheck=git_connection_healthcheck_result,
-                                                                                jira_connection_healthcheck=jira_connection_healthcheck_result)
+    healthcheck_result = IngestionHealthCheckResult(
+        ingestion_type=IngestionType.AGENT,
+        git_connection_healthcheck=git_connection_healthcheck_result,
+        jira_connection_healthcheck=jira_connection_healthcheck_result,
+    )
 
     config_outdir = config.outdir
 
@@ -98,7 +109,9 @@ def full_validate(config, creds, jellyfish_endpoint_info, skip_jira: bool = Fals
         outfile.write(healthcheck_result.to_json())
 
     if upload:
-        submit_health_check_to_jellyfish(config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir)
+        submit_health_check_to_jellyfish(
+            config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir
+        )
     else:
         logger.info("This healthcheck report will not be uploaded.")
 
@@ -143,7 +156,9 @@ def validate_num_repos(git_configs, creds):
     return metadata_by_project
 
 
-def validate_git(config, creds, endpoint_git_instances_info) -> list[GitConnectionHealthCheckResult]:
+def validate_git(
+    config, creds, endpoint_git_instances_info
+) -> list[GitConnectionHealthCheckResult]:
     """
     Validates git config and credentials.
     """
@@ -201,7 +216,11 @@ def validate_git(config, creds, endpoint_git_instances_info) -> list[GitConnecti
                 for repo in repo_list:
                     print(f"    -- {repo}")
 
-            included_inaccessible_repos_list = [r for r in included_inaccessible_repos_list if not _check_repo_included(r, all_repos)]
+            included_inaccessible_repos_list = [
+                r
+                for r in included_inaccessible_repos_list
+                if not _check_repo_included(r, all_repos)
+            ]
 
             if included_inaccessible_repos_list:
                 successful = False
@@ -216,10 +235,12 @@ def validate_git(config, creds, endpoint_git_instances_info) -> list[GitConnecti
             print(f"Git connection unsuccessful! Exception: {e}")
             successful = False
 
-        healthcheck_result = GitConnectionHealthCheckResult(successful=successful,
-                                                  instance_slug=instance_slug,
-                                                  included_inaccessible_repos=included_inaccessible_repos_list,
-                                                  accessible_projects_and_repos=accessible_projects_and_repos)
+        healthcheck_result = GitConnectionHealthCheckResult(
+            successful=successful,
+            instance_slug=instance_slug,
+            included_inaccessible_repos=included_inaccessible_repos_list,
+            accessible_projects_and_repos=accessible_projects_and_repos,
+        )
 
         healthcheck_result_list.append(healthcheck_result)
 
@@ -262,7 +283,9 @@ def validate_memory(config):
         return False
 
 
-def get_healthcheck_signed_urls(jellyfish_api_base: str, jellyfish_api_token: str, files: list[str]):
+def get_healthcheck_signed_urls(
+    jellyfish_api_base: str, jellyfish_api_token: str, files: list[str]
+):
     headers = {'Jellyfish-API-Token': jellyfish_api_token}
 
     payload = {'files': files}
@@ -277,22 +300,36 @@ def get_healthcheck_signed_urls(jellyfish_api_base: str, jellyfish_api_token: st
     return r.json()['signed_urls']
 
 
-def submit_health_check_to_jellyfish(jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str) -> None:
+def submit_health_check_to_jellyfish(
+    jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str
+) -> None:
     """
     Uploads the given IngestionHealthCheckResult to Jellyfish
     """
     logger.info(f'Attempting to upload healthcheck result to s3...')
     agent_log_filename = 'jf_agent.log'
-    signed_urls = get_healthcheck_signed_urls(jellyfish_api_base=jellyfish_api_base,
-                                              jellyfish_api_token=jellyfish_api_token,
-                                              files=[HEALTHCHECK_JSON_FILENAME, agent_log_filename])
+    signed_urls = get_healthcheck_signed_urls(
+        jellyfish_api_base=jellyfish_api_base,
+        jellyfish_api_token=jellyfish_api_token,
+        files=[HEALTHCHECK_JSON_FILENAME, agent_log_filename],
+    )
 
     # Uploading healthcheck.json
     healthcheck_signed_url = signed_urls[HEALTHCHECK_JSON_FILENAME]
-    upload_file(HEALTHCHECK_JSON_FILENAME, healthcheck_signed_url['s3_path'], healthcheck_signed_url['url'], config_outdir=config_outdir)
+    upload_file(
+        HEALTHCHECK_JSON_FILENAME,
+        healthcheck_signed_url['s3_path'],
+        healthcheck_signed_url['url'],
+        config_outdir=config_outdir,
+    )
 
     # Uploading jf_agent.log
     logfile_signed_url = signed_urls[agent_log_filename]
-    upload_file(agent_log_filename, logfile_signed_url['s3_path'], logfile_signed_url['url'], config_outdir=config_outdir)
-    
+    upload_file(
+        agent_log_filename,
+        logfile_signed_url['s3_path'],
+        logfile_signed_url['url'],
+        config_outdir=config_outdir,
+    )
+
     logger.info(f'Successfully uploaded healthcheck result to s3!')
