@@ -158,7 +158,17 @@ def main():
     # to try to upload failed data.
     error_and_timeout_free = True
 
-    if args.from_failure:
+    if config.run_mode == 'validate':
+        try:
+            full_validate(
+                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
+            )
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
+
+    elif args.from_failure:
         error_and_timeout_free = False
         old_files = os.listdir(args.output_basedir)
         files = sorted(old_files, reverse=True)
@@ -175,16 +185,6 @@ def main():
         config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
 
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
-
-    elif config.run_mode == 'validate':
-        try:
-            full_validate(
-                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
-            )
-        except Exception as err:
-            logger.error(
-                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
-            )
 
     elif not config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
