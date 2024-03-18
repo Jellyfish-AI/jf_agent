@@ -152,10 +152,7 @@ def main():
     )
 
     success = True
-
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
-
-    logger.info("Running ingestion healthcheck validation!")
 
     # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
     # to try to upload failed data.
@@ -163,15 +160,13 @@ def main():
 
     if config.run_mode == 'validate':
         try:
-            full_validate(config, creds, jellyfish_endpoint_info)
+            full_validate(
+                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
+            )
         except Exception as err:
             logger.error(
                 f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
             )
-
-    elif config.run_mode == 'send_only':
-        # Importantly, don't overwrite the already-existing diagnostics file
-        pass
 
     elif args.from_failure:
         error_and_timeout_free = False
@@ -191,7 +186,18 @@ def main():
 
         logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
-    else:
+    elif not config.run_mode == 'send_only':
+        # Importantly, don't overwrite the already-existing diagnostics file
+        try:
+            # Run Jira validation from JF ingest by default.
+            # Temporarily skip Git until we cut the validation over to JF ingest
+            logger.info("Running ingestion healthcheck validation!")
+            full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
+
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
                 validate_num_repos(config.git_configs, creds)
