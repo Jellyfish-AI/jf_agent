@@ -69,7 +69,7 @@ dependencies = [
     "urllib3>=1.26.5",
     "pyyaml>=4.21b",
     "jira<2.1,>=2.0.0",
-    "tqdm",
+    "tqdm>=4.66.2",
     "stashy",
     "dateparser",
     "jsonstreams",
@@ -80,7 +80,7 @@ dependencies = [
     "click~=8.0.4",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
-    "jf-ingest==0.0.56",
+    "jf-ingest==0.0.63",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
