@@ -4,8 +4,8 @@
 [metadata]
 groups = ["default", "dev"]
 strategy = ["cross_platform"]
-lock_version = "4.4.1"
-content_hash = "sha256:c2b493d47fcc0dee789651a5569f3adaf48e478946d0da22feab181f94f6d5e4"
+lock_version = "4.4"
+content_hash = "sha256:1c4fecd850473a00569a39091dc0d0a6d3c23be64554606f4d1286d736285f63"
 
 [[package]]
 name = "appdirs"
@@ -290,11 +290,11 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.62"
+version = "0.0.63"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 dependencies = [
-    "jira<2.1,>=2.0.0",
+    "jira<=3.1.1,>=2.0.0",
     "psutil>=5.9.6",
     "python-dateutil>=2.8.2",
     "pytz>=2023.3.post1",
@@ -303,8 +303,8 @@ dependencies = [
     "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf-ingest-0.0.62.tar.gz", hash = "sha256:171fe4a9da7a643f24391487ead1b70fc8375115956dc738316ee241a27a1fee"},
-    {file = "jf_ingest-0.0.62-py3-none-any.whl", hash = "sha256:983b2fa93d9c30647c4c0ec84f835d3258ceeed33306491283b7dd1dd4103d5f"},
+    {file = "jf-ingest-0.0.63.tar.gz", hash = "sha256:ef6b782b92d643f1381b13c63bc57e818ea48f3440ff89ed0a9ace1e594578fc"},
+    {file = "jf_ingest-0.0.63-py3-none-any.whl", hash = "sha256:f4cdd934e3d8b4bec34c904c0ad4a8693dff416308ad6189db330193f83e3ad3"},
 ]
 
 [[package]]
@@ -715,15 +715,15 @@ files = [
 
 [[package]]
 name = "tqdm"
-version = "4.66.1"
+version = "4.66.2"
 requires_python = ">=3.7"
 summary = "Fast, Extensible Progress Meter"
 dependencies = [
     "colorama; platform_system == \"Windows\"",
 ]
 files = [
-    {file = "tqdm-4.66.1-py3-none-any.whl", hash = "sha256:d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386"},
-    {file = "tqdm-4.66.1.tar.gz", hash = "sha256:d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7"},
+    {file = "tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9"},
+    {file = "tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531"},
 ]
 
 [[package]]
