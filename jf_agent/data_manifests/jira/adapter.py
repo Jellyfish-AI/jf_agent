@@ -164,7 +164,7 @@ class JiraCloudManifestAdapter:
             return False
 
     def get_issues_count_for_project(self, project_id: int) -> int:
-        return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
+        return self._get_jql_search(jql_search=f'project = "{project_id}"', max_results=0)['total']
 
     def _get_raw_result(self, url) -> dict:
         response = retry_for_429s(self.jira_connection._session.get, url)
