@@ -154,6 +154,32 @@ def main():
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
+    # send start signal to Agent heartbeat monitor
+    diagnostics.send_diagnostic_start_reading(
+        jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
+        jellyfish_api_token=creds.jellyfish_api_token,
+        timestamp_key=get_timestamp_from_outdir(config.outdir),
+        will_run_git=bool(config.git_configs),
+        will_run_jira=bool(config.jira_url),
+        will_send=not config.run_mode == 'send_only',
+    )
+
+    logger.info(f'Will write output files into {config.outdir}')
+    diagnostics.open_file(config.outdir)
+
+    sys_diag_done_event = threading.Event()
+    sys_diag_collector = threading.Thread(
+        target=diagnostics.continually_gather_system_diagnostics,
+        name='sys_diag_collector',
+        args=(
+            sys_diag_done_event,
+            config.outdir,
+            JELLYFISH_WEBHOOK_BASE,
+            creds.jellyfish_api_token,
+        ),
+    )
+    sys_diag_collector.start()
+
     # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
     # to try to upload failed data.
     error_and_timeout_free = True
@@ -203,17 +229,6 @@ def main():
                 validate_num_repos(config.git_configs, creds)
         except Exception as e:
             logger.warning(f"Could not validate client/org creds, moving on. Got {e}")
-
-        logger.info(f'Will write output files into {config.outdir}')
-        diagnostics.open_file(config.outdir)
-
-        sys_diag_done_event = threading.Event()
-        sys_diag_collector = threading.Thread(
-            target=diagnostics.continually_gather_system_diagnostics,
-            name='sys_diag_collector',
-            args=(sys_diag_done_event, config.outdir),
-        )
-        sys_diag_collector.start()
 
         try:
             diagnostics.capture_agent_version()
@@ -272,6 +287,14 @@ def main():
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
     logger.info('Done!')
+
+    diagnostics.send_diagnostic_end_reading(
+        jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
+        jellyfish_api_token=creds.jellyfish_api_token,
+        timestamp_key=get_timestamp_from_outdir(config.outdir),
+        git_success=None,
+        jira_success=None,
+    )
     agent_logging.close_out(logging_config)
 
     return success
@@ -516,7 +539,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     for manifest in manifests:
         # Always send Manifest data to S3
         manifest.upload_to_s3(
-            jellyfish_api_base=config.jellyfish_api_base,
+            jellyfish_webhook_base=config.jellyfish_api_base,
             jellyfish_api_token=creds.jellyfish_api_token,
         )
 
@@ -708,8 +731,13 @@ def _download_git_data(
     )
 
 
+def get_timestamp_from_outdir(outdir: str):
+    _, timestamp = os.path.split(outdir)
+    return timestamp
+
+
 def send_data(config, creds, successful=True):
-    _, timestamp = os.path.split(config.outdir)
+    timestamp = get_timestamp_from_outdir(config.outdir)
 
     def get_signed_url(files):
         base_url = config.jellyfish_api_base
