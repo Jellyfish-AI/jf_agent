@@ -607,29 +607,12 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 download_data_status.append({'type': 'Jira', 'status': success_status_str})
             except Exception as e:
                 logger.error(
-                    f'Exception encountered when trying to download JIRA data. Exception: {e}'
+                    'Error encountered when downloading Jira data. '
+                    'This Jira submission will be marked as failed. '
+                    f'Error: {e}'
                 )
-                logger.debug(traceback.format_exc())
-                logger.info(f'Rolling back and using load_and_dump_jira to ingest data')
-                jf_ingest_files = f'{config.outdir}/jira'
-                try:
-                    if os.path.isdir(jf_ingest_files):
-                        logger.debug(
-                            f'JF Ingest files were detected at {jf_ingest_files}, attempting to remove them now'
-                        )
-                        shutil.rmtree(jf_ingest_files)
-                        logger.debug(f'Successfully removed left over JF Ingest files')
-                    else:
-                        logger.debug(f'No JF Ingest files were detected at {jf_ingest_files}')
-                except Exception as e:
-                    # Extreme precaution, wrap the above file operations in a try catch block
-                    logger.debug(
-                        f'Error encountered when attempting to remove JF Ingest files: {e}'
-                    )
-
-                download_data_status.append(
-                    load_and_dump_jira(config, endpoint_jira_info, jira_connection)
-                )
+                logger.debug(traceback.print_exc())
+                download_data_status.append({'type': 'Jira', 'status': 'failed'})
         else:
             download_data_status.append(
                 load_and_dump_jira(config, endpoint_jira_info, jira_connection)
