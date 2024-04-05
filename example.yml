@@ -118,7 +118,16 @@ jira:
   # by email domain, should null-email users be included?  uncomment this 
   # if they shouldn't:
   #
-  # is_email_required = True
+  # is_email_required: True
+
+  # This is a special run mode that allows you to skip saving your JIRA data
+  # locally, and instead continuously submit it via S3. This run mode is good
+  # if you plan to upload a VERY large amount of data (like an initial upload
+  # for a massive company). Please contact your Jellyfish representative to see
+  # if this run configuration is right for you. In general, this flag should NOT
+  # be included, or it should be set as False
+  #
+  # skip_saving_data_locally: True
 
 #############################
 # 3. Git configuration
