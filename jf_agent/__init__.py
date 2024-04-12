@@ -1,4 +1,3 @@
-import sys
 import gzip
 import json
 import jsonstreams
@@ -10,6 +9,7 @@ from jf_agent.util import batched
 logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://app.jellyfish.co'
+JELLYFISH_WEBHOOK_BASE = 'https://webhooks.jellyfish.co'
 VALID_RUN_MODES = (
     'validate',
     'download_and_send',
@@ -18,10 +18,6 @@ VALID_RUN_MODES = (
     'print_all_jira_fields',
     'print_apparently_missing_git_repos',
 )
-
-
-class BadConfigException(Exception):
-    pass
 
 
 def write_file(outdir, filename_prefix, compress, results):

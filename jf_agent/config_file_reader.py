@@ -1,14 +1,19 @@
 from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime, date
+import json
 import logging
 import os
-from typing import List
+from typing import List, Optional
 import urllib3
 import yaml
 
-from jf_agent import VALID_RUN_MODES, BadConfigException
+from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
+from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
+from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
+
+from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +67,16 @@ ValidatedConfig = namedtuple(
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
+        'jira_skip_saving_data_locally',
         'git_configs',
         'outdir',
         'compress_output_files',
         'jellyfish_api_base',
+        'jellyfish_webhook_base',
         'skip_ssl_verification',
         'send_agent_config',
         'git_max_concurrent',
+        'skip_healthcheck_upload',
     ],
 )
 
@@ -101,6 +109,7 @@ def obtain_config(args) -> ValidatedConfig:
         )
 
     jellyfish_api_base = args.jellyfish_api_base
+    jellyfish_webhook_base = args.jellyfish_webhook_base
     config_file_path = args.config_file
 
     run_mode = args.mode
@@ -127,6 +136,7 @@ def obtain_config(args) -> ValidatedConfig:
     yaml_conf_global = yaml_config.get('global', {})
     skip_ssl_verification = yaml_conf_global.get('no_verify_ssl', False)
     send_agent_config = yaml_conf_global.get('send_agent_config', False)
+    skip_healthcheck_upload = yaml_conf_global.get('skip_healthcheck_upload', False)
 
     # jira configuration
     jira_config = yaml_config.get('jira', {})
@@ -153,6 +163,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_issue_jql = jira_config.get('issue_jql', '')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
     jira_download_sprints = jira_config.get('download_sprints', True)
+    jira_skip_saving_data_locally = jira_config.get('skip_saving_data_locally', False)
 
     # warn if any of the recommended fields are missing or excluded
     if jira_include_fields:
@@ -258,13 +269,16 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
+        jira_skip_saving_data_locally,
         git_configs,  # array of GitConfig
         outdir,
         compress_output_files,
         jellyfish_api_base,
+        jellyfish_webhook_base,
         skip_ssl_verification,
         send_agent_config,
         git_max_concurrent,
+        skip_healthcheck_upload,
     )
 
 
@@ -289,6 +303,97 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 
 
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
+
+
+def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) -> IngestionConfig:
+    """
+    Handles converting our agent config to the jf_ingest IngestionConfig
+    shared dataclass.
+    """
+
+    company_info = get_company_info(config, creds)
+
+    company_slug = company_info.get('company_slug')
+
+    jira_config: Optional[JiraDownloadConfig] = None
+    # In the jellyfish API we are offsetting this value by x1000 and + 1, so we need to do the inverse here
+    work_logs_timestamp = int((endpoint_jira_info.get('last_updated', 1) - 1) / 1000)
+    if config.jira_url and (
+        (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
+    ):
+        jira_config: JiraDownloadConfig = JiraDownloadConfig(
+            company_slug=company_slug,
+            #
+            # Auth Info
+            url=config.jira_url,
+            user=creds.jira_username if creds.jira_username else "",
+            password=creds.jira_password if creds.jira_password else "",
+            bypass_ssl_verification=config.skip_ssl_verification,
+            personal_access_token=creds.jira_bearer_token if creds.jira_bearer_token else "",
+            #
+            # Server Info
+            gdpr_active=config.jira_gdpr_active,
+            #
+            # Fields Info
+            exclude_fields=config.jira_exclude_fields,
+            include_fields=config.jira_include_fields,
+            #
+            # User Info
+            required_email_domains=config.jira_required_email_domains,
+            is_email_required=config.jira_is_email_required,
+            #
+            # Projects Info
+            include_projects=config.jira_include_projects,
+            exclude_projects=config.jira_exclude_projects,
+            include_project_categories=config.jira_include_project_categories,
+            exclude_project_categories=config.jira_exclude_project_categories,
+            #
+            # Sprints/Boards Info
+            download_sprints=config.jira_download_sprints,
+            #
+            # Issues
+            full_redownload=False,
+            earliest_issue_dt=config.jira_earliest_issue_dt
+            if config.jira_earliest_issue_dt
+            else datetime.min,
+            issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
+            jellyfish_issue_metadata=IssueMetadata.from_json(
+                endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
+            ),
+            jellyfish_project_ids_to_keys=json.loads(
+                endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
+            ),
+            skip_issues=False,
+            only_issues=False,
+            #
+            # worklogs
+            download_worklogs=config.jira_download_worklogs,
+            # we are passed the raw unix timestamp for work logs, but jf_ingest
+            # expects a datetime. Do a quick conversion here
+            work_logs_pull_from=datetime.fromtimestamp(work_logs_timestamp),
+            # Jira Ingest Feature Flags
+            # TODO: Generate from launchdarkly
+            feature_flags={},
+        )
+
+    ingestion_config = IngestionConfig(
+        company_slug=company_slug,
+        upload_to_s3=config.run_mode_includes_send,
+        # NOTE: There is a special run mode for jira where we do not save data locally.
+        # This run mode is helpful for very large companies that need to do a large
+        # initial upload, and they don't want to provision a massive docker container.
+        # TODO: Break this out to optionally apply to only jira or only git
+        save_locally=not config.jira_skip_saving_data_locally,
+        # TODO: Maybe we set this, although the constructor can handle them being null
+        local_file_path=config.outdir,
+        timestamp=os.path.split(config.outdir)[1],
+        jira_config=jira_config,
+        jellyfish_api_token=creds.jellyfish_api_token,
+        jellyfish_api_base=config.jellyfish_api_base,
+        ingest_type=IngestionType.AGENT,
+    )
+
+    return ingestion_config
 
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:

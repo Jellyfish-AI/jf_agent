@@ -5,8 +5,7 @@ import math
 import random
 import re
 import traceback
-import time
-from typing import Dict, Generator, Tuple
+from typing import Dict
 
 from dateutil import parser
 from jira.exceptions import JIRAError
@@ -21,6 +20,7 @@ from tqdm import tqdm
 from jf_agent.jf_jira.utils import retry_for_429s
 from jf_agent.util import split
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.utils import retry_for_429s
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,7 @@ def download_users(
     # searching a different way
     if 950 <= len(jira_users) <= 1000:
         logger.info(
-            level=logging.INFO,
-            msg=f'Page limit reached with {len(jira_users)} users, '
-            'falling back to search by letter method.',
+            f'Page limit reached with {len(jira_users)} users, falling back to search by letter method.'
         )
         jira_users = _users_by_letter(jira_connection, gdpr_active)
 
@@ -106,8 +104,9 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_resolutions(jira_connection):
-    logger.info('downloading jira resolutions... [!n]')
+    logger.info("downloading jira resolutions... [!n]")
     result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    logger.info("✓")
     return result
 
 
@@ -379,7 +378,9 @@ def download_all_issue_metadata(
     logger.info('downloading issue metadata... [!n]')
 
     # all_project_ids is passed in as a set - need it to be a list so it can be split
+    # randomize order so that we don't always hit the same projects first
     all_project_ids = list(all_project_ids)
+    random.shuffle(all_project_ids)
 
     # If project_ids is too long (Max URI is 26526) we need to do it in multiple GET requests
     # Set to 20K to be on the safe side
@@ -491,7 +492,7 @@ def detect_issues_needing_re_download(
         existing_metadata = issue_metadata_from_jellyfish.get(int(issue_id_str))
         if existing_metadata and issue_key != existing_metadata.key:
             logger.info(
-                f'Detected a key change for issue {issue_id_str} ({existing_metadata.key} -> {issue_key})',
+                f'Detected a key change for issue {issue_id_str} ({existing_metadata.key} -> {issue_key})'
             )
             issue_keys_changed.append(existing_metadata.key)
 
@@ -669,7 +670,7 @@ def _download_jira_issues_segment(
 
 
 def _download_jira_issues_page(
-        jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
+    jira_connection, jira_issue_ids_segment, field_spec, start_at, batch_size
 ):
     '''
     Returns a tuple: (issues_downloaded, num_issues_apparently_deleted)
@@ -692,7 +693,8 @@ def _download_jira_issues_page(
             resp_json = json_loads(
                 retry_for_429s(
                     jira_connection._session.post,
-                        url=jira_connection._get_url('search'), data=json.dumps(search_params)
+                    url=jira_connection._get_url('search'),
+                    data=json.dumps(search_params),
                 )
             )
             return _expand_changelog(resp_json['issues'], jira_connection), 0

@@ -1,5 +1,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import traceback
 import dotenv
 import gzip
 import logging
@@ -10,7 +11,6 @@ from collections import namedtuple
 from glob import glob
 from pathlib import Path
 import sys
-from time import sleep
 
 import requests
 import json
@@ -20,28 +20,32 @@ from jf_agent import (
     write_file,
     VALID_RUN_MODES,
     JELLYFISH_API_BASE,
-    BadConfigException,
+    JELLYFISH_WEBHOOK_BASE,
 )
+from jf_agent.exception import BadConfigException
 from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
 from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import obtain_config
+from jf_agent.config_file_reader import get_ingest_config, obtain_config
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
     load_and_dump_jira,
     print_missing_repos_found_by_jira,
 )
-from jf_agent.session import retry_session
+
 from jf_agent.validation import (
-    validate_jira,
-    validate_git,
-    validate_memory,
+    full_validate,
     validate_num_repos,
     ProjectMetadata,
 )
+
+from jf_agent.util import get_company_info, upload_file
+
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
+from jf_ingest.config import IngestionType
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +90,16 @@ def main():
         ),
     )
     parser.add_argument(
+        '--jellyfish-webhook-base',
+        default=JELLYFISH_WEBHOOK_BASE,
+        help=(
+            f'For Jellyfish developers: override for JELLYFISH_WEBHOOK_BASE (which defaults to {JELLYFISH_WEBHOOK_BASE}) '
+            "-- if you're running the Jellyfish webhook service locally you might use: "
+            "http://localhost:4999 (if running the agent container with --network host) or "
+            "http://172.17.0.1:4999 (if running the agent container with --network bridge)"
+        ),
+    )
+    parser.add_argument(
         '-ius',
         '--for-print-missing-repos-issues-updated-within-last-x-months',
         type=int,
@@ -106,55 +120,83 @@ def main():
         '--debug-requests',
         action='store_true',
         help='Enable http requests debug logging. WARNING, this is VERY verbose and WILL print out all headers '
-             'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.')
+        'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.',
+    )
     parser.add_argument(
         '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
     parser.add_argument(
         '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
     )
+    parser.add_argument(
+        '-f',
+        '--from-failure',
+        action='store_true',
+        help='To be run with -m send-only. Indicates that we have had a failure '
+        'but we will try to send the data anyways, but will *not* try to redownload.',
+    )
 
     args = parser.parse_args()
+
     config = obtain_config(args)
 
     if args.env_file:
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    agent_logging.configure(config.outdir, config.debug_http_requests)
+    logging_config = agent_logging.configure(
+        config.outdir,
+        config.jellyfish_webhook_base,
+        creds.jellyfish_api_token,
+        config.debug_http_requests,
+    )
 
     success = True
+    jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
+    # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
+    # to try to upload failed data.
+    error_and_timeout_free = True
 
     if config.run_mode == 'validate':
-        logger.info('Validating configuration...')
+        try:
+            full_validate(
+                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
+            )
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
 
-        # Check for Jira credentials
-        if config.jira_url and (
-            (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
-        ):
-            validate_jira(config, creds)
-        else:
-            logger.info("\nNo Jira URL or credentials provided, skipping Jira validation...")
+    elif args.from_failure:
+        error_and_timeout_free = False
+        old_files = os.listdir(args.output_basedir)
+        files = sorted(old_files, reverse=True)
 
-        # Check for Git configs
-        if config.git_configs:
-            validate_git(config, creds)
-        else:
-            logger.info("\nNo Git configs provided, skipping Git validation...")
+        # This needs to be the second on the list
+        # Since we'll have already created a first one for * this * run
+        # And the timestamps won't line up
+        if len(files) < 2:
+            logger.error('No previous directory to mount, cannot send data post-failure!')
+            return False
 
-        # Finally, display memory usage statistics.
-        validate_memory()
+        previous_run_file = files[1]
 
-        logger.info("\nDone")
+        config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
 
-        return True
+        logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
 
-    elif config.run_mode == 'send_only':
+    elif not config.run_mode == 'send_only':
         # Importantly, don't overwrite the already-existing diagnostics file
-        pass
-
-    else:
-        jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+        try:
+            # Run Jira validation from JF ingest by default.
+            # Temporarily skip Git until we cut the validation over to JF ingest
+            logger.info("Running ingestion healthcheck validation!")
+            full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
+        except Exception as err:
+            logger.error(
+                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+            )
 
         try:
             if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
@@ -183,7 +225,7 @@ def main():
                     config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
                 )
             except Exception as e:
-                logger.warning(
+                logger.debug(
                     'Exception encountered when trying to generate manifests. '
                     f'This should not affect your agent upload. Exception: {e}',
                 )
@@ -205,24 +247,39 @@ def main():
                     jellyfish_endpoint_info.git_instance_info,
                     jellyfish_endpoint_info.jf_options,
                 )
-
                 success = all(s['status'] == 'success' for s in download_data_status)
-
                 write_file(
                     config.outdir, 'status', config.compress_output_files, download_data_status
                 )
 
             diagnostics.capture_outdir_size(config.outdir)
 
-            # Kills the sys_diag_collector thread
+        except Exception as err:
+            logger.error(f"Encountered error during agent run! {err}")
+            agent_logging.close_out(logging_config)
+            return False
+
+        finally:
+            # We need to close this before we send data
+            # Otherwise we'll send a .fuse_hidden file (temp file)
+            diagnostics.close_file()
+
+            # Kills the sys_diag_collector thread.
+            # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
             sys_diag_done_event.set()
             sys_diag_collector.join()
 
-        finally:
-            diagnostics.close_file()
+    success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
+    logger.info('Done!')
+    agent_logging.close_out(logging_config)
+
+    return success
+
+
+def potentially_send_data(config, creds, successful=True) -> bool:
     if config.run_mode_includes_send:
-        success &= send_data(config, creds)
+        successful &= send_data(config, creds, successful)
     else:
         logger.info(
             f'\nSkipping send_data because run_mode is "{config.run_mode}"\n'
@@ -230,9 +287,7 @@ def main():
             f'To send this data to Jellyfish, use "-m send_only -od {config.outdir}"'
         )
 
-    logger.info('Done!')
-
-    return success
+    return successful
 
 
 UserProvidedCreds = namedtuple(
@@ -413,39 +468,31 @@ def obtain_jellyfish_endpoint_info(config, creds):
 @logging_helper.log_entry_exit(logger)
 def generate_manifests(config, creds, jellyfish_endpoint_info):
     manifests: list[Manifest] = []
-    base_url = config.jellyfish_api_base
-    resp = requests.get(
-        f'{base_url}/endpoints/agent/company',
-        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
-    )
 
-    if not resp.ok:
-        logger.error(
-            f"ERROR: Couldn't get company info from {base_url}/agent/company "
-            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
-        )
-        raise BadConfigException()
+    company_info = get_company_info(config, creds)
 
-    company_info = resp.json()
     company_slug = company_info.get('company_slug')
+
+    # temporarily disable Jira manifests
+
     # Create and add Jira Manifest
-    if config.jira_url:
-        logger.info('Attempting to generate Jira Manifest...')
-        try:
-            jira_manifest = create_jira_manifest(
-                company_slug=company_slug, config=config, creds=creds
-            )
-            if jira_manifest:
-                logger.info('Successfully created Jira Manifest')
-                manifests.append(jira_manifest)
-            else:
-                logger.warning('create_jira_manifest returned a None Type.')
-        except Exception as e:
-            logger.debug(
-                f'Error encountered when generating jira manifest. Error: {e}', exc_info=True
-            )
-    else:
-        logger.info('No Jira config detected, skipping Jira manifest generation')
+    # if config.jira_url:
+    #     logger.info('Attempting to generate Jira Manifest...')
+    #     try:
+    #         jira_manifest = create_jira_manifest(
+    #             company_slug=company_slug, config=config, creds=creds
+    #         )
+    #         if jira_manifest:
+    #             logger.info('Successfully created Jira Manifest')
+    #             manifests.append(jira_manifest)
+    #         else:
+    #             logger.warning('create_jira_manifest returned a None Type.')
+    #     except Exception as e:
+    #         logger.debug(
+    #             f'Error encountered when generating jira manifest. Error: {e}', exc_info=True
+    #         )
+    # else:
+    #     logger.info('No Jira config detected, skipping Jira manifest generation')
 
     if config.git_configs:
         try:
@@ -549,7 +596,27 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
-        download_data_status.append(load_and_dump_jira(config, endpoint_jira_info, jira_connection))
+        if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
+            try:
+                logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+                ingest_config = get_ingest_config(
+                    config=config, creds=creds, endpoint_jira_info=endpoint_jira_info
+                )
+                success = load_and_push_jira_to_s3(ingest_config)
+                success_status_str = 'success' if success else 'failed'
+                download_data_status.append({'type': 'Jira', 'status': success_status_str})
+            except Exception as e:
+                logger.error(
+                    'Error encountered when downloading Jira data. '
+                    'This Jira submission will be marked as failed. '
+                    f'Error: {e}'
+                )
+                logger.debug(traceback.print_exc())
+                download_data_status.append({'type': 'Jira', 'status': 'failed'})
+        else:
+            download_data_status.append(
+                load_and_dump_jira(config, endpoint_jira_info, jira_connection)
+            )
 
     if len(config.git_configs) == 0:
         return download_data_status
@@ -557,7 +624,6 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     # git downloading is parallelized by the number of configurations.
     futures = []
     with ThreadPoolExecutor(max_workers=config.git_max_concurrent) as executor:
-
         if jf_options.get('normalize_project_distribution', False):
             try:
                 metadata_by_project = validate_num_repos(
@@ -625,16 +691,16 @@ def _download_git_data(
     )
 
 
-def send_data(config, creds):
+def send_data(config, creds, successful=True):
     _, timestamp = os.path.split(config.outdir)
 
     def get_signed_url(files):
         base_url = config.jellyfish_api_base
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
-        payload = {'files': files}
+        payload = {'files': files, 'ingestType': IngestionType.AGENT}
 
         r = requests.post(
-            f'{base_url}/endpoints/agent/signed-url?timestamp={timestamp}',
+            f'{base_url}/endpoints/ingest/signed-url?timestamp={timestamp}',
             headers=headers,
             json=payload,
         )
@@ -646,48 +712,12 @@ def send_data(config, creds):
 
     def upload_file_from_thread(filename, path_to_obj, signed_url):
         try:
-            upload_file(filename, path_to_obj, signed_url)
+            upload_file(filename, path_to_obj, signed_url, config_outdir=config.outdir)
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
                 logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
             )
-
-    def upload_file(filename, path_to_obj, signed_url, local=False):
-        filepath = filename if local else f'{config.outdir}/{filename}'
-
-        total_retries = 5
-        retry_count = 0
-        while total_retries >= retry_count:
-            try:
-                with open(filepath, 'rb') as f:
-                    # If successful, returns HTTP status code 204
-                    session = retry_session()
-                    upload_resp = session.post(
-                        signed_url['url'],
-                        data=signed_url['fields'],
-                        files={'file': (path_to_obj, f)},
-                    )
-                    upload_resp.raise_for_status()
-                    logger.info(f'Successfully uploaded {filename}')
-                    return
-            # For large file uploads, we run into intermittent 104 errors where the 'peer' (jellyfish)
-            # will appear to shut down the session connection.
-            # These exceptions ARE NOT handled by the above retry_session retry logic, which handles 500 level errors.
-            # Attempt to catch and retry the 104 type error here
-            except requests.exceptions.ConnectionError as e:
-                logging_helper.log_standard_error(
-                    logging.WARNING, msg_args=[filename, repr(e)], error_code=3001, exc_info=True,
-                )
-                retry_count += 1
-                # Back off logic
-                sleep(1 * retry_count)
-
-        # If we make it out of the while loop without returning, that means
-        # we failed to upload the file.
-        logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
-        )
 
     # Compress any not yet compressed files before sending
     for fname in glob(f'{config.outdir}/*.json'):
@@ -710,6 +740,11 @@ def send_data(config, creds):
     # get the full file paths for each of the immediate
     # subdirectories (we're assuming only a single level)
     for directory in directories:
+        # SKIP OVER THE JIRA DIRECTORY, WHICH IS UPLOADED VIA JF INGEST
+        # TODO: The GIT directories will also be uploaded via ingest,
+        # but for now they are handled via this 'legacy' way
+        if directory.lower() == 'jira':
+            continue
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
@@ -731,7 +766,6 @@ def send_data(config, creds):
     for t in threads:
         t.join()
 
-    success = True
     if any(thread_exceptions):
         # Run through exceptions and inject them into the agent log
         for exception in thread_exceptions:
@@ -741,28 +775,41 @@ def send_data(config, creds):
         logger.error(
             'ERROR: not all files uploaded to S3. Files have been saved locally. Once connectivity issues are resolved, try running the Agent in send_only mode.'
         )
-        success = False
+        successful = False
 
     # If sending agent config flag is on, upload config.yml to s3 bucket
     if config.send_agent_config:
         config_file_dict = get_signed_url(['config.yml'])['config.yml']
-        upload_file('config.yml', config_file_dict['s3_path'], config_file_dict['url'], local=True)
+        upload_file(
+            'config.yml',
+            config_file_dict['s3_path'],
+            config_file_dict['url'],
+            local=True,
+            config_outdir=config.outdir,
+        )
 
     # Log this information before we upload the log file.
-    logger.info(f'Agent run succeeded: {success}')
+    logger.info(f'Agent run succeeded: {successful}')
 
     # Upload log files as last step before uploading the .done file
     log_file_dict = get_signed_url([agent_logging.LOG_FILE_NAME])[agent_logging.LOG_FILE_NAME]
-    upload_file(agent_logging.LOG_FILE_NAME, log_file_dict['s3_path'], log_file_dict['url'])
+    upload_file(
+        agent_logging.LOG_FILE_NAME,
+        log_file_dict['s3_path'],
+        log_file_dict['url'],
+        config_outdir=config.outdir,
+    )
 
-    if success:
+    if successful:
         # creating .done file, only on success
         done_file_path = f'{os.path.join(config.outdir, ".done")}'
         Path(done_file_path).touch()
         done_file_dict = get_signed_url(['.done'])['.done']
-        upload_file('.done', done_file_dict['s3_path'], done_file_dict['url'])
+        upload_file(
+            '.done', done_file_dict['s3_path'], done_file_dict['url'], config_outdir=config.outdir
+        )
 
-    return success
+    return successful
 
 
 def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_months):

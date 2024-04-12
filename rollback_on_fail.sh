@@ -23,5 +23,10 @@ CODE=$?
 
 if [[ $CODE -ne 0 && ! -v ROLLBACK_OVERRIDE ]]; then
     echo "encountered error or timeout, rolling back to stable"
+
+    echo "Will attempt to upload logs from the failed run, for debugging."
+
+    timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" "-f"
+
     rollback "$@"
 fi

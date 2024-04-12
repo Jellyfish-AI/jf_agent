@@ -3,10 +3,9 @@
 
 [metadata]
 groups = ["default", "dev"]
-cross_platform = true
-static_urls = false
-lock_version = "4.3"
-content_hash = "sha256:dc1a788b6d16cc93e1d2eb131a0cc23e59c13ab5ed57e71ac2b5977b4c49957d"
+strategy = ["cross_platform"]
+lock_version = "4.4"
+content_hash = "sha256:56e9236cc767f70ac2d1c79f91376e201edc06735caee06114cc1dfd18ea7a95"
 
 [[package]]
 name = "appdirs"
@@ -291,18 +290,22 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.10"
+version = "0.0.66"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 dependencies = [
-    "jira<2.1,>=2.0.0",
+    "PyJWT<2.0",
+    "jira<=3.1.1,>=2.0.0",
     "psutil>=5.9.6",
+    "python-dateutil>=2.8.2",
     "pytz>=2023.3.post1",
     "requests-mock==1.11.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf-ingest-0.0.10.tar.gz", hash = "sha256:9584feba05c6e51cb0fd61ae6ca1f40d4f30aca46ce97d42fc5861647e110af7"},
-    {file = "jf_ingest-0.0.10-py3-none-any.whl", hash = "sha256:38f6c5615854f868caf565ef9d7000a9d321042d52b27fcfae237b5d0e16acc5"},
+    {file = "jf-ingest-0.0.66.tar.gz", hash = "sha256:94645f0bcbb214e516dadb4905a619a2cad1f730446b8e0b0a14b674f546afb1"},
+    {file = "jf_ingest-0.0.66-py3-none-any.whl", hash = "sha256:8e4378ca120d14889314b8046b442aee1e40202526b7e93f4f7103d1acee7355"},
 ]
 
 [[package]]
@@ -352,28 +355,28 @@ files = [
 
 [[package]]
 name = "oauthlib"
-version = "3.2.2"
-requires_python = ">=3.6"
+version = "3.1.0"
+requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
 files = [
-    {file = "oauthlib-3.2.2-py3-none-any.whl", hash = "sha256:8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca"},
-    {file = "oauthlib-3.2.2.tar.gz", hash = "sha256:9859c40929662bec5d64f34d01c99e093149682a3f38915dc0655d5a633dd918"},
+    {file = "oauthlib-3.1.0-py2.py3-none-any.whl", hash = "sha256:df884cd6cbe20e32633f1db1072e9356f53638e4361bef4e8b03c9127c9328ea"},
+    {file = "oauthlib-3.1.0.tar.gz", hash = "sha256:bee41cc35fcca6e988463cacc3bcb8a96224f470ca547e697b604cc697b2f889"},
 ]
 
 [[package]]
 name = "oauthlib"
-version = "3.2.2"
+version = "3.1.0"
 extras = ["signedtoken"]
-requires_python = ">=3.6"
+requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
 dependencies = [
-    "cryptography>=3.0.0",
-    "oauthlib==3.2.2",
-    "pyjwt<3,>=2.0.0",
+    "cryptography",
+    "oauthlib==3.1.0",
+    "pyjwt>=1.0.0",
 ]
 files = [
-    {file = "oauthlib-3.2.2-py3-none-any.whl", hash = "sha256:8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca"},
-    {file = "oauthlib-3.2.2.tar.gz", hash = "sha256:9859c40929662bec5d64f34d01c99e093149682a3f38915dc0655d5a633dd918"},
+    {file = "oauthlib-3.1.0-py2.py3-none-any.whl", hash = "sha256:df884cd6cbe20e32633f1db1072e9356f53638e4361bef4e8b03c9127c9328ea"},
+    {file = "oauthlib-3.1.0.tar.gz", hash = "sha256:bee41cc35fcca6e988463cacc3bcb8a96224f470ca547e697b604cc697b2f889"},
 ]
 
 [[package]]
@@ -470,12 +473,11 @@ files = [
 
 [[package]]
 name = "pyjwt"
-version = "2.8.0"
-requires_python = ">=3.7"
+version = "1.7.1"
 summary = "JSON Web Token implementation in Python"
 files = [
-    {file = "PyJWT-2.8.0-py3-none-any.whl", hash = "sha256:59127c392cc44c2da5bb3192169a91f429924e17aff6534d70fdc02ab3e04320"},
-    {file = "PyJWT-2.8.0.tar.gz", hash = "sha256:57e28d156e3d5c10088e0c68abb90bfac3df82b40a71bd0daa20c65ccd5c23de"},
+    {file = "PyJWT-1.7.1-py2.py3-none-any.whl", hash = "sha256:5c6eca3c2940464d106b99ba83b00c6add741c9becaec087fb7ccdefea71350e"},
+    {file = "PyJWT-1.7.1.tar.gz", hash = "sha256:8d59a976fb773f3e6a39c85636357c4f0e242707394cadadd9814f5cbaa20e96"},
 ]
 
 [[package]]
@@ -713,15 +715,15 @@ files = [
 
 [[package]]
 name = "tqdm"
-version = "4.66.1"
+version = "4.66.2"
 requires_python = ">=3.7"
 summary = "Fast, Extensible Progress Meter"
 dependencies = [
     "colorama; platform_system == \"Windows\"",
 ]
 files = [
-    {file = "tqdm-4.66.1-py3-none-any.whl", hash = "sha256:d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386"},
-    {file = "tqdm-4.66.1.tar.gz", hash = "sha256:d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7"},
+    {file = "tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9"},
+    {file = "tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531"},
 ]
 
 [[package]]

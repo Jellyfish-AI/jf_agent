@@ -6,7 +6,7 @@ from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
-from jf_agent.jf_jira.utils import retry_for_429s
+from jf_ingest.utils import retry_for_429s
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,7 @@ class JiraCloudManifestAdapter:
             return False
 
     def get_issues_count_for_project(self, project_id: int) -> int:
-        return self._get_jql_search(jql_search=f"project = {project_id}", max_results=0)['total']
+        return self._get_jql_search(jql_search=f'project = "{project_id}"', max_results=0)['total']
 
     def _get_raw_result(self, url) -> dict:
         response = retry_for_429s(self.jira_connection._session.get, url)
