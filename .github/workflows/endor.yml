@@ -20,7 +20,7 @@ jobs:
       if: github.event_name == 'pull_request'
       uses: endorlabs/github-action@v1.1.1
       with:
-        namespace: "jellyfish-poc" # Replace with your Endor Labs tenant namespace
+        namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
         scan_secrets: false
         pr: true
@@ -30,7 +30,7 @@ jobs:
       if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       uses: endorlabs/github-action@v1.1.1
       with:
-        namespace: "jellyfish-poc" # Replace with your Endor Labs tenant namespace
+        namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
         scan_secrets: false
         pr: false
