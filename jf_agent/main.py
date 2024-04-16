@@ -220,16 +220,6 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
-            try:
-                generate_manifests(
-                    config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
-                )
-            except Exception as e:
-                logger.debug(
-                    'Exception encountered when trying to generate manifests. '
-                    f'This should not affect your agent upload. Exception: {e}',
-                )
-                logger.debug(f'Manifest generation bug: {e}', exc_info=True)
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
