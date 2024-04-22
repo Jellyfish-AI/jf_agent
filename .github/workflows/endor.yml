@@ -26,6 +26,7 @@ jobs:
         pr: true
         pr_baseline: "master"
         github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
+        additional_args: "--exit-on-policy-warning"
     - name: Endor Labs Scan Push to main
       if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       uses: endorlabs/github-action@v1.1.1
