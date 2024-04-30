@@ -67,6 +67,7 @@ ValidatedConfig = namedtuple(
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
+        'jira_skip_saving_data_locally',
         'git_configs',
         'outdir',
         'compress_output_files',
@@ -162,6 +163,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_issue_jql = jira_config.get('issue_jql', '')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
     jira_download_sprints = jira_config.get('download_sprints', True)
+    jira_skip_saving_data_locally = jira_config.get('skip_saving_data_locally', False)
 
     # warn if any of the recommended fields are missing or excluded
     if jira_include_fields:
@@ -267,6 +269,7 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
+        jira_skip_saving_data_locally,
         git_configs,  # array of GitConfig
         outdir,
         compress_output_files,
@@ -376,8 +379,11 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
         upload_to_s3=config.run_mode_includes_send,
-        # ALWAYS save locally for Agent runs!
-        save_locally=True,
+        # NOTE: There is a special run mode for jira where we do not save data locally.
+        # This run mode is helpful for very large companies that need to do a large
+        # initial upload, and they don't want to provision a massive docker container.
+        # TODO: Break this out to optionally apply to only jira or only git
+        save_locally=not config.jira_skip_saving_data_locally,
         # TODO: Maybe we set this, although the constructor can handle them being null
         local_file_path=config.outdir,
         timestamp=os.path.split(config.outdir)[1],

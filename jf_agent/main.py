@@ -235,16 +235,6 @@ def main():
             diagnostics.capture_run_args(
                 args.mode, args.config_file, config.outdir, args.prev_output_dir
             )
-            try:
-                generate_manifests(
-                    config=config, creds=creds, jellyfish_endpoint_info=jellyfish_endpoint_info
-                )
-            except Exception as e:
-                logger.debug(
-                    'Exception encountered when trying to generate manifests. '
-                    f'This should not affect your agent upload. Exception: {e}',
-                )
-                logger.debug(f'Manifest generation bug: {e}', exc_info=True)
 
             if config.run_mode_is_print_apparently_missing_git_repos:
                 issues_to_scan = get_issues_to_scan_from_jellyfish(
@@ -630,29 +620,12 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 download_data_status.append({'type': 'Jira', 'status': success_status_str})
             except Exception as e:
                 logger.error(
-                    f'Exception encountered when trying to download JIRA data. Exception: {e}'
+                    'Error encountered when downloading Jira data. '
+                    'This Jira submission will be marked as failed. '
+                    f'Error: {e}'
                 )
-                logger.debug(traceback.format_exc())
-                logger.info(f'Rolling back and using load_and_dump_jira to ingest data')
-                jf_ingest_files = f'{config.outdir}/jira'
-                try:
-                    if os.path.isdir(jf_ingest_files):
-                        logger.debug(
-                            f'JF Ingest files were detected at {jf_ingest_files}, attempting to remove them now'
-                        )
-                        shutil.rmtree(jf_ingest_files)
-                        logger.debug(f'Successfully removed left over JF Ingest files')
-                    else:
-                        logger.debug(f'No JF Ingest files were detected at {jf_ingest_files}')
-                except Exception as e:
-                    # Extreme precaution, wrap the above file operations in a try catch block
-                    logger.debug(
-                        f'Error encountered when attempting to remove JF Ingest files: {e}'
-                    )
-
-                download_data_status.append(
-                    load_and_dump_jira(config, endpoint_jira_info, jira_connection)
-                )
+                logger.debug(traceback.print_exc())
+                download_data_status.append({'type': 'Jira', 'status': 'failed'})
         else:
             download_data_status.append(
                 load_and_dump_jira(config, endpoint_jira_info, jira_connection)
