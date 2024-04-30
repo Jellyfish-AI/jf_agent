@@ -9,7 +9,7 @@ from jf_agent.util import batched
 logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://app.jellyfish.co'
-JELLYFISH_WEBHOOK_BASE = 'https://lsm0xckjje.execute-api.us-east-1.amazonaws.com/dev'
+JELLYFISH_WEBHOOK_BASE = 'https://webhooks.jellyfish.co'
 VALID_RUN_MODES = (
     'validate',
     'download_and_send',

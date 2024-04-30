@@ -529,7 +529,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
     for manifest in manifests:
         # Always send Manifest data to S3
         manifest.upload_to_s3(
-            jellyfish_webhook_base=config.jellyfish_api_base,
+            jellyfish_api_base=config.jellyfish_api_base,
             jellyfish_api_token=creds.jellyfish_api_token,
         )
 
