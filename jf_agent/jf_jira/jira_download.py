@@ -17,10 +17,10 @@ import string
 import threading
 from tqdm import tqdm
 
-from jf_agent.jf_jira.utils import retry_for_429s
+from jf_agent.jf_jira.utils import retry_for_status
 from jf_agent.util import split
 from jf_ingest import diagnostics, logging_helper
-from jf_ingest.utils import retry_for_429s
+from jf_ingest.utils import retry_for_status
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 
     fields = [
         field
-        for field in retry_for_429s(jira_connection.fields)
+        for field in retry_for_status(jira_connection.fields)
         if all(filt(field) for filt in filters)
     ]
 
@@ -105,7 +105,7 @@ def download_fields(jira_connection, include_fields, exclude_fields):
 @logging_helper.log_entry_exit(logger)
 def download_resolutions(jira_connection):
     logger.info("downloading jira resolutions... [!n]")
-    result = [r.raw for r in retry_for_429s(jira_connection.resolutions)]
+    result = [r.raw for r in retry_for_status(jira_connection.resolutions)]
     logger.info("✓")
     return result
 
@@ -121,7 +121,7 @@ def download_issuetypes(jira_connection, project_ids):
     '''
     logger.info('downloading jira issue types...  [!n]',)
     result = []
-    for it in retry_for_429s(jira_connection.issue_types):
+    for it in retry_for_status(jira_connection.issue_types):
         if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
             if it.raw['scope']['project']['id'] in project_ids:
                 result.append(it.raw)
@@ -136,7 +136,7 @@ def download_issuetypes(jira_connection, project_ids):
 @logging_helper.log_entry_exit(logger)
 def download_issuelinktypes(jira_connection):
     logger.info('downloading jira issue link types... [!n]')
-    result = [lt.raw for lt in retry_for_429s(jira_connection.issue_link_types)]
+    result = [lt.raw for lt in retry_for_status(jira_connection.issue_link_types)]
     logger.info('✓')
     return result
 
@@ -146,7 +146,7 @@ def download_issuelinktypes(jira_connection):
 @logging_helper.log_entry_exit(logger)
 def download_priorities(jira_connection):
     logger.info('downloading jira priorities... [!n]')
-    result = [p.raw for p in retry_for_429s(jira_connection.priorities)]
+    result = [p.raw for p in retry_for_status(jira_connection.priorities)]
     logger.info('✓')
     return result
 
@@ -190,7 +190,7 @@ def download_projects_and_versions(
 
     def project_is_accessible(project_id):
         try:
-            retry_for_429s(jira_connection.search_issues, f'project = {project_id}', fields=['id'])
+            retry_for_status(jira_connection.search_issues, f'project = {project_id}', fields=['id'])
             return True
         except JIRAError as e:
             # Handle zombie projects that appear in the project list
@@ -208,7 +208,7 @@ def download_projects_and_versions(
             else:
                 raise
 
-    all_projects = retry_for_429s(jira_connection.projects)
+    all_projects = retry_for_status(jira_connection.projects)
     projects = [
         proj
         for proj in all_projects
@@ -225,14 +225,14 @@ def download_projects_and_versions(
     logger.info('downloading jira project components... [!n]')
     for p in projects:
         p.raw.update(
-            {'components': [c.raw for c in retry_for_429s(jira_connection.project_components, p)]}
+            {'components': [c.raw for c in retry_for_status(jira_connection.project_components, p)]}
         )
     logger.info('✓')
 
     logger.info('downloading jira versions... [!n]')
     result = []
     for p in projects:
-        versions = retry_for_429s(jira_connection.project_versions, p)
+        versions = retry_for_status(jira_connection.project_versions, p)
         p.raw.update({'versions': [v.raw for v in versions]})
         result.append(p.raw)
     logger.info('✓')
@@ -253,7 +253,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
         while True:
             try:
                 # Can't use the jira_connection's .boards() method, since it doesn't support all the query parms
-                project_boards = retry_for_429s(
+                project_boards = retry_for_status(
                     jira_connection._session.get,
                     url=f'{jira_connection._options["server"]}/rest/agile/1.0/board',
                     params={
@@ -287,7 +287,7 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             while True:
                 batch = None
                 try:
-                    batch = retry_for_429s(
+                    batch = retry_for_status(
                         jira_connection.sprints,
                         # ignore future sprints
                         board_id=b['id'],
@@ -330,7 +330,7 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
     error = None
     while batch_size > 0:
         try:
-            api_response = retry_for_429s(
+            api_response = retry_for_status(
                 jira_connection.search_issues,
                 f'{issue_jql} order by id asc',
                 fields=['updated'],
@@ -409,7 +409,7 @@ def download_all_issue_metadata(
         )
         if issue_filter:
             issue_jql += f' and {issue_filter}'
-        total_num_issues = retry_for_429s(
+        total_num_issues = retry_for_status(
             jira_connection.search_issues, issue_jql, fields=['id']
         ).total
         issues_per_thread = math.ceil(total_num_issues / num_parallel_threads)
@@ -531,7 +531,7 @@ def download_necessary_issues(
     field_spec = list(include_fields) or ['*all']
     field_spec.extend(f'-{field}' for field in exclude_fields)
 
-    actual_batch_size = retry_for_429s(
+    actual_batch_size = retry_for_status(
         jira_connection.search_issues,
         'order by id asc',
         fields=field_spec,
@@ -691,7 +691,7 @@ def _download_jira_issues_page(
 
         try:
             resp_json = json_loads(
-                retry_for_429s(
+                retry_for_status(
                     jira_connection._session.post,
                     url=jira_connection._get_url('search'),
                     data=json.dumps(search_params),
@@ -730,7 +730,7 @@ def _expand_changelog(jira_issues, jira_connection):
             start_at = changelog.maxResults
             batch_size = 100
             while start_at < changelog.total:
-                more_cls = retry_for_429s(
+                more_cls = retry_for_status(
                     jira_connection._get_json,
                     f'issue/{i["id"]}/changelog',
                     {'startAt': start_at, 'maxResults': batch_size},
@@ -753,12 +753,12 @@ def download_worklogs(jira_connection, issue_ids, endpoint_jira_info):
     updated = []
     since = endpoint_jira_info.get('last_updated', 0)
     while True:
-        worklog_ids_json = retry_for_429s(
+        worklog_ids_json = retry_for_status(
             jira_connection._get_json, 'worklog/updated', params={'since': since}
         )
         updated_worklog_ids = [v['worklogId'] for v in worklog_ids_json['values']]
 
-        resp = retry_for_429s(
+        resp = retry_for_status(
             jira_connection._session.post,
             url=jira_connection._get_url('worklog/list'),
             data=json.dumps({'ids': updated_worklog_ids}),
@@ -787,7 +787,7 @@ def download_customfieldoptions(jira_connection, project_ids):
     optionvalues = {}
     for project_id in project_ids:
         try:
-            meta = retry_for_429s(
+            meta = retry_for_status(
                 jira_connection.createmeta,
                 projectIds=[project_id],
                 expand='projects.issuetypes.fields',
@@ -822,7 +822,7 @@ def download_teams(jira_connection):
         teams_url = jira_connection.JIRA_BASE_URL.format(
             server=server, rest_path='teams-api', rest_api_version='1.0', path='team'
         )
-        teams = retry_for_429s(jira_connection._get_json, 'team', base=teams_url)
+        teams = retry_for_status(jira_connection._get_json, 'team', base=teams_url)
         logger.info('✓')
         return teams
     except Exception as e:
@@ -834,7 +834,7 @@ def download_teams(jira_connection):
 @logging_helper.log_entry_exit(logger)
 def download_statuses(jira_connection):
     logger.info('downloading jira statuses... [!n]')
-    statuses = retry_for_429s(jira_connection.statuses)
+    statuses = retry_for_status(jira_connection.statuses)
     result = [{'status_id': status.id, 'raw_json': status.raw} for status in statuses]
     logger.info('✓')
     return result
@@ -925,7 +925,7 @@ def _search_users(
     if query is None:
         # use new endpoint that doesn't take a query.  This may not exist in some instances.
         try:
-            return retry_for_429s(
+            return retry_for_status(
                 jira_connection._get_json,
                 'users/search',
                 {'startAt': start_at, 'maxResults': max_results},
@@ -943,11 +943,11 @@ def _search_users(
             'includeActive': include_active,
             'includeInactive': include_inactive,
         }
-        return retry_for_429s(jira_connection._get_json, 'user/search', params)
+        return retry_for_status(jira_connection._get_json, 'user/search', params)
 
     return [
         u.raw
-        for u in retry_for_429s(
+        for u in retry_for_status(
             jira_connection.search_users,
             query,
             startAt=start_at,
@@ -1048,7 +1048,7 @@ def _scan_jira_issue_for_repo_data(jira_connection, issue_id, application_type):
     }
 
     try:
-        response = retry_for_429s(
+        response = retry_for_status(
             jira_connection._get_json,
             '/rest/dev-status/1.0/issue/detail',
             params,
