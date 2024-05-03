@@ -25,7 +25,7 @@ def get_wait_time(e: Optional[Exception], retries: int) -> int:
         return 5 ** retries
 
 
-def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs) -> Any:
+def retry_for_status(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs) -> Any:
     """
     This function allows for us to retry 429s from Jira. There are much more elegant ways of accomplishing
     this, but this is a quick and reasonable approach to doing so.
@@ -45,7 +45,7 @@ def retry_for_429s(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs)
                     # because sometimes we circumvent the JIRA standard library
                     # and use functions like "get" and "_get_json", but it's still
                     # better than nothing
-                    msg_args=[f.__name__, retry, max_retries, wait_time],
+                    msg_args=[e.status_code, f.__name__, retry, max_retries, wait_time],
                     error_code=3071,
                 )
                 time.sleep(wait_time)

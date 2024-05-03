@@ -6,7 +6,7 @@ from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
-from jf_ingest.utils import retry_for_429s
+from jf_ingest.utils import retry_for_status
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class JiraCloudManifestAdapter:
         page_size = 50
         curs = 0
         while True:
-            page = retry_for_429s(func_endpoint, startAt=curs, maxResults=page_size)
+            page = retry_for_status(func_endpoint, startAt=curs, maxResults=page_size)
             page_length = len(page)
             # Check if we are at the end of all pages
             if page_length == 0:
@@ -61,21 +61,21 @@ class JiraCloudManifestAdapter:
 
     def get_fields_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
-        return len(retry_for_429s(self.jira_connection.fields))
+        return len(retry_for_status(self.jira_connection.fields))
 
     def get_resolutions_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
-        return len(retry_for_429s(self.jira_connection.resolutions))
+        return len(retry_for_status(self.jira_connection.resolutions))
 
     def get_issue_types_count(self) -> int:
         # Lazy loading paranoia, we might not need to do this for loop
-        return len(retry_for_429s(self.jira_connection.issue_types))
+        return len(retry_for_status(self.jira_connection.issue_types))
 
     def get_issue_link_types_count(self) -> int:
-        return len(retry_for_429s(self.jira_connection.issue_link_types))
+        return len(retry_for_status(self.jira_connection.issue_link_types))
 
     def get_priorities_count(self) -> int:
-        return len(retry_for_429s(self.jira_connection.priorities))
+        return len(retry_for_status(self.jira_connection.priorities))
 
     def _get_all_projects(self) -> list[dict]:
         if not self._projects_cache:
@@ -167,7 +167,7 @@ class JiraCloudManifestAdapter:
         return self._get_jql_search(jql_search=f'project = "{project_id}"', max_results=0)['total']
 
     def _get_raw_result(self, url) -> dict:
-        response = retry_for_429s(self.jira_connection._session.get, url)
+        response = retry_for_status(self.jira_connection._session.get, url)
         response.raise_for_status()
         json_str = response.content.decode()
         return json.loads(json_str)
@@ -185,6 +185,6 @@ class JiraCloudManifestAdapter:
                 start_at += len(page_result['values'])
 
     def _get_jql_search(self, jql_search: str, max_results: int = 0):
-        return retry_for_429s(
+        return retry_for_status(
             self.jira_connection._get_json, 'search', {'jql': jql_search, "maxResults": max_results}
         )
