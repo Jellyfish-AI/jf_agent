@@ -190,7 +190,9 @@ def download_projects_and_versions(
 
     def project_is_accessible(project_id):
         try:
-            retry_for_status(jira_connection.search_issues, f'project = {project_id}', fields=['id'])
+            retry_for_status(
+                jira_connection.search_issues, f'project = {project_id}', fields=['id']
+            )
             return True
         except JIRAError as e:
             # Handle zombie projects that appear in the project list
@@ -859,7 +861,7 @@ def _search_all_users(jira_connection, gdpr_active):
     start_at = 0
 
     # different jira versions / different times, the way to list all users has changed. Try a few.
-    for q in [None, '', '""', '%', '@']:
+    for q in [' ', '""', '%', '@']:
         logger.debug(f'Attempting wild card search with {q}')
         # iterate through pages of results
         while True:
