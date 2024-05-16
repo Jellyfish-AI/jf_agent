@@ -4,14 +4,14 @@ from datetime import datetime, date
 import json
 import logging
 import os
-from typing import List, Optional
+from typing import List, Optional, Union
 import urllib3
 import yaml
 
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
-from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
+from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig, GitConfig as GitIngestConfig, GitAuthConfig
 
 from jf_agent.util import get_company_info
 
@@ -316,6 +316,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
     company_slug = company_info.get('company_slug')
 
     jira_config: Optional[JiraDownloadConfig] = None
+    git_configs: List[GitIngestConfig] = []
     # In the jellyfish API we are offsetting this value by x1000 and + 1, so we need to do the inverse here
     work_logs_timestamp = int((endpoint_jira_info.get('last_updated', 1) - 1) / 1000)
     if config.jira_url and (
@@ -376,6 +377,27 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
             feature_flags={},
         )
 
+    for conf in config.git_configs:
+        auth_config = GitAuthConfig(
+            company_slug=company_slug,
+            token=creds.git_instance_to_creds.get(conf.git_instance_slug),
+            base_url=conf.git_url,
+            verify=not config.skip_ssl_verification, # this lives on the root config, not the conf var scoped to this block
+        )
+        gc = GitIngestConfig(
+            git_auth_config=auth_config,
+            company_slug=company_slug,
+            instance_slug=conf.git_instance_slug,
+            git_provider=conf.git_provider,
+            url=conf.git_url,
+            git_organizations=conf.git_include_projects,
+            excluded_organizations=conf.git_exclude_projects,
+            included_repos=conf.git_include_repos,
+            excluded_repos=conf.git_exclude_repos,
+            # branches by repo?
+        )
+        git_configs.append(gc)
+
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
         upload_to_s3=config.run_mode_includes_send,
@@ -388,6 +410,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
         local_file_path=config.outdir,
         timestamp=os.path.split(config.outdir)[1],
         jira_config=jira_config,
+        git_configs=git_configs,
         jellyfish_api_token=creds.jellyfish_api_token,
         jellyfish_api_base=config.jellyfish_api_base,
         ingest_type=IngestionType.AGENT,
@@ -396,7 +419,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
     return ingestion_config
 
 
-def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:
+def _get_git_config(git_config, git_provider_override=None, multiple=False, use_jf_ingest=False) -> Union[GitConfig, GitIngestConfig]:
     git_provider = git_config.get('provider', git_provider_override)
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
@@ -463,23 +486,31 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         )
         raise BadConfigException()
 
-    return GitConfig(
-        git_provider=git_provider,
-        git_instance_slug=git_instance_slug,
-        git_url=git_url,
-        git_include_projects=list(git_include_projects),
-        git_exclude_projects=list(git_exclude_projects),
-        git_include_all_repos_inside_projects=list(git_include_all_repos_inside_projects),
-        git_exclude_all_repos_inside_projects=list(git_exclude_all_repos_inside_projects),
-        git_include_repos=list(git_include_repos),
-        git_exclude_repos=list(git_exclude_repos),
-        git_include_branches=dict(git_include_branches),
-        git_strip_text_content=git_config.get('strip_text_content', False),
-        git_redact_names_and_urls=git_config.get('redact_names_and_urls', False),
-        gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
-        git_verbose=git_config.get('verbose', False),
-        creds_envvar_prefix=creds_envvar_prefix,
-        # legacy fields ===========
-        git_include_bbcloud_projects=list(git_include_bbcloud_projects),
-        git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
-    )
+    if use_jf_ingest:
+        config = GitIngestConfig(
+            
+        )
+    
+    else: 
+        config= GitConfig(
+            git_provider=git_provider,
+            git_instance_slug=git_instance_slug,
+            git_url=git_url,
+            git_include_projects=list(git_include_projects),
+            git_exclude_projects=list(git_exclude_projects),
+            git_include_all_repos_inside_projects=list(git_include_all_repos_inside_projects),
+            git_exclude_all_repos_inside_projects=list(git_exclude_all_repos_inside_projects),
+            git_include_repos=list(git_include_repos),
+            git_exclude_repos=list(git_exclude_repos),
+            git_include_branches=dict(git_include_branches),
+            git_strip_text_content=git_config.get('strip_text_content', False),
+            git_redact_names_and_urls=git_config.get('redact_names_and_urls', False),
+            gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
+            git_verbose=git_config.get('verbose', False),
+            creds_envvar_prefix=creds_envvar_prefix,
+            # legacy fields ===========
+            git_include_bbcloud_projects=list(git_include_bbcloud_projects),
+            git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
+        )
+
+    return config

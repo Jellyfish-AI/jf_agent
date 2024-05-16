@@ -8,8 +8,10 @@ import requests
 from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
+from jf_ingest.config import GitProvider
 from jf_ingest.validation import (
     validate_jira,
+    validate_git,
     GitConnectionHealthCheckResult,
     JiraConnectionHealthCheckResult,
     IngestionHealthCheckResult,
@@ -79,9 +81,11 @@ def full_validate(
 
     # Check for Git configs
     if config.git_configs and not skip_git:
+        # jf_ingest can only handle github for now
+        git_configs_to_validate = [c for c in ingest_config.git_configs if c.git_provider == GitProvider.GITHUB]
         try:
             git_connection_healthcheck_result = validate_git(
-                config, creds, jellyfish_endpoint_info.git_instance_info
+                git_configs_to_validate
             )
 
         except Exception as e:
@@ -156,107 +160,107 @@ def validate_num_repos(git_configs, creds):
     return metadata_by_project
 
 
-def validate_git(
-    config, creds, endpoint_git_instances_info
-) -> list[GitConnectionHealthCheckResult]:
-    """
-    Validates git config and credentials.
-    """
+# def validate_git(
+#     config, creds, endpoint_git_instances_info
+# ) -> list[GitConnectionHealthCheckResult]:
+#     """
+#     Validates git config and credentials.
+#     """
 
-    git_configs = config.git_configs
+#     git_configs = config.git_configs
 
-    healthcheck_result_list = []
+#     healthcheck_result_list = []
 
-    for i, git_config in enumerate(git_configs, start=1):
-        instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
+#     for i, git_config in enumerate(git_configs, start=1):
+#         instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
 
-        successful = True
+#         successful = True
 
-        included_inaccessible_repos_list = git_config.git_include_repos
+#         included_inaccessible_repos_list = git_config.git_include_repos
 
-        accessible_projects_and_repos = {}
+#         accessible_projects_and_repos = {}
 
-        print(f"\nGit details for instance {i}/{len(git_configs)}:")
-        print(f"  Instance slug: {instance_slug}")
-        print(f"  Provider: {git_config.git_provider}")
-        print(f"  Included projects: {git_config.git_include_projects}")
-        if len(git_config.git_exclude_projects) > 0:
-            print(f"  Excluded projects: {git_config.git_exclude_projects}")
-        print(f"  Included repos: {git_config.git_include_repos}")
-        if len(git_config.git_exclude_repos) > 0:
-            print(f"  Excluded repos: {git_config.git_exclude_repos}")
-        if len(git_config.git_include_branches) > 0:
-            print(f"  Included Branches: {git_config.git_include_branches}")
+#         print(f"\nGit details for instance {i}/{len(git_configs)}:")
+#         print(f"  Instance slug: {instance_slug}")
+#         print(f"  Provider: {git_config.git_provider}")
+#         print(f"  Included projects: {git_config.git_include_projects}")
+#         if len(git_config.git_exclude_projects) > 0:
+#             print(f"  Excluded projects: {git_config.git_exclude_projects}")
+#         print(f"  Included repos: {git_config.git_include_repos}")
+#         if len(git_config.git_exclude_repos) > 0:
+#             print(f"  Excluded repos: {git_config.git_exclude_repos}")
+#         if len(git_config.git_include_branches) > 0:
+#             print(f"  Included Branches: {git_config.git_include_branches}")
 
-        print('==> Testing Git connection...')
+#         print('==> Testing Git connection...')
 
-        try:
-            client = get_git_client(
-                git_config,
-                list(creds.git_instance_to_creds.values())[i - 1],
-                skip_ssl_verification=config.skip_ssl_verification,
-            )
+#         try:
+#             client = get_git_client(
+#                 git_config,
+#                 list(creds.git_instance_to_creds.values())[i - 1],
+#                 skip_ssl_verification=config.skip_ssl_verification,
+#             )
 
-            project_repo_dict = get_nested_repos_from_git(client, git_config)
+#             project_repo_dict = get_nested_repos_from_git(client, git_config)
 
-            accessible_projects_and_repos = project_repo_dict
+#             accessible_projects_and_repos = project_repo_dict
 
-            all_repos = sum(project_repo_dict.values(), [])
+#             all_repos = sum(project_repo_dict.values(), [])
 
-            if not all_repos:
-                print(
-                    " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
-                )
-                continue
+#             if not all_repos:
+#                 print(
+#                     " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
+#                 )
+#                 continue
 
-            print("  All projects and repositories available to agent:")
-            for project_name, repo_list in project_repo_dict.items():
-                print(f"  -- {project_name}")
+#             print("  All projects and repositories available to agent:")
+#             for project_name, repo_list in project_repo_dict.items():
+#                 print(f"  -- {project_name}")
 
-                for repo in repo_list:
-                    print(f"    -- {repo}")
+#                 for repo in repo_list:
+#                     print(f"    -- {repo}")
 
-            included_inaccessible_repos_list = [
-                r
-                for r in included_inaccessible_repos_list
-                if not _check_repo_included(r, all_repos)
-            ]
+#             included_inaccessible_repos_list = [
+#                 r
+#                 for r in included_inaccessible_repos_list
+#                 if not _check_repo_included(r, all_repos)
+#             ]
 
-            if included_inaccessible_repos_list:
-                successful = False
-                print(
-                    f"  WARNING: the following repos are explicitly defined as included repos, but agent doesn't seem"
-                    f" to see this repository -- possibly missing permissions."
-                )
-                for inaccessible_repo in included_inaccessible_repos_list:
-                    print(f"    - {inaccessible_repo}")
+#             if included_inaccessible_repos_list:
+#                 successful = False
+#                 print(
+#                     f"  WARNING: the following repos are explicitly defined as included repos, but agent doesn't seem"
+#                     f" to see this repository -- possibly missing permissions."
+#                 )
+#                 for inaccessible_repo in included_inaccessible_repos_list:
+#                     print(f"    - {inaccessible_repo}")
 
-        except Exception as e:
-            print(f"Git connection unsuccessful! Exception: {e}")
-            successful = False
+#         except Exception as e:
+#             print(f"Git connection unsuccessful! Exception: {e}")
+#             successful = False
 
-        healthcheck_result = GitConnectionHealthCheckResult(
-            successful=successful,
-            instance_slug=instance_slug,
-            included_inaccessible_repos=included_inaccessible_repos_list,
-            accessible_projects_and_repos=accessible_projects_and_repos,
-        )
+#         healthcheck_result = GitConnectionHealthCheckResult(
+#             successful=successful,
+#             instance_slug=instance_slug,
+#             included_inaccessible_repos=included_inaccessible_repos_list,
+#             accessible_projects_and_repos=accessible_projects_and_repos,
+#         )
 
-        healthcheck_result_list.append(healthcheck_result)
+#         healthcheck_result_list.append(healthcheck_result)
 
-    return healthcheck_result_list
+#     return healthcheck_result_list
 
 
-def _check_repo_included(repo: str | int, all_repos: list[str]) -> bool:
-    """
-    Takes in a repo and returns whether it is in the given list of accessible repos
-    Handles the gitlab case where repos are specified as ints.
+# def _check_repo_included(repo: str | int, all_repos: list[str]) -> bool:
+#     """
+#     Takes in a repo and returns whether it is in the given list of accessible repos
+#     Handles the gitlab case where repos are specified as ints.
 
-    """
-    if type(repo) == int:
-        return repo in all_repos
-    else:
-        return repo.lower() in set(n.lower() for n in all_repos)
+#     """
+#     if type(repo) == int:
+#         return repo in all_repos
+#     else:
+#         return repo.lower() in set(n.lower() for n in all_repos)
 
 
 def validate_memory(config):
