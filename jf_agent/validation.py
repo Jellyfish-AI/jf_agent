@@ -8,7 +8,7 @@ import requests
 from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
 from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
-from jf_ingest.config import GitProvider
+from jf_ingest.config import GitProvider, GitProviderInJellyfishRepo
 from jf_ingest.validation import (
     validate_jira,
     validate_git,
@@ -82,7 +82,7 @@ def full_validate(
     # Check for Git configs
     if config.git_configs and not skip_git:
         # jf_ingest can only handle github for now
-        git_configs_to_validate = [c for c in ingest_config.git_configs if c.git_provider == GitProvider.GITHUB]
+        git_configs_to_validate = [c for c in ingest_config.git_configs if c.git_provider == GitProviderInJellyfishRepo.GITHUB]
         try:
             git_connection_healthcheck_result = validate_git(
                 git_configs_to_validate

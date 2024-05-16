@@ -39,6 +39,8 @@ class GitConfig:
     # legacy fields ==================
     git_include_bbcloud_projects: List
     git_exclude_bbcloud_projects: List
+    # jf_ingest
+    instance_file_key: str = None # not sure if this should be optional or not but trying not to break other things
 
 
 # todo convert to dataclass
@@ -394,6 +396,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
             excluded_organizations=conf.git_exclude_projects,
             included_repos=conf.git_include_repos,
             excluded_repos=conf.git_exclude_repos,
+            instance_file_key=conf.instance_file_key,
             # branches by repo?
         )
         git_configs.append(gc)
@@ -437,6 +440,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False, use_
     git_include_repos = set(git_config.get('include_repos', []))
     git_exclude_repos = set(git_config.get('exclude_repos', []))
     git_include_branches = dict(git_config.get('include_branches', {}))
+    instance_file_key = git_config.get('instance_file_key', None)
 
     if multiple and not git_instance_slug:
         print('ERROR: Git `instance_slug` is required for multiple Git instance mode.')
@@ -485,11 +489,6 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False, use_
             ' Make sure you set `include_projects` and not `exclude_projects`, and try again.'
         )
         raise BadConfigException()
-
-    if use_jf_ingest:
-        config = GitIngestConfig(
-            
-        )
     
     else: 
         config= GitConfig(
@@ -508,6 +507,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False, use_
             gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
             git_verbose=git_config.get('verbose', False),
             creds_envvar_prefix=creds_envvar_prefix,
+            instance_file_key=instance_file_key,
             # legacy fields ===========
             git_include_bbcloud_projects=list(git_include_bbcloud_projects),
             git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
