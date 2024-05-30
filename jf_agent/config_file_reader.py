@@ -67,6 +67,7 @@ ValidatedConfig = namedtuple(
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
+        'jira_recursively_download_parents',
         'jira_skip_saving_data_locally',
         'git_configs',
         'outdir',
@@ -163,6 +164,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_issue_jql = jira_config.get('issue_jql', '')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
     jira_download_sprints = jira_config.get('download_sprints', True)
+    jira_recursively_download_parents = jira_config.get('recursively_download_parents', False)
     jira_skip_saving_data_locally = jira_config.get('skip_saving_data_locally', False)
 
     # warn if any of the recommended fields are missing or excluded
@@ -269,6 +271,7 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
+        jira_recursively_download_parents,
         jira_skip_saving_data_locally,
         git_configs,  # array of GitConfig
         outdir,
@@ -365,6 +368,7 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
             ),
             skip_issues=False,
             only_issues=False,
+            recursively_download_parents=config.jira_recursively_download_parents,
             #
             # worklogs
             download_worklogs=config.jira_download_worklogs,
