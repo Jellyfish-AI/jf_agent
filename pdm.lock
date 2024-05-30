@@ -4,8 +4,8 @@
 [metadata]
 groups = ["default", "dev"]
 strategy = ["cross_platform"]
-lock_version = "4.4.1"
-content_hash = "sha256:5f100610eede4028e0efd3c8757f53fb9aaac458077e4c352c11014924eb6c3d"
+lock_version = "4.4"
+content_hash = "sha256:646a322606a8e5055f44c50dcaf93aacca268baac277bba10e9d79dd881e7f97"
 
 [[package]]
 name = "appdirs"
@@ -362,22 +362,22 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.78"
+version = "0.0.88"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 dependencies = [
     "PyJWT<2.0",
-    "jira<=3.1.1,>=2.0.0",
+    "jira~=3.1.1",
     "psutil>=5.9.6",
     "python-dateutil>=2.8.2",
     "pytz>=2023.3.post1",
+    "requests-jwt>=0.6.0",
     "requests-mock==1.11.0",
     "requests>=2.31.0",
     "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf_ingest-0.0.78-py3-none-any.whl", hash = "sha256:cd7b592812dd66a6b883c5fa9f8ea0fb72d1ef939247c8d9119a6276e2b3c785"},
-    {file = "jf_ingest-0.0.78.tar.gz", hash = "sha256:ff42bd94139fc1aa75da7077ab28a76601a40bdac34e2456fb1958578ce57958"},
+    {file = "jf_ingest-0.0.88-py3-none-any.whl", hash = "sha256:a28ba8a79cd2a3f0a40419831001ccec19411a191e8cf1f98d085a5dfa78c47b"},
 ]
 
 [[package]]
@@ -703,6 +703,19 @@ dependencies = [
 files = [
     {file = "requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f"},
     {file = "requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1"},
+]
+
+[[package]]
+name = "requests-jwt"
+version = "0.6.0"
+summary = "This package allows for HTTP JSON Web Token (JWT) authentication using the requests library."
+dependencies = [
+    "PyJWT",
+    "requests",
+]
+files = [
+    {file = "requests-jwt-0.6.0.tar.gz", hash = "sha256:07822cb11b980f209050a3ae46a61d7961b94818e3cfc26d21c82d967c99fac4"},
+    {file = "requests_jwt-0.6.0-py3-none-any.whl", hash = "sha256:7b8190d822b9134eb7f2ee229af0a5a309a1c169e4a5c969e4d2a7dd434678be"},
 ]
 
 [[package]]

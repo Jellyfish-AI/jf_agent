@@ -52,6 +52,10 @@ jira:
   # Whether the agent should download sprints.  If omitted, defaults to True.
   download_sprints: True
 
+  # When provided, we will recurively download all parents until we run out of parents
+  # to download. WARNING: This may greatly increase Agent run time!
+  recursively_download_parents: False
+
   #############################
   # Options for filtering projects. Only data for projects that meet ALL
   # these criteria will be used. For example, if you provide both
