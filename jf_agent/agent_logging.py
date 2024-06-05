@@ -11,6 +11,8 @@ from typing import Any, List, Union
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 
+from jf_ingest.logging_helper import AGENT_LOG_TAG
+
 '''
 Guidance on logging/printing in the agent:
 
@@ -193,14 +195,43 @@ class AgentLoggingConfig:
     listener: QueueListener
 
 
+class AgentConsoleLogFilter(logging.Filter):
+    """
+    This class is responsible for filtering out any logs that should only exist in Agent log file.
+    There is a lot of debugging information and stack traces that we want to hide from the agent
+    console logging for a good user experience, so we must filter them out here.
+    We DO want all that information the logs, however, where we or a client go see them for debugging
+    purposes.
+    """
+
+    def filter(self, record: LogRecord) -> bool:
+        """Return True if the log should be emitted. Checks to see if the jf_ingest.logging_helper.AGENT_LOG_TAG
+        is present in the record object. If it is, and it's set to True, this log should be suppressed (return False)
+
+        Args:
+            record (LogRecord): A record log object to potentially filter
+
+        Returns:
+            bool: Returns False if jf_ingest.logging_helper.AGENT_LOG_TAG is present and set to True. Returns True on all other records
+        """
+        if AGENT_LOG_TAG in record.__dict__:
+            pass
+            # print(f'\n  {record.message} tagged as an agent file log {record.__dict__.get(AGENT_LOG_TAG)}\n')
+        else:
+            pass
+            # print(f'\n  {AGENT_LOG_TAG} not found in {record.__dict__}\n')
+        return not record.__dict__.get(AGENT_LOG_TAG, False)
+
+
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> AgentLoggingConfig:
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
-    stdout_handler = CustomStreamHandler(stream=sys.stdout)
-    stdout_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
-    stdout_handler.setLevel(logging.INFO)
+    console_log_handler = CustomStreamHandler(stream=sys.stdout)
+    console_log_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
+    console_log_handler.setLevel(logging.INFO)
+    console_log_handler.addFilter(AgentConsoleLogFilter())
 
     # logging in agent.log and those sent to the queue should be identical
     file_and_queue_formatter = logging.Formatter(
@@ -209,8 +240,10 @@ def configure(
 
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
+    # We want to catch as much as possible in the Agent Log File!!
     logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
     logfile_handler.setFormatter(file_and_queue_formatter)
+    # Set Log File Handler to DEBUG to catch as much debugging information as possible
     logfile_handler.setLevel(logging.DEBUG)
 
     log_queue = Queue(-1)  # no size bound
@@ -241,14 +274,12 @@ def configure(
     config = AgentLoggingConfig(
         level=logging.DEBUG,
         datefmt='%Y-%m-%d %H:%M:%S',
-        handlers=[logfile_handler, stdout_handler, log_queue_handler],
+        handlers=[logfile_handler, console_log_handler, log_queue_handler],
         listener=queue_listener,
     )
 
     logging.basicConfig(
-        level=config.level,
-        datefmt=config.datefmt,
-        handlers=config.handlers,
+        level=config.level, datefmt=config.datefmt, handlers=config.handlers,
     )
 
     logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')
