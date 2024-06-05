@@ -11,6 +11,8 @@ from jf_agent.data_manifests.git.manifest import (
 from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
 from jf_agent.data_manifests.manifest import ManifestSource
 
+from jf_ingest import logging_helper
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +57,7 @@ def create_manifests(
         try:
             # If the git config doesn't have a git instance, do not generate a manifest
             if not instance_slug:
-                logger.debug(
+                logging_helper.send_to_agent_log_file(
                     f'Git instance for company {company_slug} was detected as NONE. The manifest for this instance will not be processed or uploaded',
                 )
                 continue
@@ -127,14 +129,16 @@ def create_manifests(
                     )
                 )
         except UnsupportedGitProvider as e:
-            logger.debug(
+            logging_helper.send_to_agent_log_file(
                 'Unsupported Git Provider exception encountered. '
                 f'This shouldn\'t affect your agent upload. Error: {e}',
+                level=logging.ERROR,
             )
         except Exception as e:
-            logger.debug(
+            logging_helper.send_to_agent_log_file(
                 'An exception happened when creating manifest. This shouldn\'t affect your agent upload. '
                 f'Exception: {e}',
+                level=logging.ERROR,
             )
 
     return manifests

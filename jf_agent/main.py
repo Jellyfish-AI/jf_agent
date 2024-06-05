@@ -528,9 +528,10 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
                 endpoint_git_instances_info=jellyfish_endpoint_info.git_instance_info,
             )
         except Exception as e:
-            logger.debug(
-                f'Error encountered when generating git manifests. Error: {e}', exc_info=True,
+            logging_helper.send_to_agent_log_file(
+                f'Error encountered when generating git manifests. Error: {e}', level=logging.ERROR
             )
+            logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     else:
         logger.info('No Git Configuration detection, skipping Git manifests generation',)
 
@@ -634,7 +635,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                     'This Jira submission will be marked as failed. '
                     f'Error: {e}'
                 )
-                logger.debug(traceback.print_exc())
+                logging_helper.send_to_agent_log_file(traceback.print_exc(), level=logging.ERROR)
                 download_data_status.append({'type': 'Jira', 'status': 'failed'})
         else:
             download_data_status.append(

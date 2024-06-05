@@ -239,7 +239,7 @@ class GithubGqlAdapter(GitAdapter):
                                 )
 
                     except Exception as e:
-                        logger.debug(traceback.format_exc())
+                        logging_helper.send_to_agent_log_file(traceback.format_exc())
                         logger.warning(
                             f':WARN: Got exception for branch {branch_name}: {e}. Skipping...'
                         )

@@ -644,7 +644,9 @@ def _download_jira_issues_segment(
     download onto the shared queue.
     '''
     start_at = 0
-    logger.debug(f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}")
+    logging_helper.send_to_agent_log_file(
+        f"Beginning to download jira issues in segment of {len(jira_issue_ids_segment)}"
+    )
     try:
         while start_at < len(jira_issue_ids_segment):
             issues, num_apparently_deleted = _download_jira_issues_page(
@@ -828,7 +830,9 @@ def download_teams(jira_connection):
         logger.info('✓')
         return teams
     except Exception as e:
-        logger.debug(f"Could not fetch teams, instead got {e}")
+        logging_helper.send_to_agent_log_file(
+            f"Could not fetch teams, instead got {e}", level=logging.ERROR
+        )
         return ""
 
 
@@ -862,7 +866,7 @@ def _search_all_users(jira_connection, gdpr_active):
 
     # different jira versions / different times, the way to list all users has changed. Try a few.
     for q in [' ', '""', '%', '@']:
-        logger.debug(f'Attempting wild card search with {q}')
+        logging_helper.send_to_agent_log_file(f'Attempting wild card search with {q}')
         # iterate through pages of results
         while True:
             users = _search_users(
@@ -878,7 +882,7 @@ def _search_all_users(jira_connection, gdpr_active):
 
         # found users; no need to try other query techniques
         if jira_users:
-            logger.debug(f'Found {len(jira_users.keys())} users')
+            logging_helper.send_to_agent_log_file(f'Found {len(jira_users.keys())} users')
             return list(jira_users.values())
 
     # no users found
