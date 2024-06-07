@@ -47,9 +47,9 @@ def load_and_dump(
         )
     except Exception as e:
         logging_helper.send_to_agent_log_file(
-            f'Problem finding scopes for your API key. Error: {e}'
+            f'Problem finding scopes for your API key. Error: {e}', level=logging.ERROR
         )
-        logging_helper.send_to_agent_log_file(traceback.format_exc())
+        logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     write_file(
         outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
     )

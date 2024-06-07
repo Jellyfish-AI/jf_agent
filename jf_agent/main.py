@@ -166,7 +166,8 @@ def main():
         )
     except Exception as e:
         logging_helper.send_to_agent_log_file(
-            f'Error encountered when attempting to send diagnostic heart beat start (Error: {e})'
+            f'Error encountered when attempting to send diagnostic heart beat start (Error: {e})',
+            level=logging.ERROR,
         )
 
     logger.info(f'Will write output files into {config.outdir}')
@@ -293,7 +294,8 @@ def main():
         )
     except Exception as e:
         logging_helper.send_to_agent_log_file(
-            f'Error encountered when attempting to send the Agent heart beat end marker. Error: {e}'
+            f'Error encountered when attempting to send the Agent heart beat end marker. Error: {e}',
+            level=logging.ERROR,
         )
     agent_logging.close_out(logging_config)
 
@@ -635,7 +637,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                     'This Jira submission will be marked as failed. '
                     f'Error: {e}'
                 )
-                logging_helper.send_to_agent_log_file(traceback.print_exc(), level=logging.ERROR)
+                logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
                 download_data_status.append({'type': 'Jira', 'status': 'failed'})
         else:
             download_data_status.append(

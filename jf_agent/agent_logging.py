@@ -214,12 +214,6 @@ class AgentConsoleLogFilter(logging.Filter):
         Returns:
             bool: Returns False if jf_ingest.logging_helper.AGENT_LOG_TAG is present and set to True. Returns True on all other records
         """
-        if AGENT_LOG_TAG in record.__dict__:
-            pass
-            # print(f'\n  {record.message} tagged as an agent file log {record.__dict__.get(AGENT_LOG_TAG)}\n')
-        else:
-            pass
-            # print(f'\n  {AGENT_LOG_TAG} not found in {record.__dict__}\n')
         return not record.__dict__.get(AGENT_LOG_TAG, False)
 
 
