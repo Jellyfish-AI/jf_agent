@@ -1,11 +1,13 @@
 import json
 import logging
 from dataclasses import dataclass
+import traceback
 from typing import Callable, Generator
 from jf_agent.jf_jira import get_basic_jira_connection
 from jf_agent.jf_jira.jira_download import download_users
 from jira import JIRAError
 
+from jf_ingest import logging_helper
 from jf_ingest.utils import retry_for_status
 
 logger = logging.getLogger(__name__)
@@ -155,12 +157,13 @@ class JiraCloudManifestAdapter:
         except Exception as e:
             # This is unexpected behavior and it should never happen, log the error
             # before returning
-            logger.debug(
+            logging_helper.send_to_agent_log_file(
                 'Unusual exception encountered when testing auth. '
                 'This should not affect agent uploading. '
                 f'JIRAError was expected but the following error was raised: {e}',
-                exc_info=True,
+                level=logging.ERROR,
             )
+            logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
             return False
 
     def get_issues_count_for_project(self, project_id: int) -> int:

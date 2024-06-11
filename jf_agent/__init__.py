@@ -6,6 +6,8 @@ import logging
 from itertools import chain
 from jf_agent.util import batched
 
+from jf_ingest import logging_helper
+
 logger = logging.getLogger(__name__)
 
 JELLYFISH_API_BASE = 'https://app.jellyfish.co'
@@ -75,7 +77,9 @@ def download_and_write_streaming(
                             _get_item_by_key(item, addl_info_dict_key),
                         )
                     )
-            logger.debug(f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB')
+            logging_helper.send_to_agent_log_file(
+                f'File: {filepath}, Size: {round(outfile.tell() / 1000000, 1)}MB'
+            )
 
         outfile.close()
         batch_num += 1

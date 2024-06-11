@@ -1,6 +1,7 @@
 from datetime import datetime
 from itertools import chain
 import logging
+import traceback
 
 from jira import JIRA
 from jira.resources import GreenHopperResource
@@ -38,7 +39,10 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
         'options': {
             'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
             'verify': not config.skip_ssl_verification,
-            "headers": {"Accept": "application/json;q=1.0, */*;q=0.9", 'Content-Type': 'application/json'},
+            "headers": {
+                "Accept": "application/json;q=1.0, */*;q=0.9",
+                'Content-Type': 'application/json',
+            },
         },
     }
     if creds.jira_username and creds.jira_password:
@@ -55,7 +59,6 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
             'Content-Type': 'application/json',
             'Accept': "application/json;q=1.0, */*;q=0.9",
             'X-Atlassian-Token': 'no-check',
-
         }
     else:
         raise RuntimeError(
@@ -213,7 +216,7 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             deleted_issue_ids,
         ) = detect_issues_needing_sync(issue_metadata_from_jira, issue_metadata_from_jellyfish)
 
-        logger.debug(
+        logging_helper.send_to_agent_log_file(
             f'Up to date: {len(already_up_to_date_issue_ids)}  out of date: {len(out_of_date_issue_ids)}  '
             f'missing: {len(missing_issue_ids)}  deleted: {len(deleted_issue_ids)}'
         )
@@ -231,8 +234,10 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
             try:
                 write_file(config.outdir, fname, config.compress_output_files, vals)
             except Exception:
-                logger.debug(f"Could not write issue metadata for file: {fname}", exc_info=True)
-
+                logging_helper.send_to_agent_log_file(
+                    f"Could not write issue metadata for file: {fname}", level=logging.ERROR
+                )
+                logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
 
         @diagnostics.capture_timing()
         @logging_helper.log_entry_exit(logger)
@@ -329,10 +334,12 @@ def load_and_dump_jira(config, endpoint_jira_info, jira_connection):
                 config.outdir,
                 'jira_teams',
                 config.compress_output_files,
-                download_teams(jira_connection)
+                download_teams(jira_connection),
             )
         except Exception as e:
-            logger.debug(f"Could not download teams, got {e}")
+            logging_helper.send_to_agent_log_file(
+                f"Could not download teams, got {e}", level=logging.ERROR
+            )
 
         return {'type': 'Jira', 'status': 'success'}
 
