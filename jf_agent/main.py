@@ -277,16 +277,17 @@ def main():
                 return False
 
     finally:
-        logger.info('Closing Diagnostics file')
-        # We need to close this before we send data
-        # Otherwise we'll send a .fuse_hidden file (temp file)
-        diagnostics.close_file()
 
         # Kills the sys_diag_collector thread.
         # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
         logger.info('Shutting down Systems Diagnostics Thread')
         sys_diag_done_event.set()
         sys_diag_collector.join()
+
+        logger.info('Closing Diagnostics file')
+        # We need to close this before we send data
+        # Otherwise we'll send a .fuse_hidden file (temp file)
+        diagnostics.close_file()
 
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
