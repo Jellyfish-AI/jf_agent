@@ -11,7 +11,13 @@ import yaml
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
 from jf_ingest import logging_helper
-from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
+from jf_ingest.config import (
+    IngestionConfig,
+    IngestionType,
+    IssueMetadata,
+    JiraDownloadConfig,
+    GitConfig as JFIngestGitConfig,
+)
 
 from jf_agent.util import get_company_info
 
@@ -308,7 +314,9 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
-def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) -> IngestionConfig:
+def get_ingest_config(
+    config: ValidatedConfig, creds, endpoint_jira_info: dict, endpoint_git_instances_info: dict
+) -> IngestionConfig:
     """
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
@@ -380,6 +388,34 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
             feature_flags={},
         )
 
+    git_configs: List[JFIngestGitConfig] = []
+    for agent_git_config in config.git_configs:
+        agent_git_config: GitConfig = agent_git_config
+        instance_slug = agent_git_config.git_instance_slug
+        endpoint_git_instance_info = endpoint_git_instances_info.get(instance_slug)
+        git_configs.append(
+            JFIngestGitConfig(
+                company_slug=company_slug,
+                instance_slug=instance_slug,
+                instance_file_key=endpoint_git_instance_info['key'],
+                git_provider=agent_git_config.git_provider,  # TODO cast this
+                git_auth_config=None,  # TODO
+                url=agent_git_config.git_url,
+                jf_options={},
+                pull_commits_since_for_repo_in_org=None,  # TODO
+                pull_prs_since_for_repo_in_org=None,  # TODO
+                default_pull_from_for_commits_and_prs=datetime.min,  # TODO
+                discover_orgs=False,  # TODO,
+                git_organizations=agent_git_config.git_include_projects,
+                excluded_organizations=agent_git_config.git_exclude_projects,
+                included_repos=agent_git_config.git_include_repos,
+                excluded_repos=agent_git_config.git_exclude_repos,
+                included_branches_by_repo=agent_git_config.git_include_branches,
+                git_redact_names_and_urls=agent_git_config.git_redact_names_and_urls,
+                git_strip_text_content=agent_git_config.git_strip_text_content,
+            )
+        )
+
     ingestion_config = IngestionConfig(
         company_slug=company_slug,
         upload_to_s3=config.run_mode_includes_send,
@@ -391,10 +427,11 @@ def get_ingest_config(config: ValidatedConfig, creds, endpoint_jira_info: dict) 
         # TODO: Maybe we set this, although the constructor can handle them being null
         local_file_path=config.outdir,
         timestamp=os.path.split(config.outdir)[1],
-        jira_config=jira_config,
         jellyfish_api_token=creds.jellyfish_api_token,
         jellyfish_api_base=config.jellyfish_api_base,
         ingest_type=IngestionType.AGENT,
+        jira_config=jira_config,
+        git_configs=git_configs,
     )
 
     return ingestion_config

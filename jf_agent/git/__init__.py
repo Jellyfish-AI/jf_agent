@@ -17,6 +17,8 @@ from jf_agent.config_file_reader import GitConfig
 
 from jf_agent import download_and_write_streaming, write_file
 from jf_ingest import logging_helper, diagnostics
+from jf_ingest.config import IngestionConfig
+from jf_ingest.jf_git.adapters import load_and_push_git_to_s3
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +292,7 @@ def load_and_dump_git(
     compress_output_files: bool,
     git_connection,
     jf_options: dict,
+    jf_ingest_config: IngestionConfig,
 ):
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
@@ -320,6 +323,7 @@ def load_and_dump_git(
             from jf_agent.git.github_gql_adapter import GithubGqlAdapter
 
             if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
+                load_and_push_git_to_s3(ingest_config=jf_ingest_config)
                 GithubGqlAdapter(
                     config,
                     outdir,
