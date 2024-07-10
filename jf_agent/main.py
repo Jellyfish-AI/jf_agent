@@ -184,100 +184,109 @@ def main():
             creds.jellyfish_api_token,
         ),
     )
-    sys_diag_collector.start()
+    try:
+        sys_diag_collector.start()
 
-    # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
-    # to try to upload failed data.
-    error_and_timeout_free = True
+        # This will only get set if --from-failure is passed down, indicating that the run is being re-run from failure
+        # to try to upload failed data.
+        error_and_timeout_free = True
 
-    if config.run_mode == 'validate':
-        try:
-            full_validate(
-                config, creds, jellyfish_endpoint_info, upload=not config.skip_healthcheck_upload
-            )
-        except Exception as err:
-            logger.error(
-                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
-            )
-
-    elif args.from_failure:
-        error_and_timeout_free = False
-        old_files = os.listdir(args.output_basedir)
-        files = sorted(old_files, reverse=True)
-
-        # This needs to be the second on the list
-        # Since we'll have already created a first one for * this * run
-        # And the timestamps won't line up
-        if len(files) < 2:
-            logger.error('No previous directory to mount, cannot send data post-failure!')
-            return False
-
-        previous_run_file = files[1]
-
-        config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
-
-        logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
-
-    elif not config.run_mode == 'send_only':
-        # Importantly, don't overwrite the already-existing diagnostics file
-        try:
-            # Run Jira validation from JF ingest by default.
-            # Temporarily skip Git until we cut the validation over to JF ingest
-            logger.info("Running ingestion healthcheck validation!")
-            full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
-        except Exception as err:
-            logger.error(
-                f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
-            )
-
-        try:
-            if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
-                validate_num_repos(config.git_configs, creds)
-        except Exception as e:
-            logger.warning(f"Could not validate client/org creds, moving on. Got {e}")
-
-        try:
-            diagnostics.capture_agent_version()
-            diagnostics.capture_run_args(
-                args.mode, args.config_file, config.outdir, args.prev_output_dir
-            )
-
-            if config.run_mode_is_print_apparently_missing_git_repos:
-                issues_to_scan = get_issues_to_scan_from_jellyfish(
-                    config, creds, args.for_print_missing_repos_issues_updated_within_last_x_months,
-                )
-                if issues_to_scan:
-                    print_missing_repos_found_by_jira(config, creds, issues_to_scan)
-                return True
-
-            if config.run_mode_includes_download:
-                download_data_status = download_data(
+        if config.run_mode == 'validate':
+            try:
+                full_validate(
                     config,
                     creds,
-                    jellyfish_endpoint_info.jira_info,
-                    jellyfish_endpoint_info.git_instance_info,
-                    jellyfish_endpoint_info.jf_options,
+                    jellyfish_endpoint_info,
+                    upload=not config.skip_healthcheck_upload,
                 )
-                success = all(s['status'] == 'success' for s in download_data_status)
-                write_file(
-                    config.outdir, 'status', config.compress_output_files, download_data_status
+            except Exception as err:
+                logger.error(
+                    f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
                 )
 
-            diagnostics.capture_outdir_size(config.outdir)
+        elif args.from_failure:
+            error_and_timeout_free = False
+            old_files = os.listdir(args.output_basedir)
+            files = sorted(old_files, reverse=True)
 
-        except Exception as err:
-            logger.error(f"Encountered error during agent run! {err}")
-            agent_logging.close_out(logging_config)
-            return False
+            # This needs to be the second on the list
+            # Since we'll have already created a first one for * this * run
+            # And the timestamps won't line up
+            if len(files) < 2:
+                logger.error('No previous directory to mount, cannot send data post-failure!')
+                return False
 
-    # We need to close this before we send data
-    # Otherwise we'll send a .fuse_hidden file (temp file)
-    diagnostics.close_file()
+            previous_run_file = files[1]
 
-    # Kills the sys_diag_collector thread.
-    # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
-    sys_diag_done_event.set()
-    sys_diag_collector.join()
+            config = config._replace(outdir=os.path.join(args.output_basedir, previous_run_file))
+
+            logger.info(f"Mounted old output directory as {config.outdir}, will attempt to send.")
+
+        elif not config.run_mode == 'send_only':
+            # Importantly, don't overwrite the already-existing diagnostics file
+            try:
+                # Run Jira validation from JF ingest by default.
+                # Temporarily skip Git until we cut the validation over to JF ingest
+                logger.info("Running ingestion healthcheck validation!")
+                full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
+            except Exception as err:
+                logger.error(
+                    f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
+                )
+
+            try:
+                if jellyfish_endpoint_info.jf_options.get('validate_num_repos', False):
+                    validate_num_repos(config.git_configs, creds)
+            except Exception as e:
+                logger.warning(f"Could not validate client/org creds, moving on. Got {e}")
+
+            try:
+                diagnostics.capture_agent_version()
+                diagnostics.capture_run_args(
+                    args.mode, args.config_file, config.outdir, args.prev_output_dir
+                )
+
+                if config.run_mode_is_print_apparently_missing_git_repos:
+                    issues_to_scan = get_issues_to_scan_from_jellyfish(
+                        config,
+                        creds,
+                        args.for_print_missing_repos_issues_updated_within_last_x_months,
+                    )
+                    if issues_to_scan:
+                        print_missing_repos_found_by_jira(config, creds, issues_to_scan)
+                    return True
+
+                if config.run_mode_includes_download:
+                    download_data_status = download_data(
+                        config,
+                        creds,
+                        jellyfish_endpoint_info.jira_info,
+                        jellyfish_endpoint_info.git_instance_info,
+                        jellyfish_endpoint_info.jf_options,
+                    )
+                    success = all(s['status'] == 'success' for s in download_data_status)
+                    write_file(
+                        config.outdir, 'status', config.compress_output_files, download_data_status
+                    )
+
+                diagnostics.capture_outdir_size(config.outdir)
+
+            except Exception as err:
+                logger.error(f"Encountered error during agent run! {err}")
+                agent_logging.close_out(logging_config)
+                return False
+
+    finally:
+        logger.info('Closing Diagnostics file')
+        # We need to close this before we send data
+        # Otherwise we'll send a .fuse_hidden file (temp file)
+        diagnostics.close_file()
+
+        # Kills the sys_diag_collector thread.
+        # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
+        logger.info('Shutting down Systems Diagnostics Thread')
+        sys_diag_done_event.set()
+        sys_diag_collector.join()
 
     success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
 
