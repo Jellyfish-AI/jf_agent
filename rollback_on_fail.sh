@@ -1,23 +1,12 @@
 #!/bin/bash
 
-echo "checking for time limit override"
-if [[ -v OVERRIDE_TIME_LIMIT ]]; then
-	echo "Time limit override detected, agent will timeout at ${OVERRIDE_TIME_LIMIT}"
-	TIME_LIMIT="${OVERRIDE_TIME_LIMIT}"
-else
-	TIME_LIMIT=$(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "Jellyfish-API-Token: $JELLYFISH_API_TOKEN" https://app.jellyfish.co/endpoints/agent/time-limit | jq -r .time_limit_string)
-	TIME_LIMIT="${TIME_LIMIT:-12h}"
-	echo "Time limit override not detected, retrieved timelimit from Jellyfish: (${TIME_LIMIT})"
-fi
-echo "running agent with timelimit $TIME_LIMIT"
-
-timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" 
+python jf_agent/main.py "$@"
 CODE=$?
 
-if [[ $CODE -ne 0 && ! -v ROLLBACK_OVERRIDE ]]; then
+if [[ $CODE -ne 0 ]]; then
     echo "encountered error or timeout"
 
     echo "Will attempt to upload logs from the failed run, for debugging."
 
-    timeout --preserve-status "$TIME_LIMIT" python jf_agent/main.py "$@" "-f"
+    python jf_agent/main.py "$@" "-f"
 fi
