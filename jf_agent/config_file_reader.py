@@ -17,6 +17,7 @@ from jf_ingest.config import (
     IssueMetadata,
     JiraDownloadConfig,
     GitConfig as JFIngestGitConfig,
+    GitAuthConfig as JFIngestGitAuthConfig,
 )
 
 from jf_agent.util import get_company_info
@@ -314,6 +315,52 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
+def get_github_gql_base_url(base_url: str):
+    if base_url and 'api/v3' in base_url:
+        # Github server clients provide an API with a trailing '/api/v3'
+        # replace this with the graphql endpoint
+        return base_url.replace('api/v3', 'api/graphql')
+    else:
+        return 'https://api.github.com/graphql'
+
+
+def _get_jf_ingest_git_auth_config(
+    company_slug: str,
+    config: GitConfig,
+    git_creds: dict,
+    skip_ssl_verification: bool,
+    instance_info: dict = {},
+):
+    from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
+
+    try:
+        if config.git_provider == BBS_PROVIDER:
+            return None
+
+        if config.git_provider == BBC_PROVIDER:
+            return None
+
+        if config.git_provider == GH_PROVIDER:
+            return JFIngestGitAuthConfig(
+                company_slug=company_slug,
+                token=git_creds['github_token'],
+                base_url=get_github_gql_base_url(base_url=config.git_url),
+                verify=not skip_ssl_verification,
+            )
+        if config.git_provider == GL_PROVIDER:
+            return None
+
+    except Exception as e:
+        logging_helper.log_standard_error(
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=2101, exc_info=True,
+        )
+        return
+
+    logging_helper.send_to_agent_log_file(
+        f'Git Provider {config.git_provider} is not yet supported by JF Ingest'
+    )
+
+
 def get_ingest_config(
     config: ValidatedConfig, creds, endpoint_jira_info: dict, endpoint_git_instances_info: dict
 ) -> IngestionConfig:
@@ -321,7 +368,6 @@ def get_ingest_config(
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
     """
-
     company_info = get_company_info(config, creds)
 
     company_slug = company_info.get('company_slug')
@@ -389,24 +435,60 @@ def get_ingest_config(
         )
 
     git_configs: List[JFIngestGitConfig] = []
+    is_mult_git_mode = len(config.git_configs) > 1
     for agent_git_config in config.git_configs:
         agent_git_config: GitConfig = agent_git_config
-        instance_slug = agent_git_config.git_instance_slug
-        endpoint_git_instance_info = endpoint_git_instances_info.get(instance_slug)
+
+        if is_mult_git_mode:
+            instance_slug = agent_git_config.git_instance_slug
+            endpoint_git_instance_info = endpoint_git_instances_info.get(instance_slug)
+            instance_creds = creds.git_instance_to_creds.get(instance_slug)
+        else:
+            # If there's only one git config set, then this is "single git" mode.
+            # The instance slug is likely not to be provided
+            endpoint_git_instance_info = list(endpoint_git_instances_info.values())[0]
+            instance_creds = list(creds.git_instance_to_creds.values())[0]
+            instance_slug = endpoint_git_instance_info['slug']
+
+        jf_ingest_git_auth_config = _get_jf_ingest_git_auth_config(
+            company_slug=company_slug,
+            config=agent_git_config,
+            git_creds=instance_creds,
+            skip_ssl_verification=config.skip_ssl_verification,
+            instance_info=endpoint_git_instance_info,
+        )
+
+        repos_to_prs_last_updated = {}
+        repos_to_commits_backpopulated_to = {}
+        pull_prs_since_for_repo_in_org = {}
+        for repo_id, repo_info in endpoint_git_instance_info['repos_dict_v2'].items():
+            if repo_info['latest_pr_update_date_pulled']:
+                repos_to_prs_last_updated[repo_id] = datetime.fromisoformat(
+                    repo_info['latest_pr_update_date_pulled']
+                )
+            if repo_info['commits_backpopulated_to']:
+                repos_to_commits_backpopulated_to[repo_id] = datetime.fromisoformat(
+                    repo_info['commits_backpopulated_to']
+                )
+            if repo_info['prs_backpopulated_to']:
+                pull_prs_since_for_repo_in_org[repo_id] = datetime.fromisoformat(
+                    repo_info['prs_backpopulated_to']
+                )
+
         git_configs.append(
             JFIngestGitConfig(
                 company_slug=company_slug,
                 instance_slug=instance_slug,
                 instance_file_key=endpoint_git_instance_info['key'],
-                git_provider=agent_git_config.git_provider,  # TODO cast this
-                git_auth_config=None,  # TODO
-                url=agent_git_config.git_url,
+                git_provider=agent_git_config.git_provider,
+                git_auth_config=jf_ingest_git_auth_config,
+                url=get_github_gql_base_url(agent_git_config.git_url),
                 jf_options={},
-                pull_commits_since_for_repo_in_org=None,  # TODO
-                pull_prs_since_for_repo_in_org=None,  # TODO
-                default_pull_from_for_commits_and_prs=datetime.min,  # TODO
-                discover_orgs=False,  # TODO,
+                repos_to_prs_last_updated=repos_to_prs_last_updated,
+                repos_to_commits_backpopulated_to=repos_to_commits_backpopulated_to,
+                repos_to_prs_backpopulated_to=pull_prs_since_for_repo_in_org,
                 git_organizations=agent_git_config.git_include_projects,
+                pull_from=endpoint_git_instance_info['pull_from'],
                 excluded_organizations=agent_git_config.git_exclude_projects,
                 included_repos=agent_git_config.git_include_repos,
                 excluded_repos=agent_git_config.git_exclude_repos,
