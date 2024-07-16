@@ -240,6 +240,14 @@ def get_git_client(
             )
 
         if config.git_provider == GH_PROVIDER:
+            legacy_client = GithubClient(
+                base_url=config.git_url,
+                token=git_creds['github_token'],
+                verify=not skip_ssl_verification,
+                session=retry_session(),
+            )
+            # scopes = legacy_client.get_scopes_of_api_token()
+            # input(f'scopes {scopes} (type: {type(scopes)}) >')
             if instance_info.get('supports_graphql_endpoints', False):
                 return GithubGqlClient(
                     base_url=config.git_url,
@@ -248,12 +256,7 @@ def get_git_client(
                     session=retry_session(),
                 )
             else:
-                return GithubClient(
-                    base_url=config.git_url,
-                    token=git_creds['github_token'],
-                    verify=not skip_ssl_verification,
-                    session=retry_session(),
-                )
+                return legacy_client
         if config.git_provider == GL_PROVIDER:
             return GitLabClient(
                 server_url=config.git_url,
@@ -289,7 +292,6 @@ def load_and_dump_git(
     instance_key = endpoint_git_instance_info['key']
     outdir = f'{outdir}/git_{instance_key}'
     os.mkdir(outdir)
-
     try:
         if config.git_provider == 'bitbucket_server':
             # using old func method, todo: refactor to use GitAdapter
@@ -310,7 +312,8 @@ def load_and_dump_git(
                 config, outdir, compress_output_files, git_connection
             ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
-
+            # scopes = git_connection.get_scopes_of_api_token()
+            # input(f'Scopes: {scopes} > ')
             if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
                 for jf_ingest_git_config in jf_ingest_config.git_configs:
                     if jf_ingest_git_config.instance_slug == instance_slug:

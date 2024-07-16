@@ -1,6 +1,6 @@
 from collections import namedtuple
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import json
 import logging
 import os
@@ -344,7 +344,7 @@ def _get_jf_ingest_git_auth_config(
             return JFIngestGitAuthConfig(
                 company_slug=company_slug,
                 token=git_creds['github_token'],
-                base_url=get_github_gql_base_url(base_url=config.git_url),
+                base_url=config.git_url,  # NOTE: The Auth Config points to the REST API, not the GQL API !
                 verify=not skip_ssl_verification,
             )
         if config.git_provider == GL_PROVIDER:
@@ -461,20 +461,29 @@ def get_ingest_config(
         repos_to_prs_last_updated = {}
         repos_to_commits_backpopulated_to = {}
         pull_prs_since_for_repo_in_org = {}
+
+        def _make_datetimes_timezone_aware(datetime_str: str):
+            dt = datetime.fromisoformat(datetime_str)
+            if not dt.tzinfo:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
         for repo_id, repo_info in endpoint_git_instance_info['repos_dict_v2'].items():
             if repo_info['latest_pr_update_date_pulled']:
-                repos_to_prs_last_updated[repo_id] = datetime.fromisoformat(
+                repos_to_prs_last_updated[repo_id] = _make_datetimes_timezone_aware(
                     repo_info['latest_pr_update_date_pulled']
                 )
             if repo_info['commits_backpopulated_to']:
-                repos_to_commits_backpopulated_to[repo_id] = datetime.fromisoformat(
+                repos_to_commits_backpopulated_to[repo_id] = _make_datetimes_timezone_aware(
                     repo_info['commits_backpopulated_to']
                 )
             if repo_info['prs_backpopulated_to']:
-                pull_prs_since_for_repo_in_org[repo_id] = datetime.fromisoformat(
+                pull_prs_since_for_repo_in_org[repo_id] = _make_datetimes_timezone_aware(
                     repo_info['prs_backpopulated_to']
                 )
 
+        pull_from = _make_datetimes_timezone_aware(endpoint_git_instance_info['pull_from'])
+        # pull_from = pull_from.replace(tzinfo=timezone.utc)
         git_configs.append(
             JFIngestGitConfig(
                 company_slug=company_slug,
@@ -488,7 +497,7 @@ def get_ingest_config(
                 repos_to_commits_backpopulated_to=repos_to_commits_backpopulated_to,
                 repos_to_prs_backpopulated_to=pull_prs_since_for_repo_in_org,
                 git_organizations=agent_git_config.git_include_projects,
-                pull_from=endpoint_git_instance_info['pull_from'],
+                pull_from=pull_from,
                 excluded_organizations=agent_git_config.git_exclude_projects,
                 included_repos=agent_git_config.git_include_repos,
                 excluded_repos=agent_git_config.git_exclude_repos,
