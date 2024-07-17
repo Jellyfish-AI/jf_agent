@@ -315,21 +315,8 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
-def get_github_gql_base_url(base_url: str):
-    if base_url and 'api/v3' in base_url:
-        # Github server clients provide an API with a trailing '/api/v3'
-        # replace this with the graphql endpoint
-        return base_url.replace('api/v3', 'api/graphql')
-    else:
-        return 'https://api.github.com/graphql'
-
-
 def _get_jf_ingest_git_auth_config(
-    company_slug: str,
-    config: GitConfig,
-    git_creds: dict,
-    skip_ssl_verification: bool,
-    instance_info: dict = {},
+    company_slug: str, config: GitConfig, git_creds: dict, skip_ssl_verification: bool,
 ):
     from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
 
@@ -344,7 +331,7 @@ def _get_jf_ingest_git_auth_config(
             return JFIngestGitAuthConfig(
                 company_slug=company_slug,
                 token=git_creds['github_token'],
-                base_url=config.git_url,  # NOTE: The Auth Config points to the REST API, not the GQL API !
+                base_url=config.git_url,
                 verify=not skip_ssl_verification,
             )
         if config.git_provider == GL_PROVIDER:
@@ -362,7 +349,11 @@ def _get_jf_ingest_git_auth_config(
 
 
 def get_ingest_config(
-    config: ValidatedConfig, creds, endpoint_jira_info: dict, endpoint_git_instances_info: dict
+    config: ValidatedConfig,
+    creds,
+    endpoint_jira_info: dict,
+    endpoint_git_instances_info: dict,
+    jf_options: dict,
 ) -> IngestionConfig:
     """
     Handles converting our agent config to the jf_ingest IngestionConfig
@@ -455,12 +446,7 @@ def get_ingest_config(
             config=agent_git_config,
             git_creds=instance_creds,
             skip_ssl_verification=config.skip_ssl_verification,
-            instance_info=endpoint_git_instance_info,
         )
-
-        repos_to_prs_last_updated = {}
-        repos_to_commits_backpopulated_to = {}
-        pull_prs_since_for_repo_in_org = {}
 
         def _make_datetimes_timezone_aware(datetime_str: str):
             dt = datetime.fromisoformat(datetime_str)
@@ -468,6 +454,12 @@ def get_ingest_config(
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt
 
+        repos_to_prs_last_updated = {}
+        repos_to_commits_backpopulated_to = {}
+        pull_prs_since_for_repo_in_org = {}
+        # All date-like objects have to be normalized to timezone-aware datetimes
+        # Values passed to the agent are pretty inconsistent (some of them are dates,
+        # all of them seem to be datetime agnostic)
         for repo_id, repo_info in endpoint_git_instance_info['repos_dict_v2'].items():
             if repo_info['latest_pr_update_date_pulled']:
                 repos_to_prs_last_updated[repo_id] = _make_datetimes_timezone_aware(
@@ -483,7 +475,6 @@ def get_ingest_config(
                 )
 
         pull_from = _make_datetimes_timezone_aware(endpoint_git_instance_info['pull_from'])
-        # pull_from = pull_from.replace(tzinfo=timezone.utc)
         git_configs.append(
             JFIngestGitConfig(
                 company_slug=company_slug,
@@ -491,8 +482,8 @@ def get_ingest_config(
                 instance_file_key=endpoint_git_instance_info['key'],
                 git_provider=agent_git_config.git_provider,
                 git_auth_config=jf_ingest_git_auth_config,
-                url=get_github_gql_base_url(agent_git_config.git_url),
-                jf_options={},
+                url=agent_git_config.git_url,
+                jf_options=jf_options,
                 repos_to_prs_last_updated=repos_to_prs_last_updated,
                 repos_to_commits_backpopulated_to=repos_to_commits_backpopulated_to,
                 repos_to_prs_backpopulated_to=pull_prs_since_for_repo_in_org,

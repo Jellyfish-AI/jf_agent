@@ -639,6 +639,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                     creds=creds,
                     endpoint_jira_info=endpoint_jira_info,
                     endpoint_git_instances_info=endpoint_git_instances_info,
+                    jf_options=jf_options,
                 )
                 success = load_and_push_jira_to_s3(ingest_config)
                 success_status_str = 'success' if success else 'failed'
@@ -692,6 +693,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 creds=creds,
                 endpoint_jira_info=endpoint_jira_info,
                 endpoint_git_instances_info=endpoint_git_instances_info,
+                jf_options=jf_options,
             )
             futures.append(
                 executor.submit(
