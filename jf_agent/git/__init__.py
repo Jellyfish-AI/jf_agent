@@ -9,6 +9,7 @@ import logging
 from jf_agent.git.github_gql_client import GithubGqlClient
 from stashy.client import Stash
 
+from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
 from jf_agent.session import retry_session
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 from jf_agent.git.github_client import GithubClient
@@ -17,19 +18,10 @@ from jf_agent.config_file_reader import GitConfig
 
 from jf_agent import download_and_write_streaming, write_file
 from jf_ingest import logging_helper, diagnostics
+from jf_ingest.config import IngestionConfig
+from jf_ingest.jf_git.adapters import GitAdapter as JFIngestGitAdapter
 
 logger = logging.getLogger(__name__)
-
-'''
-
-    Constants
-
-'''
-BBS_PROVIDER = 'bitbucket_server'
-BBC_PROVIDER = 'bitbucket_cloud'
-GH_PROVIDER = 'github'
-GL_PROVIDER = 'gitlab'
-PROVIDERS = [GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER]
 
 '''
 
@@ -290,13 +282,13 @@ def load_and_dump_git(
     compress_output_files: bool,
     git_connection,
     jf_options: dict,
+    jf_ingest_config: IngestionConfig,
 ):
     # use the unique git instance agent key to collate files
     instance_slug = endpoint_git_instance_info['slug']
     instance_key = endpoint_git_instance_info['key']
     outdir = f'{outdir}/git_{instance_key}'
     os.mkdir(outdir)
-
     try:
         if config.git_provider == 'bitbucket_server':
             # using old func method, todo: refactor to use GitAdapter
@@ -317,17 +309,18 @@ def load_and_dump_git(
                 config, outdir, compress_output_files, git_connection
             ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
-            from jf_agent.git.github_gql_adapter import GithubGqlAdapter
-
             if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
-                GithubGqlAdapter(
-                    config,
-                    outdir,
-                    compress_output_files,
-                    git_connection,
-                    server_git_instance_info=endpoint_git_instance_info,
-                    jf_options=jf_options,
-                ).load_and_dump_git(endpoint_git_instance_info)
+                for jf_ingest_git_config in jf_ingest_config.git_configs:
+                    if jf_ingest_git_config.instance_slug == instance_slug:
+                        logger.info(
+                            f'Setting up JF Ingest GQL adapter for instance {jf_ingest_git_config.instance_slug}'
+                        )
+                        git_adapter: JFIngestGitAdapter = JFIngestGitAdapter.get_git_adapter(
+                            jf_ingest_git_config
+                        )
+                        git_adapter.load_and_dump_git(
+                            git_config=jf_ingest_git_config, ingest_config=jf_ingest_config
+                        )
             else:
                 # using old func method, todo: refactor to use GitAdapter
                 # NOTE: We can hopefully do this with the above githubGqlAdapter!

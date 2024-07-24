@@ -45,7 +45,7 @@ from jf_agent.util import get_company_info, upload_file
 
 from jf_ingest import diagnostics, logging_helper
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
-from jf_ingest.config import IngestionType
+from jf_ingest.config import IngestionType, IngestionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -635,7 +635,11 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
             try:
                 logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
                 ingest_config = get_ingest_config(
-                    config=config, creds=creds, endpoint_jira_info=endpoint_jira_info
+                    config=config,
+                    creds=creds,
+                    endpoint_jira_info=endpoint_jira_info,
+                    endpoint_git_instances_info=endpoint_git_instances_info,
+                    jf_options=jf_options,
                 )
                 success = load_and_push_jira_to_s3(ingest_config)
                 success_status_str = 'success' if success else 'failed'
@@ -683,6 +687,14 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 if len(config.git_configs) > 1
                 else f"Starting Git download for {len(config.git_configs)} provided git configurations",
             )
+
+            ingest_config = get_ingest_config(
+                config=config,
+                creds=creds,
+                endpoint_jira_info=endpoint_jira_info,
+                endpoint_git_instances_info=endpoint_git_instances_info,
+                jf_options=jf_options,
+            )
             futures.append(
                 executor.submit(
                     _download_git_data,
@@ -692,6 +704,7 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                     endpoint_git_instances_info,
                     len(config.git_configs) > 1,
                     jf_options,
+                    ingest_config,
                 )
             )
 
@@ -699,7 +712,13 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
 
 def _download_git_data(
-    git_config, config, creds, endpoint_git_instances_info, is_multi_git_config, jf_options
+    git_config,
+    config,
+    creds,
+    endpoint_git_instances_info,
+    is_multi_git_config,
+    jf_options,
+    jf_ingest_config: IngestionConfig,
 ) -> dict:
     if is_multi_git_config:
         instance_slug = git_config.git_instance_slug
@@ -723,6 +742,7 @@ def _download_git_data(
         compress_output_files=config.compress_output_files,
         git_connection=git_connection,
         jf_options=jf_options,
+        jf_ingest_config=jf_ingest_config,
     )
 
 

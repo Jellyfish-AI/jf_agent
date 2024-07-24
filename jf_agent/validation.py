@@ -62,7 +62,13 @@ def full_validate(
     logger.info('Validating configuration...')
 
     try:
-        ingest_config = get_ingest_config(config, creds, jellyfish_endpoint_info.jira_info)
+        ingest_config = get_ingest_config(
+            config,
+            creds,
+            jellyfish_endpoint_info.jira_info,
+            jellyfish_endpoint_info.git_instance_info,
+            jf_options=jellyfish_endpoint_info.jf_options,
+        )
         if ingest_config.jira_config and not skip_jira:
             jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
         else:

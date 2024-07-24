@@ -4,6 +4,17 @@ from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
+'''
+
+    Constants
+
+'''
+BBS_PROVIDER = 'bitbucket_server'
+BBC_PROVIDER = 'bitbucket_cloud'
+GH_PROVIDER = 'github'
+GL_PROVIDER = 'gitlab'
+PROVIDERS = (GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER)
+
 # Return branches for which we should pull commits, specified by customer in git config.
 # The repo's default branch will always be included in the returned list.
 def get_branches_for_standardized_repo(repo: Any, included_branches: dict):
