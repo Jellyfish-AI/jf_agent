@@ -58,6 +58,9 @@ dev = [
     "pytest>=7.4.0",
 ]
 
+[tool.pdm.options]
+lock = ["--strategy", "inherit_metadata", "--python", ">=3.10,<3.11"]
+
 [project]
 name = "jf_agent"
 version = "0.0.1"
@@ -81,6 +84,7 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "jf-ingest==0.0.105",
+    "structlog>=24.4.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
