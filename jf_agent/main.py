@@ -28,7 +28,6 @@ from jf_agent.data_manifests.git.generator import create_manifests as create_git
 from jf_agent.data_manifests.manifest import Manifest
 from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.config_file_reader import get_ingest_config, obtain_config
-from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
     print_all_jira_fields,
