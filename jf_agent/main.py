@@ -689,16 +689,13 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
                 else f"Starting Git download for {len(config.git_configs)} provided git configurations",
             )
 
-            if git_config.git_provider in JF_INGEST_SUPPORTED_PROVIDERS:
-                ingest_config = get_ingest_config(
-                    config=config,
-                    creds=creds,
-                    endpoint_jira_info=endpoint_jira_info,
-                    endpoint_git_instances_info=endpoint_git_instances_info,
-                    jf_options=jf_options,
-                )
-            else:
-                ingest_config = None
+            ingest_config = get_ingest_config(
+                config=config,
+                creds=creds,
+                endpoint_jira_info=endpoint_jira_info,
+                endpoint_git_instances_info=endpoint_git_instances_info,
+                jf_options=jf_options,
+            )
             futures.append(
                 executor.submit(
                     _download_git_data,

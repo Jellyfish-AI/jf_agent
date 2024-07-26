@@ -20,6 +20,7 @@ from jf_ingest.config import (
     GitAuthConfig as JFIngestGitAuthConfig,
 )
 
+from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
 from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
@@ -429,6 +430,9 @@ def get_ingest_config(
     is_mult_git_mode = len(config.git_configs) > 1
     for agent_git_config in config.git_configs:
         agent_git_config: GitConfig = agent_git_config
+
+        if agent_git_config.git_provider not in JF_INGEST_SUPPORTED_PROVIDERS:
+            continue
 
         if is_mult_git_mode:
             instance_slug = agent_git_config.git_instance_slug
