@@ -67,9 +67,9 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
 
     jira_conn = JIRA(**kwargs)
 
-    jira_conn._session.headers[
-        'User-Agent'
-    ] = f'jellyfish/1.0 ({jira_conn._session.headers["User-Agent"]})'
+    jira_conn._session.headers['User-Agent'] = (
+        f'jellyfish/1.0 ({jira_conn._session.headers["User-Agent"]})'
+    )
 
     return jira_conn
 
