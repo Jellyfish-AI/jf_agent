@@ -1,16 +1,18 @@
-from datetime import datetime
 import logging
-import stashy
+from datetime import datetime
+
 import pytz
+import stashy
+from jf_ingest import diagnostics, logging_helper
+from requests.exceptions import ChunkedEncodingError, RetryError
 from tqdm import tqdm
-from requests.exceptions import RetryError, ChunkedEncodingError
 from urllib3.exceptions import MaxRetryError
+
+from jf_agent import download_and_write_streaming, write_file
+from jf_agent.config_file_reader import GitConfig
 from jf_agent.git import pull_since_date_for_repo
 from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent import download_and_write_streaming, write_file
-from jf_agent.config_file_reader import GitConfig
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -238,9 +240,9 @@ def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_na
         'message': sanitize_text(commit.get('message'), strip_text_content),
         'is_merge': len(commit['parents']) > 1,
         'repo': _standardize_pr_repo(repo, redact_names_and_urls),
-        'branch_name': branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(branch_name),
+        'branch_name': (
+            branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        ),
     }
 
 

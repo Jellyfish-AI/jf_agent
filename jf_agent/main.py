@@ -1,51 +1,44 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-import traceback
-import dotenv
 import gzip
+import json
 import logging
 import os
 import shutil
+import sys
 import threading
+import traceback
 from collections import namedtuple
+from concurrent.futures import ThreadPoolExecutor
 from glob import glob
 from pathlib import Path
-import sys
 
+import dotenv
 import requests
-import json
+from jf_ingest import diagnostics, logging_helper
+from jf_ingest.config import IngestionConfig, IngestionType
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
 
 from jf_agent import (
-    agent_logging,
-    write_file,
-    VALID_RUN_MODES,
     JELLYFISH_API_BASE,
     JELLYFISH_WEBHOOK_BASE,
+    VALID_RUN_MODES,
+    agent_logging,
+    write_file,
 )
-from jf_agent.exception import BadConfigException
-from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
-from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
-from jf_agent.data_manifests.manifest import Manifest
-from jf_agent.git import load_and_dump_git, get_git_client
 from jf_agent.config_file_reader import get_ingest_config, obtain_config
+from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
+from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
+from jf_agent.data_manifests.manifest import Manifest
+from jf_agent.exception import BadConfigException
+from jf_agent.git import get_git_client, load_and_dump_git
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
-    print_all_jira_fields,
     load_and_dump_jira,
+    print_all_jira_fields,
     print_missing_repos_found_by_jira,
 )
-
-from jf_agent.validation import (
-    full_validate,
-    validate_num_repos,
-    ProjectMetadata,
-)
-
 from jf_agent.util import get_company_info, upload_file
-
-from jf_ingest import diagnostics, logging_helper
-from jf_ingest.jf_jira import load_and_push_jira_to_s3
-from jf_ingest.config import IngestionType, IngestionConfig
+from jf_agent.validation import ProjectMetadata, full_validate, validate_num_repos
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +270,6 @@ def main():
                 return False
 
     finally:
-
         # Kills the sys_diag_collector thread.
         # We need to do this before exiting, otherwise we'll hang forever and never exit until timeout kills it.
         logger.info('Shutting down Systems Diagnostics Thread')
@@ -544,7 +536,9 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             )
             logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     else:
-        logger.info('No Git Configuration detection, skipping Git manifests generation',)
+        logger.info(
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
 
     logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
@@ -627,7 +621,9 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
     download_data_status = []
 
     if config.jira_url:
-        logger.info('Obtained Jira configuration, attempting download...',)
+        logger.info(
+            'Obtained Jira configuration, attempting download...',
+        )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
@@ -681,11 +677,13 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
         for git_config in git_configs:
             logger.info(
-                f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
-                + f'in parallel with {config.git_max_concurrent} workers, '
-                + f'for {len(git_config.git_include_projects)} projects'
-                if len(config.git_configs) > 1
-                else f"Starting Git download for {len(config.git_configs)} provided git configurations",
+                (
+                    f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
+                    + f'in parallel with {config.git_max_concurrent} workers, '
+                    + f'for {len(git_config.git_include_projects)} projects'
+                    if len(config.git_configs) > 1
+                    else f"Starting Git download for {len(config.git_configs)} provided git configurations"
+                ),
             )
 
             ingest_config = get_ingest_config(
@@ -776,7 +774,10 @@ def send_data(config, creds, successful=True):
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
-                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+                logging.ERROR,
+                msg_args=[filename],
+                error_code=3000,
+                exc_info=True,
             )
 
     # Compress any not yet compressed files before sending
@@ -813,7 +814,8 @@ def send_data(config, creds, successful=True):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread,
+            args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]

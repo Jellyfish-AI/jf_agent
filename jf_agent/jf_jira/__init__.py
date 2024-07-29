@@ -1,33 +1,33 @@
-from datetime import datetime
-from itertools import chain
 import logging
 import traceback
+from datetime import datetime
+from itertools import chain
 
+from jf_ingest import diagnostics, logging_helper
 from jira import JIRA
 from jira.resources import GreenHopperResource
 
 from jf_agent import download_and_write_streaming, write_file
 from jf_agent.jf_jira.jira_download import (
+    IssueMetadata,
+    detect_issues_needing_re_download,
+    detect_issues_needing_sync,
+    download_all_issue_metadata,
     download_boards_and_sprints,
     download_customfieldoptions,
     download_fields,
-    download_all_issue_metadata,
-    detect_issues_needing_sync,
-    detect_issues_needing_re_download,
-    download_necessary_issues,
     download_issuelinktypes,
     download_issuetypes,
+    download_missing_repos_found_by_jira,
+    download_necessary_issues,
     download_priorities,
     download_projects_and_versions,
     download_resolutions,
+    download_statuses,
+    download_teams,
     download_users,
     download_worklogs,
-    download_statuses,
-    download_missing_repos_found_by_jira,
-    download_teams,
-    IssueMetadata,
 )
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 

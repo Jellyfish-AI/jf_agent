@@ -1,5 +1,6 @@
-import gitlab
 import logging
+
+import gitlab
 import requests
 
 from jf_agent.git.utils import log_and_print_request_error

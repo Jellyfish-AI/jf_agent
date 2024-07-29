@@ -1,13 +1,12 @@
 import bisect
-from collections import namedtuple, defaultdict
-from contextlib import contextmanager
-from datetime import datetime, timedelta
 import logging
 import threading
 import time
+from collections import defaultdict, namedtuple
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 import requests
-
 from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,9 @@ class RateLimiter(object):
                     if e.response.status_code == 429:
                         # Got rate limited anyway!
                         logging_helper.log_standard_error(
-                            logging.ERROR, msg_args=[calls_made, max_calls, realm], error_code=3010,
+                            logging.ERROR,
+                            msg_args=[calls_made, max_calls, realm],
+                            error_code=3010,
                         )
                     raise
 

@@ -1,31 +1,31 @@
-from datetime import datetime, timezone
-import traceback
-from jf_agent.git.github_gql_client import GithubGqlClient
-from jf_agent.git.github_gql_utils import github_gql_format_to_datetime
-from jf_agent.git.utils import get_branches_for_standardized_repo
-from tqdm import tqdm
-from dateutil import parser
-from typing import List
 import logging
+import traceback
+from datetime import datetime, timezone
+from typing import List
+
+from dateutil import parser
+from jf_ingest import diagnostics, logging_helper
+from tqdm import tqdm
+
+from jf_agent.config_file_reader import GitConfig
 from jf_agent.git import (
     GitAdapter,
-    StandardizedUser,
-    StandardizedProject,
     StandardizedBranch,
-    StandardizedRepository,
     StandardizedCommit,
+    StandardizedProject,
     StandardizedPullRequest,
     StandardizedPullRequestComment,
     StandardizedPullRequestReview,
+    StandardizedRepository,
     StandardizedShortRepository,
+    StandardizedUser,
     pull_since_date_for_repo,
 )
-from jf_agent.git.utils import log_and_print_request_error
+from jf_agent.git.github_gql_client import GithubGqlClient
+from jf_agent.git.github_gql_utils import github_gql_format_to_datetime
+from jf_agent.git.utils import get_branches_for_standardized_repo, log_and_print_request_error
 from jf_agent.main import JellyfishEndpointInfo
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent.config_file_reader import GitConfig
-
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,10 @@ class GithubGqlAdapter(GitAdapter):
                 continue
 
             projects.append(
-                _standardize_project(organization, self.config.git_redact_names_and_urls,)
+                _standardize_project(
+                    organization,
+                    self.config.git_redact_names_and_urls,
+                )
             )
         logger.info('✓')
 
@@ -99,7 +102,8 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_repos(
-        self, standardized_projects: List[StandardizedProject],
+        self,
+        standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
         logger.info('downloading github repos...')
 
@@ -250,13 +254,14 @@ class GithubGqlAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_pull_requests(
-        self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
+        self,
+        standardized_repos: List[StandardizedRepository],
+        server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
         logger.info('downloading github prs...')
 
         nrm_prs = []
         for i, nrm_repo in enumerate(standardized_repos, start=1):
-
             with logging_helper.log_loop_iters('repo for pull requests', i, 1):
                 try:
                     # Check if we flagged this repo as quiescent
@@ -341,7 +346,12 @@ def _standardize_user(api_user) -> StandardizedUser:
     email = api_user.get('email')
     # raw user, just have email (e.g. from a commit)
     if not id:
-        return StandardizedUser(id=email, login=email, name=name, email=email,)
+        return StandardizedUser(
+            id=email,
+            login=email,
+            name=name,
+            email=email,
+        )
 
     # API user, where github matched to a known account
     return StandardizedUser(id=id, login=login, name=name, email=email)
@@ -351,24 +361,30 @@ def _standardize_project(api_org: dict, redact_names_and_urls: bool) -> Standard
     return StandardizedProject(
         id=api_org['id'],
         login=api_org['login'],
-        name=api_org.get('name')
-        if not redact_names_and_urls
-        else _project_redactor.redact_name(api_org.get('name')),
+        name=(
+            api_org.get('name')
+            if not redact_names_and_urls
+            else _project_redactor.redact_name(api_org.get('name'))
+        ),
         url=api_org['url'] if not redact_names_and_urls else None,
     )
 
 
 def _standardize_branch(api_branch, redact_names_and_urls: bool) -> StandardizedBranch:
     return StandardizedBranch(
-        name=api_branch['name']
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(api_branch['name']),
+        name=(
+            api_branch['name']
+            if not redact_names_and_urls
+            else _branch_redactor.redact_name(api_branch['name'])
+        ),
         sha=api_branch['target']['sha'],
     )
 
 
 def _standardize_repo(
-    api_repo, standardized_project: StandardizedProject, redact_names_and_urls: bool,
+    api_repo,
+    standardized_project: StandardizedProject,
+    redact_names_and_urls: bool,
 ) -> StandardizedRepository:
     repo_name = (
         api_repo['name']
@@ -428,9 +444,9 @@ def _standardize_commit(
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=api_commit['parents']['totalCount'] > 1,
         repo=standardized_repo.short(),  # use short form of repo
-        branch_name=branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(branch_name),
+        branch_name=(
+            branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        ),
     )
 
 

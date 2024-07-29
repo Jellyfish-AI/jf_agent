@@ -1,12 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
-from jf_agent.data_manifests.jira.adapter import JiraCloudManifestAdapter
-
-from jf_agent.data_manifests.jira.manifest import JiraDataManifest, JiraProjectManifest
-from jf_agent.data_manifests.manifest import ManifestSource
 from jira import JIRAError
 
+from jf_agent.data_manifests.jira.adapter import JiraCloudManifestAdapter
+from jf_agent.data_manifests.jira.manifest import JiraDataManifest, JiraProjectManifest
+from jf_agent.data_manifests.manifest import ManifestSource
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,6 @@ def create_manifest(company_slug, config, creds):
     # plus one 'global' jira manifest thread that will get
     # all totals (sprints, boards, issues, etc)
     with ThreadPoolExecutor(max_workers=5) as executor:
-
         _agent_log(f'Processing {len(project_data_dicts)} Jira Projects...')
 
         # Create future for global Jira Manifest. This will be our main JiraManifest,
@@ -74,7 +72,6 @@ def create_manifest(company_slug, config, creds):
 
 
 def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> JiraDataManifest:
-
     total_users_count = manifest_adapter.get_users_count()
     total_fields_count = manifest_adapter.get_fields_count()
     total_resolutions_count = manifest_adapter.get_resolutions_count()
@@ -109,11 +106,9 @@ def process_global_jira_data(manifest_adapter: JiraCloudManifestAdapter) -> Jira
 def generate_project_manifest(
     manifest_adapter: JiraCloudManifestAdapter, project_data_dict: dict
 ) -> JiraProjectManifest:
-
     project_key = project_data_dict['key']
     project_id = int(project_data_dict['id'])
     try:
-
         # FIRST, DO A BASIC TEST TO SEE IF WE HAVE THE PROPER PERMISSIONS
         # TO SEE ANY DATA IN THIS PROJECT
         if not manifest_adapter.test_basic_auth_for_project(project_id=project_id):

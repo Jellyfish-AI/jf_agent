@@ -1,16 +1,14 @@
 import gzip
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-import json
 from typing import Optional, TypeVar
 
 import requests
-
 from jf_ingest import logging_helper
-
 
 logger = logging.getLogger(__name__)
 

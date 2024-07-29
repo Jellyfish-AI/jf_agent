@@ -1,26 +1,26 @@
-from collections import namedtuple, defaultdict
 import json
 import logging
 import math
+import queue
 import random
 import re
+import string
+import sys
+import threading
 import traceback
+from collections import defaultdict, namedtuple
 from typing import Dict
 
 from dateutil import parser
+from jf_ingest import diagnostics, logging_helper
+from jf_ingest.utils import retry_for_status
 from jira.exceptions import JIRAError
 from jira.resources import dict2resource
 from jira.utils import json_loads
-import queue
-import sys
-import string
-import threading
 from tqdm import tqdm
 
 from jf_agent.jf_jira.utils import retry_for_status
 from jf_agent.util import split
-from jf_ingest import diagnostics, logging_helper
-from jf_ingest.utils import retry_for_status
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,9 @@ def download_issuetypes(jira_connection, project_ids):
     For issue types that are scoped to projects, only extract the ones
     in the extracted projects.
     '''
-    logger.info('downloading jira issue types...  [!n]',)
+    logger.info(
+        'downloading jira issue types...  [!n]',
+    )
     result = []
     for it in retry_for_status(jira_connection.issue_types):
         if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
@@ -204,7 +206,9 @@ def download_projects_and_versions(
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
                 logging_helper.log_standard_error(
-                    logging.ERROR, msg_args=[project_id], error_code=2112,
+                    logging.ERROR,
+                    msg_args=[project_id],
+                    error_code=2112,
                 )
                 return False
             else:
@@ -269,7 +273,9 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             except JIRAError as e:
                 if e.status_code == 400:
                     logging_helper.log_standard_error(
-                        logging.ERROR, msg_args=[project_id], error_code=2202,
+                        logging.ERROR,
+                        msg_args=[project_id],
+                        error_code=2202,
                     )
                     break
                 raise
@@ -357,7 +363,9 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
             batch_size = int(batch_size / 2)
             error = e
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[batch_size], error_code=3012,
+                logging.WARNING,
+                msg_args=[batch_size],
+                error_code=3012,
             )
 
     # copied logic from jellyfish direct connect
@@ -437,7 +445,9 @@ def download_all_issue_metadata(
             except Exception as e:
                 thread_exceptions[thread_num] = e
                 logging_helper.log_standard_error(
-                    logging.ERROR, msg_args=[thread_num, traceback.format_exc()], error_code=3032,
+                    logging.ERROR,
+                    msg_args=[thread_num, traceback.format_exc()],
+                    error_code=3032,
                 )
 
         threads = [
@@ -607,7 +617,9 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
                 logging_helper.log_standard_error(
-                    level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
+                    level=logging.WARNING,
+                    error_code=3082,
+                    msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -668,7 +680,10 @@ def _download_jira_issues_segment(
 
     except BaseException as e:
         logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
+            logging.ERROR,
+            msg_args=[thread_num],
+            error_code=3042,
+            exc_info=True,
         )
         q.put(e)
 
@@ -710,14 +725,20 @@ def _download_jira_issues_page(
 
             batch_size = int(batch_size / 2)
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+                logging.WARNING,
+                msg_args=[e, batch_size],
+                error_code=3052,
+                exc_info=True,
             )
             if batch_size == 0:
                 if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                     return [], 1
                 elif not get_changelog:
                     agent_logging.log_and_print_error_or_warning(
-                        logger, logging.WARNING, msg_args=[search_params], error_code=3062,
+                        logger,
+                        logging.WARNING,
+                        msg_args=[search_params],
+                        error_code=3062,
                     )
                     return [], 0
                 else:
@@ -967,8 +988,8 @@ def _search_users(
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
-    from jf_agent.jf_jira import get_basic_jira_connection
     from jf_agent.git import get_git_client
+    from jf_agent.jf_jira import get_basic_jira_connection
 
     # obtain list of repos in jira
     jira_connection = get_basic_jira_connection(config, creds)
@@ -1012,7 +1033,8 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
             except JIRAError as e:
                 if e.status_code == 403:
                     logging_helper.log_standard_error(
-                        logging.ERROR, error_code=2122,
+                        logging.ERROR,
+                        error_code=2122,
                     )
                     return []
 
