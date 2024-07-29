@@ -28,7 +28,7 @@ jobs:
         pip install pdm && pdm install --dev
     - name: Formatting check (black)
       run: |
-        pdm run black --check .
+        black --check .
     - name: Imports sorting check (isort)
       run: |
         pdm run isort --check .
