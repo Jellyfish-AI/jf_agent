@@ -1,8 +1,12 @@
-import traceback
-from dateutil import parser
 import logging
+import traceback
+
+from dateutil import parser
+from jf_ingest import diagnostics, logging_helper
 from tqdm import tqdm
 
+from jf_agent import download_and_write_streaming, write_file
+from jf_agent.config_file_reader import GitConfig
 from jf_agent.git import (
     GithubClient,
     StandardizedBranch,
@@ -14,13 +18,10 @@ from jf_agent.git import (
     StandardizedRepository,
     StandardizedShortRepository,
     StandardizedUser,
+    pull_since_date_for_repo,
 )
-from jf_agent.git import pull_since_date_for_repo
 from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent import download_and_write_streaming, write_file
-from jf_agent.config_file_reader import GitConfig
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,10 @@ def load_and_dump(
         )
         logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     write_file(
-        outdir, 'bb_users', compress_output_files, get_users(git_conn, config.git_include_projects),
+        outdir,
+        'bb_users',
+        compress_output_files,
+        get_users(git_conn, config.git_include_projects),
     )
 
     write_file(
@@ -254,9 +258,9 @@ def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_na
         author=_standardize_user(author),
         is_merge=len(commit['parents']) > 1,
         repo=_standardize_pr_repo(repo, redact_names_and_urls),
-        branch_name=branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(branch_name),
+        branch_name=(
+            branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        ),
     )
 
 

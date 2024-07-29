@@ -35,3 +35,11 @@ Here's how to fix it:
         jellyfishco/jf_agent:stable \
         $@
     ```
+
+## Development
+Initial set-up
+```bash
+pdm install --dev
+pdm run pre-commit install
+```
+

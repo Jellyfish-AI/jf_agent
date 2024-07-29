@@ -1,11 +1,12 @@
-import os
-import requests_mock
-import time
 import json
+import os
+import time
 from unittest import TestCase
+
+import requests_mock
 from jira.resources import Issue as JiraIssue
 
-from jf_agent.jf_jira.jira_download import get_issues, download_all_issue_metadata
+from jf_agent.jf_jira.jira_download import download_all_issue_metadata, get_issues
 from tests.utils import get_connection
 
 

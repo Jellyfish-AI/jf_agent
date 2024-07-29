@@ -1,9 +1,9 @@
 import json
 import unittest
-
-from dateutil import parser
 from unittest import TestCase
 from unittest.mock import MagicMock
+
+from dateutil import parser
 
 from jf_agent.git import StandardizedShortRepository
 from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter

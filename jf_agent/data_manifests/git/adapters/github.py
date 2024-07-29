@@ -1,5 +1,6 @@
-from dateutil import parser as datetime_parser
 from typing import Generator
+
+from dateutil import parser as datetime_parser
 
 from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
 from jf_agent.data_manifests.git.manifest import (
@@ -15,11 +16,17 @@ from jf_agent.git.github_gql_client import GithubGqlClient
 # TODO: Expand or generalize this to work with things other than github (BBCloud, Gitlab, etc)
 class GithubManifestGenerator(ManifestAdapter):
     '''
-    Basic client for probing a GH instance. 
+    Basic client for probing a GH instance.
     '''
 
     def __init__(
-        self, token: str, base_url: str, company: str, org: str, instance: str, verify=True,
+        self,
+        token: str,
+        base_url: str,
+        company: str,
+        org: str,
+        instance: str,
+        verify=True,
     ) -> None:
         # Super class fields
         self.company = company
@@ -50,12 +57,14 @@ class GithubManifestGenerator(ManifestAdapter):
                 user_count=repo['users']['totalCount'],
                 pull_request_count=repo['prs']['totalCount'],
                 branch_count=repo['branches']['totalCount'],
-                commits_on_default_branch=repo['defaultBranch']['target']['history']['totalCount']
-                if repo['defaultBranch']
-                else 0,
-                default_branch_name=repo['defaultBranch']['name']
-                if repo['defaultBranch']
-                else None,
+                commits_on_default_branch=(
+                    repo['defaultBranch']['target']['history']['totalCount']
+                    if repo['defaultBranch']
+                    else 0
+                ),
+                default_branch_name=(
+                    repo['defaultBranch']['name'] if repo['defaultBranch'] else None
+                ),
             )
 
     def get_all_user_data(self) -> Generator[GitUserManifest, None, None]:

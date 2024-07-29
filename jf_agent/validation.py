@@ -1,24 +1,22 @@
 import logging
 import os
-import psutil
 import shutil
 
+import psutil
 import requests
-
-from jf_agent.data_manifests.git.generator import get_instance_slug
-from jf_agent.config_file_reader import get_ingest_config
-from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
 from jf_ingest.validation import (
-    validate_jira,
     GitConnectionHealthCheckResult,
-    JiraConnectionHealthCheckResult,
     IngestionHealthCheckResult,
     IngestionType,
+    JiraConnectionHealthCheckResult,
+    validate_jira,
 )
 
-from jf_agent.util import upload_file
-
 from jf_agent import write_file
+from jf_agent.config_file_reader import get_ingest_config
+from jf_agent.data_manifests.git.generator import get_instance_slug
+from jf_agent.git import GithubGqlClient, get_git_client, get_nested_repos_from_git
+from jf_agent.util import upload_file
 
 logger = logging.getLogger(__name__)
 
