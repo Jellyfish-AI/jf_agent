@@ -20,7 +20,6 @@ from jf_ingest.config import (
     GitAuthConfig as JFIngestGitAuthConfig,
 )
 
-from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
 from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
@@ -360,6 +359,8 @@ def get_ingest_config(
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
     """
+    from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
+
     company_info = get_company_info(config, creds)
 
     company_slug = company_info.get('company_slug')
