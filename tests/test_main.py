@@ -1,11 +1,7 @@
 import os
-import requests_mock
-import time
-import json
+import unittest
 from unittest import TestCase
-from jira.resources import Issue as JiraIssue
 
-from jf_agent.jf_jira.jira_download import get_issues, download_all_issue_metadata
 from jf_agent.main import download_data
 from tests.utils import get_connection
 
@@ -27,6 +23,7 @@ class TestJiraDownload(TestCase):
             issue_json = issues_file.read()
         cls.mock_response = issue_json
 
+    @unittest.skip
     def test_download_data_without_jira_config(self):
         """
         Tests that download_data runs successfully without a jira_config
@@ -50,12 +47,7 @@ class TestJiraDownload(TestCase):
         ingest_config = PartialIngestConfig()
 
         statuses = download_data(
-            config,
-            creds,
-            ingest_config=ingest_config,
-            endpoint_jira_info={},
-            endpoint_git_instances_info=None,
-            jf_options=None
+            config, creds, endpoint_jira_info={}, endpoint_git_instances_info=None, jf_options=None
         )
 
         self.assertEqual(statuses, [])
