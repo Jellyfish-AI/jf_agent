@@ -31,7 +31,6 @@ e.g., function names, iteration counts
 '''
 
 LOG_FILE_NAME = 'jf_agent.log'
-LOG_FORMAT = logging.Formatter(fmt='%(message)s')
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +226,7 @@ def configure_structlog() -> None:
     """
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
@@ -242,7 +242,7 @@ def configure_structlog() -> None:
                     structlog.processors.CallsiteParameter.LINENO,
                 }
             ),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -253,15 +253,14 @@ def configure_structlog() -> None:
 def bind_context_vars(
     run_mode: str, company_slug: Optional[str], upload_time: str,
 ) -> None:
-    context_vars = {
-        'run_mode': run_mode,
-        'company_slug': company_slug,
-        'upload_time': upload_time,
-        'agent_run_uuid': str(uuid.uuid4()),
-        'jf_meta': {'commit': os.getenv("SHA"), 'timestamp': os.getenv("BUILDTIME")},
-    }
-
-    structlog.contextvars.bind_contextvars(**context_vars)
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        run_mode=run_mode,
+        company_slug=company_slug,
+        upload_time=upload_time,
+        agent_run_uuid=str(uuid.uuid4()),
+        jf_meta={'commit': os.getenv("SHA"), 'timestamp': os.getenv("BUILDTIME")}
+    )
 
 
 def configure(
@@ -270,21 +269,26 @@ def configure(
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     console_log_handler = CustomStreamHandler(stream=sys.stdout)
-    console_log_handler.setFormatter(LOG_FORMAT)
+    console_log_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
+
+    # logging in agent.log and those sent to the queue should be identical
+    file_and_queue_formatter = logging.Formatter(
+        fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s'
+    )
 
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
     # We want to catch as much as possible in the Agent Log File!!
     logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
-    logfile_handler.setFormatter(LOG_FORMAT)
+    logfile_handler.setFormatter(file_and_queue_formatter)
     # Set Log File Handler to DEBUG to catch as much debugging information as possible
     logfile_handler.setLevel(logging.DEBUG)
 
     log_queue = Queue(-1)  # no size bound
     log_queue_handler = CustomQueueHandler(log_queue, webhook_base, api_token)
-    log_queue_handler.setFormatter(LOG_FORMAT)
+    log_queue_handler.setFormatter(file_and_queue_formatter)
     log_queue_handler.setLevel(logging.DEBUG)
     queue_listener = CustomQueueListener(log_queue, log_queue_handler, respect_handler_level=True)
     queue_listener.start()

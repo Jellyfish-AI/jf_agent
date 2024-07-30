@@ -51,7 +51,7 @@ from jf_ingest.config import IngestionType, IngestionConfig
 # Configure structlog before any loggers are created
 agent_logging.configure_structlog()
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def main():
