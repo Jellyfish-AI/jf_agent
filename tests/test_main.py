@@ -1,17 +1,17 @@
-import json
 import os
-import time
-from unittest import TestCase
-
 import requests_mock
+import time
+import json
+from unittest import TestCase
 from jira.resources import Issue as JiraIssue
 
-from jf_agent.jf_jira.jira_download import download_all_issue_metadata, get_issues
+from jf_agent.jf_jira.jira_download import get_issues, download_all_issue_metadata
 from jf_agent.main import download_data
 from tests.utils import get_connection
 
 
 class TestJiraDownload(TestCase):
+
     start_at = 0
     max_results = 100
 
@@ -55,7 +55,7 @@ class TestJiraDownload(TestCase):
             ingest_config=ingest_config,
             endpoint_jira_info={},
             endpoint_git_instances_info=None,
-            jf_options=None,
+            jf_options=None
         )
 
         self.assertEqual(statuses, [])

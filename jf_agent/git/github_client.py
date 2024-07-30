@@ -1,15 +1,14 @@
-import logging
-import time
 from collections import deque
 from datetime import datetime, timedelta
-
+import logging
 import pytz
 import requests
-from jf_ingest import logging_helper
 from requests import HTTPError, Response
 from requests.utils import default_user_agent
+import time
 
 from jf_agent.session import retry_session
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +50,7 @@ class GithubClient:
                     raise
 
                 logging_helper.log_standard_error(
-                    logging.WARNING,
-                    msg_args=[m["url"], e.response.status_code],
-                    error_code=3061,
+                    logging.WARNING, msg_args=[m["url"], e.response.status_code], error_code=3061,
                 )
 
     def get_all_repos(self, org):
@@ -69,9 +66,7 @@ class GithubClient:
                 # we've seen some strange behavior with ghe, where we can get a 403 for
                 # a repo that comes back in the list.  SKip them.
                 logging_helper.log_standard_error(
-                    logging.WARNING,
-                    msg_args=[m["url"]],
-                    error_code=3081,
+                    logging.WARNING, msg_args=[m["url"]], error_code=3081,
                 )
 
     def get_branches(self, full_repo):
@@ -146,9 +141,7 @@ class GithubClient:
 
                 if i >= max_retries:
                     logging_helper.log_standard_error(
-                        logging.ERROR,
-                        msg_args=[url, i],
-                        error_code=3101,
+                        logging.ERROR, msg_args=[url, i], error_code=3101,
                     )
                     raise
 
@@ -170,9 +163,7 @@ class GithubClient:
                 reset_wait_in_seconds = min(reset_wait_in_seconds, 3600)
                 reset_wait_str = str(timedelta(seconds=reset_wait_in_seconds))
                 logging_helper.log_standard_error(
-                    logging.WARNING,
-                    msg_args=[reset_wait_str],
-                    error_code=3091,
+                    logging.WARNING, msg_args=[reset_wait_str], error_code=3091,
                 )
                 # often the GH reset time is off by <1 second, causing another rate-limit. 2 seconds buffer added.
                 time.sleep(reset_wait_in_seconds + 2)

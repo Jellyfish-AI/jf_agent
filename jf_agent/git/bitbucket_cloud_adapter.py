@@ -1,29 +1,29 @@
-import logging
-import re
-from typing import List
-
-import requests
-from dateutil import parser
-from jf_ingest import diagnostics, logging_helper
+from jf_agent.git.utils import get_branches_for_standardized_repo
 from tqdm import tqdm
+import re
+from dateutil import parser
+from typing import List
+import logging
+import requests
 
-from jf_agent.config_file_reader import GitConfig
 from jf_agent.git import (
     GitAdapter,
-    StandardizedBranch,
-    StandardizedCommit,
+    StandardizedUser,
     StandardizedProject,
+    StandardizedBranch,
+    StandardizedRepository,
+    StandardizedCommit,
     StandardizedPullRequest,
     StandardizedPullRequestComment,
     StandardizedPullRequestReview,
-    StandardizedRepository,
     StandardizedShortRepository,
-    StandardizedUser,
     pull_since_date_for_repo,
 )
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
-from jf_agent.git.utils import get_branches_for_standardized_repo
+
 from jf_agent.name_redactor import NameRedactor, sanitize_text
+from jf_agent.config_file_reader import GitConfig
+from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,7 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_repos(
-        self,
-        standardized_projects: List[StandardizedProject],
+        self, standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
         logger.info('downloading bitbucket repos...')
 
@@ -196,9 +195,7 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_pull_requests(
-        self,
-        standardized_repos: List[StandardizedRepository],
-        server_git_instance_info,
+        self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
         logger.info('downloading bitbucket prs...')
         for i, repo in enumerate(
@@ -228,9 +225,7 @@ class BitbucketCloudAdapter(GitAdapter):
                                 or not api_pr['destination']['repository']
                             ):
                                 logging_helper.log_standard_error(
-                                    logging.WARNING,
-                                    msg_args=[api_pr['id']],
-                                    error_code=3030,
+                                    logging.WARNING, msg_args=[api_pr['id']], error_code=3030,
                                 )
                                 continue
 
@@ -262,10 +257,7 @@ class BitbucketCloudAdapter(GitAdapter):
                 except Exception:
                     # if something happens when pulling PRs for a repo, just keep going.
                     logging_helper.log_standard_error(
-                        logging.ERROR,
-                        msg_args=[repo.id],
-                        error_code=3021,
-                        exc_info=True,
+                        logging.ERROR, msg_args=[repo.id], error_code=3021, exc_info=True,
                     )
 
         logger.info('Done downloading PRs!')
@@ -353,9 +345,9 @@ def _standardize_commit(
         message=sanitize_text(api_commit['message'], strip_text_content),
         is_merge=len(api_commit['parents']) > 1,
         repo=standardized_repo.short(),  # use short form of repo
-        branch_name=(
-            branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
-        ),
+        branch_name=branch_name
+        if not redact_names_and_urls
+        else _branch_redactor.redact_name(branch_name),
     )
 
 
@@ -380,26 +372,13 @@ def _standardize_user(api_user):
         username, email = m.groups()
         username = username.strip()
         email = email.strip()
-        return StandardizedUser(
-            id=raw_name,
-            login=email,
-            name=username,
-            email=email,
-        )
+        return StandardizedUser(id=raw_name, login=email, name=username, email=email,)
 
-    return StandardizedUser(
-        id=raw_name,
-        name=raw_name,
-        login=raw_name,
-    )
+    return StandardizedUser(id=raw_name, name=raw_name, login=raw_name,)
 
 
 def _standardize_pr(
-    client,
-    repo,
-    api_pr,
-    strip_text_content: bool,
-    redact_names_and_urls: bool,
+    client, repo, api_pr, strip_text_content: bool, redact_names_and_urls: bool,
 ):
     # Process the PR's diff to get additions, deletions, changed_files
     additions, deletions, changed_files = None, None, None
@@ -408,9 +387,7 @@ def _standardize_pr(
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[api_pr["id"], repo.id],
-                error_code=3031,
+                logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3031,
             )
     except requests.exceptions.RetryError:
         # Server threw a 500 on the request for the diff and we started retrying;
@@ -424,9 +401,7 @@ def _standardize_pr(
         elif e.response.status_code == 401:
             # Server threw a 401 on the request for the diff; not sure why this would be, but it seems rare
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[api_pr["id"], repo.id],
-                error_code=3041,
+                logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3041,
             )
         else:
             # Some other HTTP error happened; Re-raise
@@ -434,9 +409,7 @@ def _standardize_pr(
     except UnicodeDecodeError:
         # Occasional diffs seem to be invalid UTF-8
         logging_helper.log_standard_error(
-            logging.WARNING,
-            msg_args=[api_pr["id"], repo.id],
-            error_code=3051,
+            logging.WARNING, msg_args=[api_pr["id"], repo.id], error_code=3051,
         )
 
     # Comments
@@ -463,8 +436,7 @@ def _standardize_pr(
                 review_state='APPROVED',
             )
             for i, approval in enumerate(
-                (a['approval'] for a in activity if 'approval' in a),
-                start=1,
+                (a['approval'] for a in activity if 'approval' in a), start=1,
             )
         ]
 

@@ -4,11 +4,11 @@ from typing import Any, TypeVar
 
 from jf_agent.data_manifests.manifest import Manifest, ManifestSource
 
+
 IGitDataManifest = TypeVar('IGitDataManifest', bound='GitDataManifest')
 IGitRepoManifest = TypeVar('IGitRepoManifest', bound='GitRepoManifest')
 IGitUserManifest = TypeVar('IGitUserManifest', bound='GitUserManifest')
 IGitPullRequestManifest = TypeVar('IGitPullRequestManifest', bound='GitPullRequestManifest')
-
 
 # This is the parent class for all GitManifest type classes. It inherits
 # from manifests, but ensures that all 'GitManifests' have an instance
@@ -53,6 +53,7 @@ class GitDataManifest(GitManifest):
 
 @dataclass
 class GitUserManifest(GitManifest):
+
     user_id: str
     name: str
     login: str
@@ -72,6 +73,7 @@ class GitUserManifest(GitManifest):
 
 @dataclass
 class GitPullRequestManifest(GitManifest):
+
     repository_id: str
     repository_name: str
     # This is the unique ID that represents
@@ -92,6 +94,7 @@ class GitPullRequestManifest(GitManifest):
 
 @dataclass
 class GitBranchManifest(GitManifest):
+
     repository_id: str
     repository_name: str
     branch_name: str
@@ -103,6 +106,7 @@ class GitBranchManifest(GitManifest):
 
 @dataclass
 class GitRepoManifest(GitManifest):
+
     repository_id: str
     repository_name: str
     repository_full_name: str

@@ -1,12 +1,17 @@
 import logging
+from jf_agent.config_file_reader import GitConfig
+
+from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
+
+from jf_agent.data_manifests.git.manifest import (
+    GitDataManifest,
+    GitRepoManifest,
+    GitUserManifest,
+)
+from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
+from jf_agent.data_manifests.manifest import ManifestSource
 
 from jf_ingest import logging_helper
-
-from jf_agent.config_file_reader import GitConfig
-from jf_agent.data_manifests.git.adapters.github import GithubManifestGenerator
-from jf_agent.data_manifests.git.adapters.manifest_adapter import ManifestAdapter
-from jf_agent.data_manifests.git.manifest import GitDataManifest, GitRepoManifest, GitUserManifest
-from jf_agent.data_manifests.manifest import ManifestSource
 
 logger = logging.getLogger(__name__)
 
@@ -140,11 +145,7 @@ def create_manifests(
 
 
 def get_manifest_adapter(
-    company_slug: str,
-    git_creds: dict,
-    git_config: GitConfig,
-    instance: str,
-    org: str,
+    company_slug: str, git_creds: dict, git_config: GitConfig, instance: str, org: str,
 ):
     if git_config.git_provider != 'github':
         raise UnsupportedGitProvider(

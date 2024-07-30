@@ -9,7 +9,6 @@ from jf_agent.data_manifests.git.manifest import (
     GitUserManifest,
 )
 
-
 # TODO: Expand or generalize this to work with things other than github (BBCloud, Gitlab, etc)
 @dataclass
 class ManifestAdapter(ABC):

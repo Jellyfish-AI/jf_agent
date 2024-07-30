@@ -1,14 +1,14 @@
-import json
+from datetime import datetime, timedelta
 import logging
+from logging import LogRecord
 import os
 import sys
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from http.client import HTTPConnection, HTTPSConnection
-from logging import LogRecord
+import json
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
+from dataclasses import dataclass
 from typing import Any, List, Union
+from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 
 from jf_ingest.logging_helper import AGENT_LOG_TAG
@@ -273,9 +273,7 @@ def configure(
     )
 
     logging.basicConfig(
-        level=config.level,
-        datefmt=config.datefmt,
-        handlers=config.handlers,
+        level=config.level, datefmt=config.datefmt, handlers=config.handlers,
     )
 
     logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')

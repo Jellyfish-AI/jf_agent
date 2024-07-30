@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Callable, Optional
+from typing import Optional, Callable, Any
 
 from jf_ingest import logging_helper
 
@@ -22,7 +22,7 @@ def get_wait_time(e: Optional[Exception], retries: int) -> int:
     if retry_after is not None:
         return int(retry_after)
     else:
-        return 5**retries
+        return 5 ** retries
 
 
 def retry_for_status(f: Callable[..., Any], *args, max_retries: int = 5, **kwargs) -> Any:

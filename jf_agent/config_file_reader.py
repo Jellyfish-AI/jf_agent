@@ -1,20 +1,25 @@
+from collections import namedtuple
+from dataclasses import dataclass
+from datetime import datetime, date, timezone
 import json
 import logging
 import os
-from collections import namedtuple
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
 from typing import List, Optional
-
 import urllib3
 import yaml
-from jf_ingest import logging_helper
-from jf_ingest.config import GitAuthConfig as JFIngestGitAuthConfig
-from jf_ingest.config import GitConfig as JFIngestGitConfig
-from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
 
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
+from jf_ingest import logging_helper
+from jf_ingest.config import (
+    IngestionConfig,
+    IngestionType,
+    IssueMetadata,
+    JiraDownloadConfig,
+    GitConfig as JFIngestGitConfig,
+    GitAuthConfig as JFIngestGitAuthConfig,
+)
+
 from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
@@ -174,17 +179,13 @@ def obtain_config(args) -> ValidatedConfig:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[list(missing_required_fields)],
-                error_code=2132,
+                logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING,
-                msg_args=[list(excluded_required_fields)],
-                error_code=2142,
+                logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
@@ -315,10 +316,7 @@ git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
 
 
 def _get_jf_ingest_git_auth_config(
-    company_slug: str,
-    config: GitConfig,
-    git_creds: dict,
-    skip_ssl_verification: bool,
+    company_slug: str, config: GitConfig, git_creds: dict, skip_ssl_verification: bool,
 ):
     from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
 
@@ -341,10 +339,7 @@ def _get_jf_ingest_git_auth_config(
 
     except Exception as e:
         logging_helper.log_standard_error(
-            logging.ERROR,
-            msg_args=[config.git_provider, e],
-            error_code=2101,
-            exc_info=True,
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=2101, exc_info=True,
         )
         return
 
@@ -408,9 +403,9 @@ def get_ingest_config(
             #
             # Issues
             full_redownload=False,
-            earliest_issue_dt=(
-                config.jira_earliest_issue_dt if config.jira_earliest_issue_dt else datetime.min
-            ),
+            earliest_issue_dt=config.jira_earliest_issue_dt
+            if config.jira_earliest_issue_dt
+            else datetime.min,
             issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
             jellyfish_issue_metadata=IssueMetadata.from_json(
                 endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")

@@ -19,7 +19,6 @@ PROVIDERS = (GL_PROVIDER, GH_PROVIDER, BBS_PROVIDER, BBC_PROVIDER)
 # through jf_ingest for that provider
 JF_INGEST_SUPPORTED_PROVIDERS = (GH_PROVIDER,)
 
-
 # Return branches for which we should pull commits, specified by customer in git config.
 # The repo's default branch will always be included in the returned list.
 def get_branches_for_standardized_repo(repo: Any, included_branches: dict):

@@ -1,13 +1,12 @@
-import dataclasses
 import gzip
 import json
+import jsonstreams
+import dataclasses
 import logging
 from itertools import chain
-
-import jsonstreams
-from jf_ingest import logging_helper
-
 from jf_agent.util import batched
+
+from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 

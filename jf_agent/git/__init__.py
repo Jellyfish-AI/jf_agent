@@ -1,24 +1,25 @@
-import logging
-import os
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import List
-
 import pytz
-from jf_ingest import diagnostics, logging_helper
-from jf_ingest.config import IngestionConfig
-from jf_ingest.jf_git.adapters import GitAdapter as JFIngestGitAdapter
+import os
+
+from typing import List
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
+import logging
+from jf_agent.git.github_gql_client import GithubGqlClient
 from stashy.client import Stash
 
-from jf_agent import download_and_write_streaming, write_file
-from jf_agent.config_file_reader import GitConfig
-from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
-from jf_agent.git.github_client import GithubClient
-from jf_agent.git.github_gql_client import GithubGqlClient
-from jf_agent.git.gitlab_client import GitLabClient
 from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
 from jf_agent.session import retry_session
+from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
+from jf_agent.git.github_client import GithubClient
+from jf_agent.git.gitlab_client import GitLabClient
+from jf_agent.config_file_reader import GitConfig
+
+from jf_agent import download_and_write_streaming, write_file
+from jf_ingest import logging_helper, diagnostics
+from jf_ingest.config import IngestionConfig
+from jf_ingest.jf_git.adapters import GitAdapter as JFIngestGitAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -166,10 +167,7 @@ class GitAdapter(ABC):
         write_file(self.outdir, 'bb_projects', self.compress_output_files, nrm_projects)
 
         write_file(
-            self.outdir,
-            'bb_users',
-            self.compress_output_files,
-            self.get_users(),
+            self.outdir, 'bb_users', self.compress_output_files, self.get_users(),
         )
         nrm_repos = None
 
@@ -178,9 +176,7 @@ class GitAdapter(ABC):
         def get_and_write_repos():
             nonlocal nrm_repos
 
-            nrm_repos = self.get_repos(
-                nrm_projects,
-            )
+            nrm_repos = self.get_repos(nrm_projects,)
 
             write_file(self.outdir, 'bb_repos', self.compress_output_files, nrm_repos)
             return len(nrm_repos)
@@ -213,10 +209,7 @@ class GitAdapter(ABC):
                 'bb_prs',
                 self.compress_output_files,
                 generator_func=self.get_pull_requests,
-                generator_func_args=(
-                    nrm_repos,
-                    endpoint_git_instance_info,
-                ),
+                generator_func_args=(nrm_repos, endpoint_git_instance_info,),
                 item_id_dict_key='id',
             )
 
@@ -272,10 +265,7 @@ def get_git_client(
 
     except Exception as e:
         logging_helper.log_standard_error(
-            logging.ERROR,
-            msg_args=[config.git_provider, e],
-            error_code=2101,
-            exc_info=True,
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=2101, exc_info=True,
         )
         return
 
@@ -317,9 +307,7 @@ def load_and_dump_git(
 
             BitbucketCloudAdapter(
                 config, outdir, compress_output_files, git_connection
-            ).load_and_dump_git(
-                endpoint_git_instance_info,
-            )
+            ).load_and_dump_git(endpoint_git_instance_info,)
         elif config.git_provider == 'github':
             if endpoint_git_instance_info.get('supports_graphql_endpoints', False):
                 for jf_ingest_git_config in jf_ingest_config.git_configs:
@@ -356,10 +344,7 @@ def load_and_dump_git(
 
     except Exception as e:
         logging_helper.log_standard_error(
-            logging.ERROR,
-            msg_args=[config.git_provider, e],
-            error_code=3061,
-            exc_info=True,
+            logging.ERROR, msg_args=[config.git_provider, e], error_code=3061, exc_info=True,
         )
 
         return {
