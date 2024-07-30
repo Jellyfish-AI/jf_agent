@@ -252,7 +252,9 @@ def configure_structlog() -> None:
 
 
 def bind_context_vars(
-    run_mode: str, company_slug: Optional[str], upload_time: str,
+    run_mode: str,
+    company_slug: Optional[str],
+    upload_time: str,
 ) -> None:
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(
@@ -260,7 +262,7 @@ def bind_context_vars(
         company_slug=company_slug,
         upload_time=upload_time,
         agent_run_uuid=str(uuid.uuid4()),
-        jf_meta={'commit': os.getenv("SHA"), 'timestamp': os.getenv("BUILDTIME")}
+        jf_meta={'commit': os.getenv("SHA"), 'timestamp': os.getenv("BUILDTIME")},
     )
 
 
