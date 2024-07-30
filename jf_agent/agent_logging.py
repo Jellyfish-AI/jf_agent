@@ -224,6 +224,7 @@ def configure_structlog() -> None:
     Configures rendering of log messages within structlog, which then passes a fully formatted string to
     the logging module for output.
     """
+    structlog.stdlib.recreate_defaults()
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -242,7 +243,7 @@ def configure_structlog() -> None:
                     structlog.processors.CallsiteParameter.LINENO,
                 }
             ),
-            structlog.processors.JSONRenderer(),
+            structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
