@@ -6,7 +6,6 @@ import gzip
 import logging
 import os
 import shutil
-import structlog
 import threading
 from collections import namedtuple
 from glob import glob
