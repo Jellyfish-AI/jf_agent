@@ -6,6 +6,7 @@ import gzip
 import logging
 import os
 import shutil
+import structlog
 import threading
 from collections import namedtuple
 from glob import glob
@@ -47,7 +48,10 @@ from jf_ingest import diagnostics, logging_helper
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.config import IngestionType, IngestionConfig
 
-logger = logging.getLogger(__name__)
+# Configure structlog before any loggers are created
+agent_logging.configure_structlog()
+
+logger = structlog.get_logger(__name__)
 
 
 def main():
@@ -144,6 +148,15 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
+
+    company_info = get_company_info(config, creds)
+    company_slug = company_info.get('company_slug')
+    agent_logging.bind_context_vars(
+        config.run_mode,
+        company_slug,
+        get_timestamp_from_outdir(config.outdir),
+    )
+
     logging_config = agent_logging.configure(
         config.outdir,
         config.jellyfish_webhook_base,
