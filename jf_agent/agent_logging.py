@@ -262,7 +262,7 @@ def bind_default_agent_context(
         company_slug=company_slug,
         upload_time=upload_time,
         agent_run_uuid=str(uuid.uuid4()),
-        jf_meta={'commit': os.getenv("SHA"), 'timestamp': os.getenv("BUILDTIME")},
+        jf_meta={'commit': os.getenv("SHA"), 'commit_build_time': os.getenv("BUILDTIME")},
     )
 
 
