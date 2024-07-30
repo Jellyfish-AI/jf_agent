@@ -55,7 +55,7 @@ name = "pypi"
 [tool.pdm.dev-dependencies]
 dev = [
     "requests-mock",
-    "pytest>=7.4.0",
+    "pytest>=8.0.0",
 ]
 
 [tool.pdm.options]

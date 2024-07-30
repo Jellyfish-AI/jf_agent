@@ -1,6 +1,6 @@
 import os
-import unittest
 
+import pytest
 import requests_mock
 import time
 import json
@@ -64,7 +64,7 @@ class TestJiraDownload(TestCase):
             issue_json = issues_file.read()
         cls.mock_response = issue_json
 
-    @unittest.skip
+    @pytest.skip
     def test_get_issues_once(self):
         with requests_mock.Mocker() as m:
             m.register_uri(
@@ -83,7 +83,7 @@ class TestJiraDownload(TestCase):
         self.assertEqual(len(issues), 100)
         self.assertTrue(all(isinstance(issue, JiraIssue) for issue in issues))
 
-    @unittest.skip
+    @pytest.skip
     def test_download_all_issue_metadata_with_server_error(self):
         project_ids = ["TC"]
         earliest_issue_dt = ''
