@@ -251,7 +251,7 @@ def configure_structlog() -> None:
     )
 
 
-def bind_context_vars(
+def bind_default_agent_context(
     run_mode: str,
     company_slug: Optional[str],
     upload_time: str,
