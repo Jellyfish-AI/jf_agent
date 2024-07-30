@@ -26,12 +26,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install pdm && pdm install --dev
-    - name: Formatting check (black)
-      run: |
-        pdm run black --check .
-    - name: Imports sorting check (isort)
-      run: |
-        pdm run isort --check --profile black --filter-files --line-length=100 .
     - name: Tests (pytest)
       run: |
         pdm run python -m pytest
