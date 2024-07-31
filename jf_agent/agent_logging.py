@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 from logging import LogRecord
+import colorama
 import os
 import structlog
 import sys
@@ -225,6 +226,65 @@ def configure_structlog() -> None:
     the logging module for output.
     """
     structlog.stdlib.recreate_defaults()
+    colorama.init(autoreset=True)
+
+    log_level_colors = {
+        'critical': colorama.Style.BRIGHT + colorama.Fore.RED,
+        'error': colorama.Fore.RED,
+        'warning': colorama.Fore.YELLOW,
+        'info': colorama.Fore.GREEN,
+        'debug': colorama.Fore.CYAN,
+    }
+
+    # Custom formatter to set the color based on log level
+    def _log_level_colorizer(log_level: str) -> str:
+        color = log_level_colors.get(log_level, colorama.Fore.WHITE)
+        return f"[{color}{log_level}{colorama.Style.RESET_ALL}]"
+
+    cr = structlog.dev.ConsoleRenderer(
+        columns=[
+            structlog.dev.Column(
+                "timestamp",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style=colorama.Style.DIM + colorama.Fore.WHITE,
+                    reset_style=colorama.Style.RESET_ALL,
+                    value_repr=lambda value: datetime.fromisoformat(f"{value[:-1]}+00:00").strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                ),
+            ),
+            structlog.dev.Column(
+                "level",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style="",
+                    reset_style="",
+                    value_repr=lambda value: _log_level_colorizer(value),
+                ),
+            ),
+            structlog.dev.Column(
+                "event",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style=colorama.Fore.WHITE,
+                    reset_style=colorama.Style.RESET_ALL,
+                    value_repr=str,
+                ),
+            ),
+            # Removes the context vars from the log output
+            structlog.dev.Column(
+                "",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style=colorama.Fore.BLACK,
+                    reset_style=colorama.Style.RESET_ALL,
+                    value_repr=lambda val: "",
+                ),
+            ),
+        ],
+    )
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -232,7 +292,7 @@ def configure_structlog() -> None:
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
@@ -250,11 +310,11 @@ def configure_structlog() -> None:
         cache_logger_on_first_use=True,
     )
 
+    structlog.configure(processors=structlog.get_config()["processors"][:-1] + [cr])
+
 
 def bind_default_agent_context(
-    run_mode: str,
-    company_slug: Optional[str],
-    upload_time: str,
+    run_mode: str, company_slug: Optional[str], upload_time: str,
 ) -> None:
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(

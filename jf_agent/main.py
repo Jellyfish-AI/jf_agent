@@ -148,19 +148,17 @@ def main():
 
     creds = obtain_creds(config)
 
-    company_info = get_company_info(config, creds)
-    company_slug = company_info.get('company_slug')
-    agent_logging.bind_default_agent_context(
-        config.run_mode,
-        company_slug,
-        get_timestamp_from_outdir(config.outdir),
-    )
-
     logging_config = agent_logging.configure(
         config.outdir,
         config.jellyfish_webhook_base,
         creds.jellyfish_api_token,
         config.debug_http_requests,
+    )
+
+    company_info = get_company_info(config, creds)
+    company_slug = company_info.get('company_slug')
+    agent_logging.bind_default_agent_context(
+        config.run_mode, company_slug, get_timestamp_from_outdir(config.outdir),
     )
 
     success = True
