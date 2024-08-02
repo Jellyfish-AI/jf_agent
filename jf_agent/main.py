@@ -47,9 +47,6 @@ from jf_ingest import diagnostics, logging_helper
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.config import IngestionType, IngestionConfig
 
-# Configure structlog before any loggers are created
-agent_logging.configure_structlog()
-
 logger = logging.getLogger(__name__)
 
 

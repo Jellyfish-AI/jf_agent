@@ -33,7 +33,23 @@ e.g., function names, iteration counts
 
 LOG_FILE_NAME = 'jf_agent.log'
 
-logger = logging.getLogger(__name__)
+SHARED_STRUCTLOG_PROCESSORS = [
+    structlog.contextvars.merge_contextvars,
+    structlog.stdlib.add_log_level,
+    structlog.stdlib.ExtraAdder(),
+    structlog.stdlib.PositionalArgumentsFormatter(),
+    structlog.processors.TimeStamper(fmt="iso", utc=True),
+    structlog.processors.StackInfoRenderer(),
+    structlog.processors.format_exc_info,
+    structlog.processors.UnicodeDecoder(),
+    structlog.processors.CallsiteParameterAdder(
+        {
+            structlog.processors.CallsiteParameter.FILENAME,
+            structlog.processors.CallsiteParameter.FUNC_NAME,
+            structlog.processors.CallsiteParameter.LINENO,
+        }
+    ),
+]
 
 
 # For styling in log files, I think it's best to always use new lines even when we use
@@ -167,16 +183,7 @@ class CustomQueueHandler(QueueHandler):
         if record != self._sentinel:
             msg = _standardize_log_msg(self.format(record))
             self.messages_to_send.append(
-                {
-                    'message': msg,
-                    'timestamp': int(
-                        datetime.strptime(
-                            record.asctime + '000', '%Y-%m-%d %H:%M:%S,%f'
-                        ).timestamp()
-                        * 1000
-                    ),
-                    'initiated_at': self.initiated_at,
-                }
+                {'message': msg, 'initiated_at': self.initiated_at,}
             )
 
         if self.post_errors >= self.post_error_threshold:
@@ -192,7 +199,7 @@ class CustomQueueHandler(QueueHandler):
 
 @dataclass
 class AgentLoggingConfig:
-    level: str
+    level: int
     datefmt: str
     handlers: List[str]
     listener: QueueListener
@@ -221,13 +228,22 @@ class AgentConsoleLogFilter(logging.Filter):
 
 
 def configure_structlog() -> None:
-    """
-    Configures rendering of log messages within structlog, which then passes a fully formatted string to
-    the logging module for output.
-    """
     structlog.stdlib.recreate_defaults()
+    os.environ['FORCE_COLOR'] = '1'
     colorama.init(autoreset=True)
 
+    structlog.configure(
+        processors=[
+            *SHARED_STRUCTLOG_PROCESSORS,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+
+def console_log_formatter() -> structlog.stdlib.ProcessorFormatter:
     log_level_colors = {
         'critical': colorama.Style.BRIGHT + colorama.Fore.RED,
         'error': colorama.Fore.RED,
@@ -235,11 +251,13 @@ def configure_structlog() -> None:
         'info': colorama.Fore.GREEN,
         'debug': colorama.Fore.CYAN,
     }
+    max_key_len = len(max(log_level_colors.keys(), key=len))
 
-    # Custom formatter to set the color based on log level
-    def _log_level_colorizer(log_level: str) -> str:
+    # Custom formatter to set the color based on log level + apply uniform padding
+    def _log_level_colorizer(log_level: str, pad_len: int) -> str:
+        log_level_padded = log_level + (' ' * (pad_len - len(log_level)))
         color = log_level_colors.get(log_level, colorama.Fore.WHITE)
-        return f"[{color}{log_level}{colorama.Style.RESET_ALL}]"
+        return f"[{color}{log_level_padded}{colorama.Style.RESET_ALL}]"
 
     cr = structlog.dev.ConsoleRenderer(
         columns=[
@@ -260,7 +278,7 @@ def configure_structlog() -> None:
                     key_style=None,
                     value_style="",
                     reset_style="",
-                    value_repr=lambda value: _log_level_colorizer(value),
+                    value_repr=lambda value: _log_level_colorizer(value, max_key_len),
                 ),
             ),
             structlog.dev.Column(
@@ -285,32 +303,24 @@ def configure_structlog() -> None:
         ],
     )
 
-    structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso", utc=True),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.CallsiteParameterAdder(
-                {
-                    structlog.processors.CallsiteParameter.FILENAME,
-                    structlog.processors.CallsiteParameter.FUNC_NAME,
-                    structlog.processors.CallsiteParameter.LINENO,
-                }
-            ),
-            structlog.dev.ConsoleRenderer(),
-        ],
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use=True,
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
+        processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, cr,],
     )
 
-    structlog.configure(processors=structlog.get_config()["processors"][:-1] + [cr])
+    return formatter
+
+
+def json_log_formatter() -> structlog.stdlib.ProcessorFormatter:
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(),
+        ],
+    )
+
+    return formatter
 
 
 def bind_default_agent_context(
@@ -329,35 +339,40 @@ def bind_default_agent_context(
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> AgentLoggingConfig:
+    # Remove default handlers that are added when logging is used before configuring
+    logging.getLogger().handlers.clear()
+
+    # Configure structlog and get necessary formatters for the log handlers
+    configure_structlog()
+    console_formatter = console_log_formatter()
+    json_formatter = json_log_formatter()
+
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     console_log_handler = CustomStreamHandler(stream=sys.stdout)
-    console_log_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
+    console_log_handler.setFormatter(console_formatter)
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
-
-    # logging in agent.log and those sent to the queue should be identical
-    file_and_queue_formatter = logging.Formatter(
-        fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s'
-    )
 
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
     # We want to catch as much as possible in the Agent Log File!!
     logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
-    logfile_handler.setFormatter(file_and_queue_formatter)
+    logfile_handler.setFormatter(json_formatter)
     # Set Log File Handler to DEBUG to catch as much debugging information as possible
     logfile_handler.setLevel(logging.DEBUG)
 
     log_queue = Queue(-1)  # no size bound
     log_queue_handler = CustomQueueHandler(log_queue, webhook_base, api_token)
-    log_queue_handler.setFormatter(file_and_queue_formatter)
+    log_queue_handler.setFormatter(json_formatter)
     log_queue_handler.setLevel(logging.DEBUG)
     queue_listener = CustomQueueListener(log_queue, log_queue_handler, respect_handler_level=True)
     queue_listener.start()
 
     # Silence the urllib3 logger to only emit WARNING level logs,
     # because the debug level logs are super noisy
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
     if debug_requests:
         import http.client
 
@@ -382,9 +397,13 @@ def configure(
     )
 
     logging.basicConfig(
-        level=config.level, datefmt=config.datefmt, handlers=config.handlers,
+        level=config.level,
+        datefmt=config.datefmt,
+        handlers=[logfile_handler, console_log_handler, log_queue_handler],
+        force=True,
     )
 
+    logger = logging.getLogger(__name__)
     logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')
 
     return config
@@ -392,6 +411,7 @@ def configure(
 
 def close_out(config: AgentLoggingConfig) -> None:
     # send a custom sentinel so the final log batch sends, then stop the listener
+    logger = logging.getLogger(__name__)
     logger.info('Closing the agent log stream.')
     config.listener.queue.put(-1)
     config.listener.stop()
