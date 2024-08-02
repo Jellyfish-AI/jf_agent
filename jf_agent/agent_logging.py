@@ -238,7 +238,6 @@ class AgentConsoleLogFilter(logging.Filter):
 
 def configure_structlog() -> None:
     structlog.stdlib.recreate_defaults()
-    os.environ['FORCE_COLOR'] = '1'
     colorama.init(autoreset=True)
 
     structlog.configure(
