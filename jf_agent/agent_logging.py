@@ -191,8 +191,28 @@ class CustomQueueHandler(QueueHandler):
 
         if record != self._sentinel:
             msg = _standardize_log_msg(self.format(record))
+
+            # This logic is required to handle the different way that the timestamp attribute
+            # is set by structlog loggers
+            try:
+                asctime = (
+                    int(
+                        datetime.strptime(
+                            record.asctime + '000', '%Y-%m-%d %H:%M:%S,%f'
+                        ).timestamp()
+                    )
+                    * 1000
+                )
+            except AttributeError:
+                created_time = datetime.fromtimestamp(record.created)
+                asctime = created_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+
+            timestamp = int(
+                datetime.strptime(asctime + '000', '%Y-%m-%d %H:%M:%S,%f').timestamp() * 1000
+            )
+
             self.messages_to_send.append(
-                {'message': msg, 'initiated_at': self.initiated_at,}
+                {'message': msg, 'timestamp': timestamp, 'initiated_at': self.initiated_at,}
             )
 
         if self.post_errors >= self.post_error_threshold:
@@ -345,6 +365,7 @@ def configure(
     logging.getLogger().handlers.clear()
 
     # Configure structlog and get necessary formatters for the log handlers
+    # Note: structlog should be configured before the standard logging module
     configure_structlog()
     console_formatter = console_log_formatter()
     json_formatter = json_log_formatter()
