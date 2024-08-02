@@ -51,6 +51,15 @@ SHARED_STRUCTLOG_PROCESSORS = [
     ),
 ]
 
+LOG_LEVEL_COLORS = {
+    'critical': colorama.Style.BRIGHT + colorama.Fore.RED,
+    'error': colorama.Fore.RED,
+    'warning': colorama.Fore.YELLOW,
+    'info': colorama.Fore.GREEN,
+    'debug': colorama.Fore.CYAN,
+}
+LOG_LEVEL_PADDING = len(max(LOG_LEVEL_COLORS.keys(), key=len))
+
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
@@ -244,22 +253,7 @@ def configure_structlog() -> None:
 
 
 def console_log_formatter() -> structlog.stdlib.ProcessorFormatter:
-    log_level_colors = {
-        'critical': colorama.Style.BRIGHT + colorama.Fore.RED,
-        'error': colorama.Fore.RED,
-        'warning': colorama.Fore.YELLOW,
-        'info': colorama.Fore.GREEN,
-        'debug': colorama.Fore.CYAN,
-    }
-    max_key_len = len(max(log_level_colors.keys(), key=len))
-
-    # Custom formatter to set the color based on log level + apply uniform padding
-    def _log_level_colorizer(log_level: str, pad_len: int) -> str:
-        log_level_padded = log_level + (' ' * (pad_len - len(log_level)))
-        color = log_level_colors.get(log_level, colorama.Fore.WHITE)
-        return f"[{color}{log_level_padded}{colorama.Style.RESET_ALL}]"
-
-    cr = structlog.dev.ConsoleRenderer(
+    custom_console_renderer = structlog.dev.ConsoleRenderer(
         columns=[
             structlog.dev.Column(
                 "timestamp",
@@ -278,7 +272,7 @@ def console_log_formatter() -> structlog.stdlib.ProcessorFormatter:
                     key_style=None,
                     value_style="",
                     reset_style="",
-                    value_repr=lambda value: _log_level_colorizer(value, max_key_len),
+                    value_repr=lambda value: _log_level_colorizer(value, LOG_LEVEL_PADDING),
                 ),
             ),
             structlog.dev.Column(
@@ -305,10 +299,19 @@ def console_log_formatter() -> structlog.stdlib.ProcessorFormatter:
 
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
-        processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, cr,],
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            custom_console_renderer,
+        ],
     )
 
     return formatter
+
+
+def _log_level_colorizer(log_level: str, pad_len: int) -> str:
+    log_level_padded = log_level + (' ' * (pad_len - len(log_level)))
+    color = LOG_LEVEL_COLORS.get(log_level, colorama.Fore.WHITE)
+    return f"[{color}{log_level_padded}{colorama.Style.RESET_ALL}]"
 
 
 def json_log_formatter() -> structlog.stdlib.ProcessorFormatter:

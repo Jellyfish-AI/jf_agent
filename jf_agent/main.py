@@ -144,7 +144,6 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-
     logging_config = agent_logging.configure(
         config.outdir,
         config.jellyfish_webhook_base,
