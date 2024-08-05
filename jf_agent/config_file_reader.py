@@ -388,6 +388,24 @@ def get_ingest_config(
     if config.jira_url and (
         (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
+        issue_metadata: List[IssueMetadata] = IssueMetadata.from_json(
+            endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
+        )
+
+        pull_from = (
+            datetime.combine(config.jira_earliest_issue_dt, datetime.min.time())
+            if config.jira_earliest_issue_dt
+            else datetime.min
+        )
+
+        # Make timezone aware
+        pull_from = pull_from.replace(tzinfo=timezone.utc)
+
+        project_id_to_pull_from = {im.project_id: pull_from for im in issue_metadata}
+        for im in issue_metadata:
+            project_id_to_pull_from[im.project_id] = max(
+                im.updated, project_id_to_pull_from[im.project_id]
+            )
         jira_config: JiraDownloadConfig = JiraDownloadConfig(
             company_slug=company_slug,
             #
@@ -420,13 +438,10 @@ def get_ingest_config(
             #
             # Issues
             full_redownload=False,
-            earliest_issue_dt=(
-                config.jira_earliest_issue_dt if config.jira_earliest_issue_dt else datetime.min
-            ),
+            pull_from=pull_from,
+            project_id_to_pull_from=project_id_to_pull_from,
             issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
-            jellyfish_issue_metadata=IssueMetadata.from_json(
-                endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
-            ),
+            jellyfish_issue_metadata=issue_metadata,
             jellyfish_project_ids_to_keys=json.loads(
                 endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
             ),

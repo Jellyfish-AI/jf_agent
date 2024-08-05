@@ -836,12 +836,18 @@ def send_data(config: ValidatedConfig, creds, directories_to_skip: list[str], su
     filenames.remove(agent_logging.LOG_FILE_NAME)
     # get the full file paths for each of the immediate
     # subdirectories (we're assuming only a single level)
-    logger.info(f'Skipping directory upload for the following directories: {directories_to_skip}')
+    logging_helper.send_to_agent_log_file(
+        f'Skipping directory upload for the following directories: {directories_to_skip}'
+    )
     for directory in directories:
-        print(directory)
+        logging_helper.send_to_agent_log_file(f'Checking directory: {directory}...')
         if directory in directories_to_skip:
-            logger.info(f'Skipping {directory} because it is in the {directories_to_skip} list')
+            logging_helper.send_to_agent_log_file(
+                f'Skipping {directory} because it is in the {directories_to_skip} list'
+            )
             continue
+        else:
+            logging_helper.send_to_agent_log_file(f'{directory} will be uploaded!')
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
