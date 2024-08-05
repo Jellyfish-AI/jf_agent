@@ -276,6 +276,7 @@ def readable_log_formatter(use_color: bool) -> structlog.stdlib.ProcessorFormatt
             ),
             structlog.dev.Column(
                 "level",
+                # Value/reset style is set directly in the _log_level_colorizer function
                 structlog.dev.KeyValueColumnFormatter(
                     key_style=None,
                     value_style="",
