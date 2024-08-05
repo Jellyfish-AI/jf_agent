@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:7e272450961e38231c2165242c6093842be5efe42406fba5e3c9a7237988e3f3"
+content_hash = "sha256:1435a5220f9b67358a63b4cdf2e06c26abee893cf93bd16d658ce2547d95197f"
 
 [[metadata.targets]]
 requires_python = ">=3.10,<3.11"
@@ -169,7 +169,7 @@ version = "0.4.6"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 summary = "Cross-platform colored terminal text."
 groups = ["default", "dev"]
-marker = "(platform_system == \"Windows\" or sys_platform == \"win32\") and python_version >= \"3.10\" and python_version < \"3.11\""
+marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
