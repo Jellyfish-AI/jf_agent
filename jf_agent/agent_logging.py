@@ -1,16 +1,19 @@
-from datetime import datetime, timedelta
+import json
 import logging
-from logging import LogRecord
 import os
 import sys
-import json
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from http.client import HTTPConnection, HTTPSConnection
+from logging import LogRecord
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
-from dataclasses import dataclass
-from typing import Any, List, Union
-from http.client import HTTPConnection, HTTPSConnection
+from typing import Any, List, Optional, Union
 from urllib.parse import urlparse
 
+import colorama
+import structlog
 from jf_ingest.logging_helper import AGENT_LOG_TAG
 
 '''
@@ -30,7 +33,37 @@ e.g., function names, iteration counts
 
 LOG_FILE_NAME = 'jf_agent.log'
 
-logger = logging.getLogger(__name__)
+SHARED_STRUCTLOG_PROCESSORS = [
+    structlog.contextvars.merge_contextvars,
+    structlog.stdlib.add_log_level,
+    structlog.stdlib.ExtraAdder(),
+    structlog.stdlib.PositionalArgumentsFormatter(),
+    structlog.processors.TimeStamper(fmt="iso", utc=True),
+    structlog.processors.StackInfoRenderer(),
+    structlog.processors.format_exc_info,
+    structlog.processors.UnicodeDecoder(),
+    structlog.processors.CallsiteParameterAdder(
+        {
+            structlog.processors.CallsiteParameter.FILENAME,
+            structlog.processors.CallsiteParameter.FUNC_NAME,
+            structlog.processors.CallsiteParameter.LINENO,
+        }
+    ),
+]
+
+LOG_LEVEL_COLORS = {
+    'critical': colorama.Style.BRIGHT + colorama.Fore.RED,
+    'error': colorama.Fore.RED,
+    'warning': colorama.Fore.YELLOW,
+    'info': colorama.Fore.GREEN,
+    'debug': colorama.Fore.CYAN,
+}
+LOG_LEVEL_PADDING = len(max(LOG_LEVEL_COLORS.keys(), key=len))
+CONSOLE_RENDERER_STYLE = {
+    "reset": colorama.Style.RESET_ALL,
+    "timestamp": colorama.Style.DIM + colorama.Fore.WHITE,
+    "event": colorama.Fore.WHITE,
+}
 
 
 # For styling in log files, I think it's best to always use new lines even when we use
@@ -163,15 +196,11 @@ class CustomQueueHandler(QueueHandler):
 
         if record != self._sentinel:
             msg = _standardize_log_msg(self.format(record))
+
             self.messages_to_send.append(
                 {
                     'message': msg,
-                    'timestamp': int(
-                        datetime.strptime(
-                            record.asctime + '000', '%Y-%m-%d %H:%M:%S,%f'
-                        ).timestamp()
-                        * 1000
-                    ),
+                    'timestamp': int(record.created * 1000),
                     'initiated_at': self.initiated_at,
                 }
             )
@@ -189,7 +218,7 @@ class CustomQueueHandler(QueueHandler):
 
 @dataclass
 class AgentLoggingConfig:
-    level: str
+    level: int
     datefmt: str
     handlers: List[str]
     listener: QueueListener
@@ -217,38 +246,157 @@ class AgentConsoleLogFilter(logging.Filter):
         return not record.__dict__.get(AGENT_LOG_TAG, False)
 
 
+def configure_structlog() -> None:
+    structlog.stdlib.recreate_defaults()
+
+    structlog.configure(
+        processors=[
+            *SHARED_STRUCTLOG_PROCESSORS,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+
+def readable_log_formatter(use_color: bool) -> structlog.stdlib.ProcessorFormatter:
+    custom_console_renderer = structlog.dev.ConsoleRenderer(
+        columns=[
+            structlog.dev.Column(
+                "timestamp",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style=_color_switch("timestamp", use_color),
+                    reset_style=_color_switch("reset", use_color),
+                    value_repr=lambda value: datetime.fromisoformat(f"{value[:-1]}+00:00").strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                ),
+            ),
+            structlog.dev.Column(
+                "level",
+                # Value/reset style is set directly in the _log_level_colorizer function
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style="",
+                    reset_style="",
+                    value_repr=lambda value: _log_level_colorizer(
+                        value, LOG_LEVEL_PADDING, use_color
+                    ),
+                ),
+            ),
+            structlog.dev.Column(
+                "event",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style=_color_switch("event", use_color),
+                    reset_style=_color_switch("reset", use_color),
+                    value_repr=str,
+                ),
+            ),
+            # Removes the context vars from the log output
+            structlog.dev.Column(
+                "",
+                structlog.dev.KeyValueColumnFormatter(
+                    key_style=None,
+                    value_style="",
+                    reset_style="",
+                    value_repr=lambda val: "",
+                ),
+            ),
+        ],
+    )
+
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            custom_console_renderer,
+        ],
+    )
+
+    return formatter
+
+
+def _log_level_colorizer(log_level: str, pad_len: int, use_color: bool) -> str:
+    log_level_padded = str(log_level + (' ' * (pad_len - len(log_level))))
+
+    if not use_color:
+        return log_level_padded
+
+    color = LOG_LEVEL_COLORS.get(log_level, colorama.Fore.WHITE)
+    return f"[{color}{log_level_padded}{colorama.Style.RESET_ALL}]"
+
+
+def _color_switch(column: str, use_color: bool) -> str:
+    if not use_color:
+        return ""
+
+    return CONSOLE_RENDERER_STYLE[column]
+
+
+def json_log_formatter() -> structlog.stdlib.ProcessorFormatter:
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(),
+        ],
+    )
+
+    return formatter
+
+
+def bind_default_agent_context(
+    run_mode: str,
+    company_slug: Optional[str],
+    upload_time: str,
+) -> None:
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        run_mode=run_mode,
+        company_slug=company_slug,
+        upload_time=upload_time,
+        agent_run_uuid=str(uuid.uuid4()),
+        jf_meta={'commit': os.getenv("SHA"), 'commit_build_time': os.getenv("BUILDTIME")},
+    )
+
+
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> AgentLoggingConfig:
+    # Remove default handlers that are added when logging is used before configuring
+    logging.getLogger().handlers.clear()
+
+    # Configure structlog before the standard logging module
+    configure_structlog()
+
+    # Set an envvar so tdqm works with structlog
+    os.environ["TDQM_POSITION"] = "-1"
+
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     console_log_handler = CustomStreamHandler(stream=sys.stdout)
-    console_log_handler.setFormatter(logging.Formatter(fmt='%(message)s'))
+    console_log_handler.setFormatter(readable_log_formatter(use_color=True))
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
-
-    # logging in agent.log and those sent to the queue should be identical
-    file_and_queue_formatter = logging.Formatter(
-        fmt='%(asctime)s %(threadName)s %(levelname)s %(name)s %(message)s'
-    )
 
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
     # We want to catch as much as possible in the Agent Log File!!
     logfile_handler = CustomFileHandler(os.path.join(outdir, LOG_FILE_NAME), mode='a')
-    logfile_handler.setFormatter(file_and_queue_formatter)
+    logfile_handler.setFormatter(readable_log_formatter(use_color=False))
     # Set Log File Handler to DEBUG to catch as much debugging information as possible
     logfile_handler.setLevel(logging.DEBUG)
 
     log_queue = Queue(-1)  # no size bound
     log_queue_handler = CustomQueueHandler(log_queue, webhook_base, api_token)
-    log_queue_handler.setFormatter(file_and_queue_formatter)
+    log_queue_handler.setFormatter(json_log_formatter())
     log_queue_handler.setLevel(logging.DEBUG)
     queue_listener = CustomQueueListener(log_queue, log_queue_handler, respect_handler_level=True)
     queue_listener.start()
 
-    # Silence the urllib3 logger to only emit WARNING level logs,
-    # because the debug level logs are super noisy
     if debug_requests:
         import http.client
 
@@ -273,9 +421,13 @@ def configure(
     )
 
     logging.basicConfig(
-        level=config.level, datefmt=config.datefmt, handlers=config.handlers,
+        level=config.level,
+        datefmt=config.datefmt,
+        handlers=[logfile_handler, console_log_handler, log_queue_handler],
+        force=True,
     )
 
+    logger = logging.getLogger(__name__)
     logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')
 
     return config
@@ -283,6 +435,7 @@ def configure(
 
 def close_out(config: AgentLoggingConfig) -> None:
     # send a custom sentinel so the final log batch sends, then stop the listener
+    logger = logging.getLogger(__name__)
     logger.info('Closing the agent log stream.')
     config.listener.queue.put(-1)
     config.listener.stop()

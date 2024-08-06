@@ -144,6 +144,14 @@ def main():
         config.debug_http_requests,
     )
 
+    company_info = get_company_info(config, creds)
+    company_slug = company_info.get('company_slug')
+    agent_logging.bind_default_agent_context(
+        config.run_mode,
+        company_slug,
+        get_timestamp_from_outdir(config.outdir),
+    )
+
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
