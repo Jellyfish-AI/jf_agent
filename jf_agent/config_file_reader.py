@@ -1,25 +1,21 @@
-from collections import namedtuple
-from dataclasses import dataclass
-from datetime import datetime, date, timezone
 import json
 import logging
 import os
+from collections import namedtuple
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import List, Optional
+
 import urllib3
 import yaml
+from jf_ingest import logging_helper
+from jf_ingest.config import AzureDevopsAuthConfig as JFIngestAzureDevopsAuthConfig
+from jf_ingest.config import GitAuthConfig as JFIngestGitAuthConfig
+from jf_ingest.config import GitConfig as JFIngestGitConfig
+from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
 
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
-from jf_ingest import logging_helper
-from jf_ingest.config import (
-    IngestionConfig,
-    IngestionType,
-    IssueMetadata,
-    JiraDownloadConfig,
-    GitConfig as JFIngestGitConfig,
-    GitAuthConfig as JFIngestGitAuthConfig,
-)
-
 from jf_agent.util import get_company_info
 
 logger = logging.getLogger(__name__)
@@ -179,13 +175,17 @@ def obtain_config(args) -> ValidatedConfig:
         missing_required_fields = set(required_jira_fields) - set(jira_include_fields)
         if missing_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[list(missing_required_fields)], error_code=2132,
+                logging.WARNING,
+                msg_args=[list(missing_required_fields)],
+                error_code=2132,
             )
     if jira_exclude_fields:
         excluded_required_fields = set(required_jira_fields).intersection(set(jira_exclude_fields))
         if excluded_required_fields:
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[list(excluded_required_fields)], error_code=2142,
+                logging.WARNING,
+                msg_args=[list(excluded_required_fields)],
+                error_code=2142,
             )
 
     git_configs: List[GitConfig] = _get_git_config_from_yaml(yaml_config)
@@ -312,13 +312,19 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
     return [_get_git_config(g, multiple=True) for g in git_config]
 
 
-git_providers = ['bitbucket_server', 'bitbucket_cloud', 'github', 'gitlab']
-
-
 def _get_jf_ingest_git_auth_config(
-    company_slug: str, config: GitConfig, git_creds: dict, skip_ssl_verification: bool,
+    company_slug: str,
+    config: GitConfig,
+    git_creds: dict,
+    skip_ssl_verification: bool,
 ):
-    from jf_agent.git.utils import BBC_PROVIDER, BBS_PROVIDER, GH_PROVIDER, GL_PROVIDER
+    from jf_agent.git.utils import (
+        ADO_PROVIDER,
+        BBC_PROVIDER,
+        BBS_PROVIDER,
+        GH_PROVIDER,
+        GL_PROVIDER,
+    )
 
     try:
         if config.git_provider == BBS_PROVIDER:
@@ -337,9 +343,20 @@ def _get_jf_ingest_git_auth_config(
         if config.git_provider == GL_PROVIDER:
             return None
 
+        if config.git_provider == ADO_PROVIDER:
+            return JFIngestAzureDevopsAuthConfig(
+                company_slug=company_slug,
+                token=git_creds['ado_token'],
+                base_url=config.git_url,
+                verify=not skip_ssl_verification,
+            )
+
     except Exception as e:
         logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[config.git_provider, e], error_code=2101, exc_info=True,
+            logging.ERROR,
+            msg_args=[config.git_provider, e],
+            error_code=2101,
+            exc_info=True,
         )
         return
 
@@ -371,6 +388,24 @@ def get_ingest_config(
     if config.jira_url and (
         (creds.jira_username and creds.jira_password) or creds.jira_bearer_token
     ):
+        issue_metadata: List[IssueMetadata] = IssueMetadata.from_json(
+            endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
+        )
+
+        pull_from = (
+            datetime.combine(config.jira_earliest_issue_dt, datetime.min.time())
+            if config.jira_earliest_issue_dt
+            else datetime.min
+        )
+
+        # Make timezone aware
+        pull_from = pull_from.replace(tzinfo=timezone.utc)
+
+        project_id_to_pull_from = {im.project_id: pull_from for im in issue_metadata}
+        for im in issue_metadata:
+            project_id_to_pull_from[im.project_id] = max(
+                im.updated, project_id_to_pull_from[im.project_id]
+            )
         jira_config: JiraDownloadConfig = JiraDownloadConfig(
             company_slug=company_slug,
             #
@@ -403,13 +438,10 @@ def get_ingest_config(
             #
             # Issues
             full_redownload=False,
-            earliest_issue_dt=config.jira_earliest_issue_dt
-            if config.jira_earliest_issue_dt
-            else datetime.min,
+            pull_from=pull_from,
+            project_id_to_pull_from=project_id_to_pull_from,
             issue_download_concurrent_threads=config.jira_issue_download_concurrent_threads,
-            jellyfish_issue_metadata=IssueMetadata.from_json(
-                endpoint_jira_info.get('issue_metadata_for_jf_ingest', "[]")
-            ),
+            jellyfish_issue_metadata=issue_metadata,
             jellyfish_project_ids_to_keys=json.loads(
                 endpoint_jira_info.get('jellyfish_project_ids_to_keys', "{}")
             ),
@@ -525,6 +557,8 @@ def get_ingest_config(
 
 
 def _get_git_config(git_config, git_provider_override=None, multiple=False) -> GitConfig:
+    from jf_agent.git.utils import PROVIDERS
+
     git_provider = git_config.get('provider', git_provider_override)
     git_url = git_config.get('url', None)
     git_include_projects = set(git_config.get('include_projects', []))
@@ -553,13 +587,13 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
 
     if git_provider is None:
         print(
-            f'ERROR: Should add provider for git configuration. Provider should be one of {git_providers}'
+            f'ERROR: Should add provider for git configuration. Provider should be one of {PROVIDERS}'
         )
         raise BadConfigException()
 
-    if git_provider not in git_providers:
+    if git_provider not in PROVIDERS:
         print(
-            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of {git_providers}'
+            f'ERROR: Unsupported Git provider {git_provider}. Provider should be one of {PROVIDERS}'
         )
         raise BadConfigException()
 

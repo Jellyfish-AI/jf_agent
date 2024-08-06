@@ -133,8 +133,8 @@ dmypy.json
 .pyre/
 
 # jf_agent configuration/credentials files (by convention)
-config.yml
-creds.env
+*.yml
+*.env
 
 # jf_agent output dir (by convention)
 output

@@ -1,51 +1,44 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-import traceback
-import dotenv
 import gzip
+import json
 import logging
 import os
 import shutil
+import sys
 import threading
+import traceback
 from collections import namedtuple
+from concurrent.futures import ThreadPoolExecutor
 from glob import glob
 from pathlib import Path
-import sys
 
+import dotenv
 import requests
-import json
+from jf_ingest import diagnostics, logging_helper
+from jf_ingest.config import GitProvider, IngestionConfig, IngestionType
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
 
 from jf_agent import (
-    agent_logging,
-    write_file,
-    VALID_RUN_MODES,
     JELLYFISH_API_BASE,
     JELLYFISH_WEBHOOK_BASE,
+    VALID_RUN_MODES,
+    agent_logging,
+    write_file,
 )
-from jf_agent.exception import BadConfigException
-from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
+from jf_agent.config_file_reader import ValidatedConfig, get_ingest_config, obtain_config
 from jf_agent.data_manifests.git.generator import create_manifests as create_git_manifests
+from jf_agent.data_manifests.jira.generator import create_manifest as create_jira_manifest
 from jf_agent.data_manifests.manifest import Manifest
-from jf_agent.git import load_and_dump_git, get_git_client
-from jf_agent.config_file_reader import get_ingest_config, obtain_config
+from jf_agent.exception import BadConfigException
+from jf_agent.git import get_git_client, load_and_dump_git
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
-    print_all_jira_fields,
     load_and_dump_jira,
+    print_all_jira_fields,
     print_missing_repos_found_by_jira,
 )
-
-from jf_agent.validation import (
-    full_validate,
-    validate_num_repos,
-    ProjectMetadata,
-)
-
 from jf_agent.util import get_company_info, upload_file
-
-from jf_ingest import diagnostics, logging_helper
-from jf_ingest.jf_jira import load_and_push_jira_to_s3
-from jf_ingest.config import IngestionType, IngestionConfig
+from jf_agent.validation import ProjectMetadata, full_validate, validate_num_repos
 
 logger = logging.getLogger(__name__)
 
@@ -154,11 +147,15 @@ def main():
     company_info = get_company_info(config, creds)
     company_slug = company_info.get('company_slug')
     agent_logging.bind_default_agent_context(
-        config.run_mode, company_slug, get_timestamp_from_outdir(config.outdir),
+        config.run_mode,
+        company_slug,
+        get_timestamp_from_outdir(config.outdir),
     )
 
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
+    directories_to_skip_uploading_for = set()
 
     # send start signal to Agent heartbeat monitor
     try:
@@ -263,9 +260,32 @@ def main():
                     return True
 
                 if config.run_mode_includes_download:
+                    ingest_config = get_ingest_config(
+                        config=config,
+                        creds=creds,
+                        endpoint_jira_info=jellyfish_endpoint_info.jira_info,
+                        endpoint_git_instances_info=jellyfish_endpoint_info.git_instance_info,
+                        jf_options=jellyfish_endpoint_info.jf_options,
+                    )
+                    # Mark some agent upload directories as skippable during out
+                    # data uploading phase, because they already get uploaded via
+                    # JF Ingest
+                    from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
+
+                    directories_to_skip_uploading_for.update(
+                        [
+                            f'git_{git_config.instance_file_key}'
+                            for git_config in ingest_config.git_configs
+                            if git_config.git_provider.value.lower()
+                            in JF_INGEST_SUPPORTED_PROVIDERS
+                        ]
+                    )
+                    # Jira is supported by all customers, always skip it
+                    directories_to_skip_uploading_for.add('jira')
                     download_data_status = download_data(
                         config,
                         creds,
+                        ingest_config,
                         jellyfish_endpoint_info.jira_info,
                         jellyfish_endpoint_info.git_instance_info,
                         jellyfish_endpoint_info.jf_options,
@@ -295,7 +315,12 @@ def main():
         # Otherwise we'll send a .fuse_hidden file (temp file)
         diagnostics.close_file()
 
-    success &= potentially_send_data(config, creds, successful=error_and_timeout_free)
+    success &= potentially_send_data(
+        config,
+        creds,
+        directories_to_skip=list(directories_to_skip_uploading_for),
+        successful=error_and_timeout_free,
+    )
 
     logger.info('Done!')
 
@@ -317,9 +342,13 @@ def main():
     return success
 
 
-def potentially_send_data(config, creds, successful=True) -> bool:
+def potentially_send_data(
+    config: ValidatedConfig, creds, directories_to_skip: list[str], successful=True
+) -> bool:
     if config.run_mode_includes_send:
-        successful &= send_data(config, creds, successful)
+        successful &= send_data(
+            config, creds, directories_to_skip=directories_to_skip, successful=successful
+        )
     else:
         logger.info(
             f'\nSkipping send_data because run_mode is "{config.run_mode}"\n'
@@ -364,6 +393,14 @@ required_jira_fields = [
 
 
 def _get_git_instance_to_creds(git_config):
+    from jf_agent.git.utils import (
+        ADO_PROVIDER,
+        BBC_PROVIDER,
+        BBS_PROVIDER,
+        GH_PROVIDER,
+        GL_PROVIDER,
+    )
+
     def _check_and_get(envvar_name):
         envvar_val = os.environ.get(envvar_name)
         if not envvar_val:
@@ -375,20 +412,22 @@ def _get_git_instance_to_creds(git_config):
 
     git_provider = git_config.git_provider
     prefix = f'{git_config.creds_envvar_prefix}_' if git_config.creds_envvar_prefix else ''
-    if git_provider == 'github':
+    if git_provider == GH_PROVIDER:
         return {'github_token': _check_and_get(f'{prefix}GITHUB_TOKEN')}
-    elif git_provider == 'bitbucket_cloud':
+    elif git_provider == BBC_PROVIDER:
         return {
             'bb_cloud_username': _check_and_get(f'{prefix}BITBUCKET_CLOUD_USERNAME'),
             'bb_cloud_app_password': _check_and_get(f'{prefix}BITBUCKET_CLOUD_APP_PASSWORD'),
         }
-    elif git_provider == 'bitbucket_server':
+    elif git_provider == BBS_PROVIDER:
         return {
             'bb_server_username': _check_and_get(f'{prefix}BITBUCKET_USERNAME'),
             'bb_server_password': _check_and_get(f'{prefix}BITBUCKET_PASSWORD'),
         }
-    elif git_provider == 'gitlab':
+    elif git_provider == GL_PROVIDER:
         return {'gitlab_token': _check_and_get(f'{prefix}GITLAB_TOKEN')}
+    elif git_provider == ADO_PROVIDER:
+        return {'ado_token': _check_and_get(f'{prefix}ADO_TOKEN')}
 
 
 def obtain_creds(config):
@@ -550,7 +589,9 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
             )
             logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     else:
-        logger.info('No Git Configuration detection, skipping Git manifests generation',)
+        logger.info(
+            'No Git Configuration detection, skipping Git manifests generation',
+        )
 
     logger.info(f'Attempting upload of {len(manifests)} manifest(s) to Jellyfish...')
 
@@ -629,24 +670,26 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
-def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info, jf_options):
+def download_data(
+    config,
+    creds,
+    ingest_config: IngestionConfig,
+    endpoint_jira_info,
+    endpoint_git_instances_info,
+    jf_options,
+):
     download_data_status = []
 
     if config.jira_url:
-        logger.info('Obtained Jira configuration, attempting download...',)
+        logger.info(
+            'Obtained Jira configuration, attempting download...',
+        )
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
         if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
             try:
                 logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
-                ingest_config = get_ingest_config(
-                    config=config,
-                    creds=creds,
-                    endpoint_jira_info=endpoint_jira_info,
-                    endpoint_git_instances_info=endpoint_git_instances_info,
-                    jf_options=jf_options,
-                )
                 success = load_and_push_jira_to_s3(ingest_config)
                 success_status_str = 'success' if success else 'failed'
                 download_data_status.append({'type': 'Jira', 'status': success_status_str})
@@ -687,19 +730,13 @@ def download_data(config, creds, endpoint_jira_info, endpoint_git_instances_info
 
         for git_config in git_configs:
             logger.info(
-                f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
-                + f'in parallel with {config.git_max_concurrent} workers, '
-                + f'for {len(git_config.git_include_projects)} projects'
-                if len(config.git_configs) > 1
-                else f"Starting Git download for {len(config.git_configs)} provided git configurations",
-            )
-
-            ingest_config = get_ingest_config(
-                config=config,
-                creds=creds,
-                endpoint_jira_info=endpoint_jira_info,
-                endpoint_git_instances_info=endpoint_git_instances_info,
-                jf_options=jf_options,
+                (
+                    f'Obtained {git_config.git_provider}:{git_config.git_instance_slug} configuration, attempting download '
+                    + f'in parallel with {config.git_max_concurrent} workers, '
+                    + f'for {len(git_config.git_include_projects)} projects'
+                    if len(config.git_configs) > 1
+                    else f"Starting Git download for {len(config.git_configs)} provided git configurations"
+                ),
             )
             futures.append(
                 executor.submit(
@@ -757,7 +794,7 @@ def get_timestamp_from_outdir(outdir: str):
     return timestamp
 
 
-def send_data(config, creds, successful=True):
+def send_data(config: ValidatedConfig, creds, directories_to_skip: list[str], successful=True):
     timestamp = get_timestamp_from_outdir(config.outdir)
 
     def get_signed_url(files):
@@ -782,7 +819,10 @@ def send_data(config, creds, successful=True):
         except Exception as e:
             thread_exceptions.append(e)
             logging_helper.log_standard_error(
-                logging.ERROR, msg_args=[filename], error_code=3000, exc_info=True,
+                logging.ERROR,
+                msg_args=[filename],
+                error_code=3000,
+                exc_info=True,
             )
 
     # Compress any not yet compressed files before sending
@@ -802,15 +842,20 @@ def send_data(config, creds, successful=True):
     # We want to save the jf_agent.log file and upload it last, to ensure
     # we are capturing as much information as possible
     filenames.remove(agent_logging.LOG_FILE_NAME)
-
     # get the full file paths for each of the immediate
     # subdirectories (we're assuming only a single level)
+    logging_helper.send_to_agent_log_file(
+        f'Skipping directory upload for the following directories: {directories_to_skip}'
+    )
     for directory in directories:
-        # SKIP OVER THE JIRA DIRECTORY, WHICH IS UPLOADED VIA JF INGEST
-        # TODO: The GIT directories will also be uploaded via ingest,
-        # but for now they are handled via this 'legacy' way
-        if directory.lower() == 'jira':
+        logging_helper.send_to_agent_log_file(f'Checking directory: {directory}...')
+        if directory in directories_to_skip:
+            logging_helper.send_to_agent_log_file(
+                f'Skipping {directory} because it is in the {directories_to_skip} list'
+            )
             continue
+        else:
+            logging_helper.send_to_agent_log_file(f'{directory} will be uploaded!')
         path = os.path.join(config.outdir, directory)
         for file_name in os.listdir(path):
             filenames.append(f'{directory}/{file_name}')
@@ -819,7 +864,8 @@ def send_data(config, creds, successful=True):
 
     threads = [
         threading.Thread(
-            target=upload_file_from_thread, args=[filename, file_dict['s3_path'], file_dict['url']],
+            target=upload_file_from_thread,
+            args=[filename, file_dict['s3_path'], file_dict['url']],
         )
         for (filename, file_dict) in signed_urls.items()
     ]
