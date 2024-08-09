@@ -144,11 +144,11 @@ def main():
         config.debug_http_requests,
     )
 
+    company_slug = None
     try:
         company_info = get_company_info(config, creds)
         company_slug = company_info.get('company_slug')
     except Exception as e:
-        company_slug = None
         logger.warning(f"Unable to get company slug from Jellyfish API: {e}")
 
     agent_logging.bind_default_agent_context(
