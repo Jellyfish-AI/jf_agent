@@ -178,6 +178,7 @@ def main():
             level=logging.ERROR,
         )
 
+    logging_helper.send_to_agent_log_file(f'Running Agent with run mode {config.run_mode}')
     logger.info(f'Will write output files into {config.outdir}')
     diagnostics.open_file(config.outdir)
 
@@ -803,6 +804,9 @@ def send_data(config: ValidatedConfig, creds, directories_to_skip: list[str], su
     timestamp = get_timestamp_from_outdir(config.outdir)
 
     def get_signed_url(files):
+        logging_helper.send_to_agent_log_file(
+            f'Creating signed URL for the following files: {files}'
+        )
         base_url = config.jellyfish_api_base
         headers = {'Jellyfish-API-Token': creds.jellyfish_api_token}
         payload = {'files': files, 'ingestType': IngestionType.AGENT}
