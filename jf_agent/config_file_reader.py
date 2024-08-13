@@ -553,6 +553,10 @@ def get_ingest_config(
         git_configs=git_configs,
     )
 
+    logging_helper.send_to_agent_log_file(
+        f'JF Ingest will{"" if ingestion_config.save_locally else " NOT"} save files locally.'
+    )
+
     return ingestion_config
 
 
