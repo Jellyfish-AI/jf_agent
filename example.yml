@@ -167,7 +167,7 @@ git:
   # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
   # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
   # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
-  # AzureDevops (required): use your organization name, which contains your projects
+  # Azure Devops (required): use your organization name, which contains your projects
   include_projects:
       - PROJ1
 
@@ -197,13 +197,13 @@ git:
   #     - 123
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
-  # Bitbucket Server, Bitbucket Cloud, GitHub or AzureDevops: use repository name (e.g.: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, GitHub or Azure Devops: use repository name (e.g.: my_repository)
   # GitLab: use project ID (e.g.: 123) (not project name)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
-  # Bitbucket Server, Bitbucket Cloud, GitHub or AzureDevops: use repository name (e.g.: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, GitHub or Azure Devops: use repository name (e.g.: my_repository)
   # GitLab: use project ID (e.g.: 123) (not project name)
   # exclude_repos:
   #    - repo_to_skip
