@@ -151,12 +151,13 @@ jira:
 ######################################
 git:
   # Supported providers are `bitbucket_server`, `bitbucket_cloud`,
-  # `gitlab` and `github`.
+  # `gitlab`, `github`, and 'ado'.
   provider: bitbucket_server
 
-  # URL to Bitbucket Server, Bitbucket Cloud, GitLab, or GitHub.
+  # URL to Bitbucket Server, Bitbucket Cloud, GitLab, GitHub, or ADO.
   # For Bitbucket Cloud, this should be https://api.bitbucket.org
   # For GitHub Cloud, this should be https://api.github.com
+  # For Azure Devops (ado), this should be https://dev.azure.com
   # For GitHub Enterprise, this should be https://github.yourcompany.com/api/v3 (note lack of trailing slash).
   # Otherwise, use the URL to your local git server.
   url: https://bitbucket.yourcompany.com
@@ -166,6 +167,7 @@ git:
   # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
   # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
   # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
+  # AzureDevops (required): use your organization name, which contains your projects
   include_projects:
       - PROJ1
 
@@ -195,13 +197,13 @@ git:
   #     - 123
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, GitHub or AzureDevops: use repository name (e.g.: my_repository)
   # GitLab: use project ID (e.g.: 123) (not project name)
   include_repos:
       - my_repository
 
   # Uncomment this to pull from all but specific repos.
-  # Bitbucket Server, Bitbucket Cloud, or GitHub: use repository name (e.g.: my_repository)
+  # Bitbucket Server, Bitbucket Cloud, GitHub or AzureDevops: use repository name (e.g.: my_repository)
   # GitLab: use project ID (e.g.: 123) (not project name)
   # exclude_repos:
   #    - repo_to_skip
