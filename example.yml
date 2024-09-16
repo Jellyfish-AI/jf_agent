@@ -173,7 +173,6 @@ git:
 
   # Uncomment this to pull from all but specific projects (not supported for GitHub, GitLab, BitbucketCloud, or Azure Devops).
   # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
-  # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
   #  exclude_projects:
   #    - PROJ1  # or, 123 for Gitlab
 
