@@ -180,7 +180,7 @@ git:
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
   # Bitbucket Server, Bitbucket Cloud, GitHub or Azure Devops: use repository name (e.g.: my_repository)
-  # GitLab: use gitlab "Project ID" (e.g.: 123) (not repository name). Comment out to pull all Gitlab Projects
+  # GitLab: use gitlab "Project ID" (e.g.: 123) (not gitlab project name). Comment out to pull all Gitlab Projects
   include_repos:
       - my_repository  # or, 123 for Gitlab
 
