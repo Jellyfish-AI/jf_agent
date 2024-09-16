@@ -164,49 +164,31 @@ git:
 
   # Only pull from specific projects / organizations / groups.
   # Bitbucket Server: use project keys, not names. Comment this out to pull from all projects.
-  # Bitbucket Cloud (required): use your organization name, as it appears in your Bitbucket URLs
+  # Bitbucket Cloud (required): use your workspace name, as it appears in your Bitbucket URLs
   # GitHub (required): use your organization name, as it appears in your GitHub URLs (e.g.: MyOrg)
   # GitLab (required): use the top-level GitLab "Group ID" (e.g.: 123)
   # Azure Devops (required): use your organization name, which contains your projects
   include_projects:
-      - PROJ1
+      - PROJ1  # or, 123 for Gitlab
 
-  # Uncomment this to pull from all but specific projects (not supported for GitHub or Bitbucket Cloud).
+  # Uncomment this to pull from all but specific projects (not supported for GitHub, GitLab, BitbucketCloud, or Azure Devops).
   # Bitbucket Server: use project keys, not names (e.g.: PROJ1)
   # GitLab: use the top-level GitLab "Group ID" (e.g.: 123)
   #  exclude_projects:
-  #    - PROJ1
+  #    - PROJ1  # or, 123 for Gitlab
 
-  # Bitbucket cloud only: the include_projects filter above maps to
-  # top-level organization for bitbucket cloud. If you've grouped your
-  # repos into Bitbucket Cloud projects, use these filters instead to
-  # pull only from repos in particular projects.  Specify projects by
-  # key (e.g.: PROJ1)
-  # include_bitbucket_cloud_projects:
-  #     - PROJ1
-  #
-  # exclude_bitbucket_cloud_projects:
-  #     - PROJ1
-
-  # GitLab only: a list of GitLab Group IDs for which we want to include ALL constituent repos
-  # include_all_repos_inside_projects:
-  #     - 123
-
-  # GitLab only: a list of GitLab Group IDs for which we want to exclude ALL constituent repos
-  # exclude_all_repos_inside_projects:
-  #     - 123
 
   # Only pull from specific repos.  Comment this out to pull from all repos.
   # Bitbucket Server, Bitbucket Cloud, GitHub or Azure Devops: use repository name (e.g.: my_repository)
-  # GitLab: use project ID (e.g.: 123) (not project name)
+  # GitLab: use gitlab "Project ID" (e.g.: 123) (not repository name). Comment out to pull all Gitlab Projects
   include_repos:
-      - my_repository
+      - my_repository  # or, 123 for Gitlab
 
   # Uncomment this to pull from all but specific repos.
   # Bitbucket Server, Bitbucket Cloud, GitHub or Azure Devops: use repository name (e.g.: my_repository)
-  # GitLab: use project ID (e.g.: 123) (not project name)
+  # GitLab: use gitlab "Project ID" (e.g.: 123) (not gitlab project name)
   # exclude_repos:
-  #    - repo_to_skip
+  #    - my_repository  # or, 123 for Gitlab
 
   # Uncomment this to pull commit data from each of the specified branches for each repository in addition to
   # the repo's default branch. If no branches are provided here, commits will only be pulled from each repository's
