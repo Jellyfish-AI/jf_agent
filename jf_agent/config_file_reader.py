@@ -448,6 +448,9 @@ def get_ingest_config(
             skip_issues=False,
             only_issues=False,
             recursively_download_parents=config.jira_recursively_download_parents,
+            jellyfish_issue_ids_for_redownload=endpoint_jira_info.get(
+                'issue_ids_to_redownload', []
+            ),
             #
             # worklogs
             download_worklogs=config.jira_download_worklogs,
@@ -455,8 +458,7 @@ def get_ingest_config(
             # expects a datetime. Do a quick conversion here
             work_logs_pull_from=datetime.fromtimestamp(work_logs_timestamp),
             # Jira Ingest Feature Flags
-            # TODO: Generate from launchdarkly
-            feature_flags={},
+            feature_flags=endpoint_jira_info.get('jf_ingest_feature_flags', {}),
         )
 
     git_configs: List[JFIngestGitConfig] = []
