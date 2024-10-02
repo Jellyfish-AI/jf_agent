@@ -328,15 +328,25 @@ def main():
         successful=error_and_timeout_free,
     )
 
-    log_extras_status_dict = dict(statuses=dict())
+    log_extras_status_dict = dict(
+        statuses=dict(
+            overall=(
+                'success'
+                if all(s.get('status', '') == 'success' for s in download_data_status)
+                else 'failed'
+            )
+        )
+    )
     for status in download_data_status:
         if status.get('type', '').lower() == 'jira':
             log_extras_status_dict['statuses']['Jira'] = status.get('status', '')
         if status.get('type', '').lower() == 'git':
             if instance_slug := status.get('instance'):
                 if 'Git' not in log_extras_status_dict:
-                    log_extras_status_dict['statuses']['Git'] = {}
-                log_extras_status_dict['statuses']['Git'][instance_slug] = status.get('status', '')
+                    log_extras_status_dict['statuses']['Git'] = []
+                log_extras_status_dict['statuses']['Git'].append(
+                    f"{instance_slug} = {status.get('status', '')}"
+                )
 
     logger.info('Done!', extra=log_extras_status_dict)
 
