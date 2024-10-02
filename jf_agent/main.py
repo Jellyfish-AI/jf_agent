@@ -328,26 +328,10 @@ def main():
         successful=error_and_timeout_free,
     )
 
-    log_extras_status_dict = dict(
-        statuses=dict(
-            overall=(
-                'success'
-                if all(s.get('status', '') == 'success' for s in download_data_status)
-                else 'failed'
-            )
-        )
+    # Add some additional, structured status logging as part of the final "Done!" logging message
+    log_extras_status_dict = agent_logging.generate_logging_extras_dict_for_done_message(
+        download_data_status
     )
-    for status in download_data_status:
-        if status.get('type', '').lower() == 'jira':
-            log_extras_status_dict['statuses']['Jira'] = status.get('status', '')
-        if status.get('type', '').lower() == 'git':
-            if instance_slug := status.get('instance'):
-                if 'Git' not in log_extras_status_dict:
-                    log_extras_status_dict['statuses']['Git'] = []
-                log_extras_status_dict['statuses']['Git'].append(
-                    f"{instance_slug} = {status.get('status', '')}"
-                )
-
     logger.info('Done!', extra=log_extras_status_dict)
 
     try:
