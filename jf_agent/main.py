@@ -156,7 +156,7 @@ def main():
         get_timestamp_from_outdir(config.outdir),
     )
 
-    logger.debug(f'Starting Agent run for...')
+    logger.debug(f'Starting Agent run...')
     download_data_status = []
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
@@ -327,8 +327,18 @@ def main():
         directories_to_skip=list(directories_to_skip_uploading_for),
         successful=error_and_timeout_free,
     )
-    logger.info('Done!')
-    logger.debug(f'Statuses for Agent Data processed: {download_data_status}')
+
+    log_extras_status_dict = dict(statuses=dict())
+    for status in download_data_status:
+        if status.get('type', '').lower() == 'jira':
+            log_extras_status_dict['statuses']['Jira'] = status.get('status', '')
+        if status.get('type', '').lower() == 'git':
+            if instance_slug := status.get('instance'):
+                if 'Git' not in log_extras_status_dict:
+                    log_extras_status_dict['statuses']['Git'] = {}
+                log_extras_status_dict['statuses']['Git'][instance_slug] = status.get('status', '')
+
+    logger.info('Done!', extra=log_extras_status_dict)
 
     try:
         diagnostics.send_diagnostic_end_reading(
