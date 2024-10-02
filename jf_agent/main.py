@@ -33,7 +33,6 @@ from jf_agent.exception import BadConfigException
 from jf_agent.git import get_git_client, load_and_dump_git
 from jf_agent.jf_jira import (
     get_basic_jira_connection,
-    load_and_dump_jira,
     print_all_jira_fields,
     print_missing_repos_found_by_jira,
 )

@@ -30,7 +30,6 @@ from jira.utils import json_loads
 from tqdm import tqdm
 
 from jf_agent.config_file_reader import ValidatedConfig
-from jf_agent.jf_jira import print_all_jira_fields
 from jf_agent.jf_jira.utils import retry_for_status
 from jf_agent.util import UserProvidedCreds, split
 
@@ -40,6 +39,7 @@ MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG = ''
 
 
 def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -> dict:
+    from jf_agent.jf_jira import print_all_jira_fields
 
     logger.info(
         'Running Jira Download...',
