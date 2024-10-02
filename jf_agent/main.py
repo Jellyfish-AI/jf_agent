@@ -692,24 +692,19 @@ def download_data(
         jira_connection = get_basic_jira_connection(config, creds)
         if config.run_mode_is_print_all_jira_fields:
             print_all_jira_fields(config, jira_connection)
-        if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
-            try:
-                logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
-                success = load_and_push_jira_to_s3(ingest_config)
-                success_status_str = 'success' if success else 'failed'
-                download_data_status.append({'type': 'Jira', 'status': success_status_str})
-            except Exception as e:
-                logger.error(
-                    'Error encountered when downloading Jira data. '
-                    'This Jira submission will be marked as failed. '
-                    f'Error: {e}'
-                )
-                logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
-                download_data_status.append({'type': 'Jira', 'status': 'failed'})
-        else:
-            download_data_status.append(
-                load_and_dump_jira(config, endpoint_jira_info, jira_connection)
+        try:
+            logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+            success = load_and_push_jira_to_s3(ingest_config)
+            success_status_str = 'success' if success else 'failed'
+            download_data_status.append({'type': 'Jira', 'status': success_status_str})
+        except Exception as e:
+            logger.error(
+                'Error encountered when downloading Jira data. '
+                'This Jira submission will be marked as failed. '
+                f'Error: {e}'
             )
+            logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
+            download_data_status.append({'type': 'Jira', 'status': 'failed'})
 
     if len(config.git_configs) == 0:
         return download_data_status
