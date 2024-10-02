@@ -37,7 +37,8 @@ from jf_agent.jf_jira import (
     print_all_jira_fields,
     print_missing_repos_found_by_jira,
 )
-from jf_agent.util import get_company_info, upload_file
+from jf_agent.jf_jira.jira_download import run_jira_download
+from jf_agent.util import UserProvidedCreds, get_company_info, upload_file
 from jf_agent.validation import ProjectMetadata, full_validate, validate_num_repos
 
 logger = logging.getLogger(__name__)
@@ -291,7 +292,6 @@ def main():
                         config,
                         creds,
                         ingest_config,
-                        jellyfish_endpoint_info.jira_info,
                         jellyfish_endpoint_info.git_instance_info,
                         jellyfish_endpoint_info.jf_options,
                     )
@@ -363,17 +363,6 @@ def potentially_send_data(
 
     return successful
 
-
-UserProvidedCreds = namedtuple(
-    'UserProvidedCreds',
-    [
-        'jellyfish_api_token',
-        'jira_username',
-        'jira_password',
-        'jira_bearer_token',
-        'git_instance_to_creds',
-    ],
-)
 
 JellyfishEndpointInfo = namedtuple(
     'JellyfishEndpointInfo', ['jira_info', 'git_instance_info', 'jf_options']
@@ -676,40 +665,19 @@ def distribute_repos_between_workers(git_configs, metadata_by_project):
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_data(
-    config,
+    config: ValidatedConfig,
     creds,
     ingest_config: IngestionConfig,
-    endpoint_jira_info,
     endpoint_git_instances_info,
     jf_options,
 ):
     download_data_status = []
 
     if config.jira_url:
-        logger.info(
-            'Obtained Jira configuration, attempting download...',
-        )
-        jira_connection = get_basic_jira_connection(config, creds)
-        if config.run_mode_is_print_all_jira_fields:
-            print_all_jira_fields(config, jira_connection)
-        if endpoint_jira_info.get('use_jf_ingest_for_jira', False):
-            try:
-                logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
-                success = load_and_push_jira_to_s3(ingest_config)
-                success_status_str = 'success' if success else 'failed'
-                download_data_status.append({'type': 'Jira', 'status': success_status_str})
-            except Exception as e:
-                logger.error(
-                    'Error encountered when downloading Jira data. '
-                    'This Jira submission will be marked as failed. '
-                    f'Error: {e}'
-                )
-                logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
-                download_data_status.append({'type': 'Jira', 'status': 'failed'})
-        else:
-            download_data_status.append(
-                load_and_dump_jira(config, endpoint_jira_info, jira_connection)
-            )
+        jira_download_status_dict = run_jira_download(config=config, ingest_config=ingest_config)
+        download_data_status.append(jira_download_status_dict)
+    else:
+        logger.info(f'No Jira Configuration supplied. Jira Download will not be run')
 
     if len(config.git_configs) == 0:
         return download_data_status

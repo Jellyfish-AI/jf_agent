@@ -1,17 +1,28 @@
+import logging
+from collections import namedtuple
+from itertools import islice
 from time import sleep
 from typing import Any, List
-from itertools import islice
+
 import requests
-from contextlib import contextmanager
+from jf_ingest import logging_helper
 
 from jf_agent.exception import BadConfigException
-
-import logging
-
 from jf_agent.session import retry_session
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
+
+
+UserProvidedCreds = namedtuple(
+    'UserProvidedCreds',
+    [
+        'jellyfish_api_token',
+        'jira_username',
+        'jira_password',
+        'jira_bearer_token',
+        'git_instance_to_creds',
+    ],
+)
 
 
 def split(lst: List[Any], n: int) -> List[List[Any]]:

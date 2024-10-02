@@ -1,28 +1,150 @@
-from collections import namedtuple, defaultdict
 import json
 import logging
 import math
+import queue
 import random
 import re
+import string
+import sys
+import threading
 import traceback
-from typing import Dict
+from collections import defaultdict, namedtuple
+from typing import Dict, Optional
 
 from dateutil import parser
+from jf_ingest import diagnostics, logging_helper
+from jf_ingest.config import IngestionConfig
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
+from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_from_jf_ingest
+from jf_ingest.jf_jira.custom_fields import (
+    IssueJCFVDBData,
+    JCFVDBData,
+    JCFVUpdate,
+    JCFVUpdateFullPayload,
+    identify_custom_field_mismatches,
+)
+from jf_ingest.utils import retry_for_status
 from jira.exceptions import JIRAError
 from jira.resources import dict2resource
 from jira.utils import json_loads
-import queue
-import sys
-import string
-import threading
 from tqdm import tqdm
 
+from jf_agent.config_file_reader import ValidatedConfig
+from jf_agent.jf_jira import print_all_jira_fields
 from jf_agent.jf_jira.utils import retry_for_status
-from jf_agent.util import split
-from jf_ingest import diagnostics, logging_helper
-from jf_ingest.utils import retry_for_status
+from jf_agent.util import UserProvidedCreds, split
 
 logger = logging.getLogger(__name__)
+
+MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG = ''
+
+
+def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -> dict:
+
+    logger.info(
+        'Running Jira Download...',
+    )
+    download_status = 'success'
+
+    # Not really sure what this print_all_jira_fields is or who still uses it.
+    # Leaving it in for backwards compatibility
+    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+    if config.run_mode_is_print_all_jira_fields:
+        print_all_jira_fields(config, jira_connection)
+
+    try:
+        detect_and_repair_custom_fields(ingest_config=ingest_config)
+    except Exception as e:
+        logger.info(
+            f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
+        )
+        logging_helper.send_to_agent_log_file(traceback.format_exc())
+
+    try:
+        logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+        success = load_and_push_jira_to_s3(ingest_config)
+        download_status = 'success' if success else 'failed'
+        logger.info(
+            'Jira Download Complete',
+        )
+    except Exception as e:
+        download_status = 'failed'
+        logger.error(
+            'Error encountered when downloading Jira data. '
+            'This Jira submission will be marked as failed. '
+            f'Error: {e}'
+        )
+        logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
+    finally:
+        return {'type': 'Jira', 'status': download_status}
+
+
+def detect_and_repair_custom_fields(
+    ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
+):
+
+    if not ingest_config.jira_config.feature_flags[MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG]:
+        logger.info('Skipping detection and repair of custom fields, feature flag is disabled')
+        return
+
+    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+    deployment_type = jira_connection.server_info()['deploymentType']
+    if deployment_type != 'Cloud':
+        logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
+        return
+
+    kwargs = dict()
+
+    logger.info("Beginning detection of custom field mismatches")
+    jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
+        ingest_config, **kwargs
+    )
+
+    # Logging
+    update_counts = defaultdict(int)
+    for update in (
+        jcfv_update_payload.out_of_sync_jcfv
+        + jcfv_update_payload.missing_from_db_jcfv
+        + jcfv_update_payload.missing_from_jira_jcfv
+    ):
+        update_counts[f'{update.value_old} -> {update.value_new}'] += 1
+    for value_change, update_count in sorted(
+        update_counts.items(), key=lambda x: x[1], reverse=True
+    ):
+        if value_change.startswith('None -> '):
+            prefix = 'INSERT'
+        elif value_change.endswith(' -> None'):
+            prefix = 'DELETE'
+        else:
+            prefix = 'UPDATE'
+        logger.info(f'{update_count: >6d} | {prefix} | {value_change }')
+
+    if submit_issues_for_repair:
+        logger.info("Submitting list of issue IDs to repair to Jellyfish")
+
+        missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
+        missing_jira_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv
+        ]
+        missing_out_of_sync_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv
+        ]
+
+        logger.info(
+            f'Submitting {len(all_ids)} issue IDs to Jellyfish that were marked for redownload'
+        )
+        all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
+
+        # TODO: SUBMIT ALL_IDS TO JELLYFISH TO MARK THEM FOR REDOWNLOAD IN OUR SYSTEM
+
+        logger.info(
+            f'Done submitting issues for repair. {len(all_ids)} issues were marked for redownload'
+        )
+
+        ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(all_ids)
+        logger.info(
+            f'In total, {len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)} will be redownloaded in Jira Download'
+        )
 
 
 # Returns an array of User dicts
@@ -119,7 +241,9 @@ def download_issuetypes(jira_connection, project_ids):
     For issue types that are scoped to projects, only extract the ones
     in the extracted projects.
     '''
-    logger.info('downloading jira issue types...  [!n]',)
+    logger.info(
+        'downloading jira issue types...  [!n]',
+    )
     result = []
     for it in retry_for_status(jira_connection.issue_types):
         if 'scope' in it.raw and it.raw['scope']['type'] == 'PROJECT':
@@ -204,7 +328,9 @@ def download_projects_and_versions(
                 == f"A value with ID '{project_id}' does not exist for the field 'project'."
             ):
                 logging_helper.log_standard_error(
-                    logging.ERROR, msg_args=[project_id], error_code=2112,
+                    logging.ERROR,
+                    msg_args=[project_id],
+                    error_code=2112,
                 )
                 return False
             else:
@@ -269,7 +395,9 @@ def download_boards_and_sprints(jira_connection, project_ids, download_sprints):
             except JIRAError as e:
                 if e.status_code == 400:
                     logging_helper.log_standard_error(
-                        logging.ERROR, msg_args=[project_id], error_code=2202,
+                        logging.ERROR,
+                        msg_args=[project_id],
+                        error_code=2202,
                     )
                     break
                 raise
@@ -357,7 +485,9 @@ def get_issues(jira_connection, issue_jql, start_at, batch_size):
             batch_size = int(batch_size / 2)
             error = e
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[batch_size], error_code=3012,
+                logging.WARNING,
+                msg_args=[batch_size],
+                error_code=3012,
             )
 
     # copied logic from jellyfish direct connect
@@ -437,7 +567,9 @@ def download_all_issue_metadata(
             except Exception as e:
                 thread_exceptions[thread_num] = e
                 logging_helper.log_standard_error(
-                    logging.ERROR, msg_args=[thread_num, traceback.format_exc()], error_code=3032,
+                    logging.ERROR,
+                    msg_args=[thread_num, traceback.format_exc()],
+                    error_code=3032,
                 )
 
         threads = [
@@ -607,7 +739,9 @@ def _filter_changelogs(issues, include_fields, exclude_fields):
             field_id_field = _get_field_identifier(i)
             if not field_id_field:
                 logging_helper.log_standard_error(
-                    level=logging.WARNING, error_code=3082, msg_args=[i.keys()],
+                    level=logging.WARNING,
+                    error_code=3082,
+                    msg_args=[i.keys()],
                 )
             if include_fields and i.get(field_id_field) not in include_fields:
                 continue
@@ -668,7 +802,10 @@ def _download_jira_issues_segment(
 
     except BaseException as e:
         logging_helper.log_standard_error(
-            logging.ERROR, msg_args=[thread_num], error_code=3042, exc_info=True,
+            logging.ERROR,
+            msg_args=[thread_num],
+            error_code=3042,
+            exc_info=True,
         )
         q.put(e)
 
@@ -710,14 +847,20 @@ def _download_jira_issues_page(
 
             batch_size = int(batch_size / 2)
             logging_helper.log_standard_error(
-                logging.WARNING, msg_args=[e, batch_size], error_code=3052, exc_info=True,
+                logging.WARNING,
+                msg_args=[e, batch_size],
+                error_code=3052,
+                exc_info=True,
             )
             if batch_size == 0:
                 if re.match(r"A value with ID .* does not exist for the field 'id'", e.text):
                     return [], 1
                 elif not get_changelog:
                     agent_logging.log_and_print_error_or_warning(
-                        logger, logging.WARNING, msg_args=[search_params], error_code=3062,
+                        logger,
+                        logging.WARNING,
+                        msg_args=[search_params],
+                        error_code=3062,
                     )
                     return [], 0
                 else:
@@ -967,8 +1110,8 @@ def _search_users(
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def download_missing_repos_found_by_jira(config, creds, issues_to_scan):
-    from jf_agent.jf_jira import get_basic_jira_connection
     from jf_agent.git import get_git_client
+    from jf_agent.jf_jira import get_basic_jira_connection
 
     # obtain list of repos in jira
     jira_connection = get_basic_jira_connection(config, creds)
@@ -1012,7 +1155,8 @@ def _get_repos_list_in_jira(issues_to_scan, jira_connection):
             except JIRAError as e:
                 if e.status_code == 403:
                     logging_helper.log_standard_error(
-                        logging.ERROR, error_code=2122,
+                        logging.ERROR,
+                        error_code=2122,
                     )
                     return []
 
