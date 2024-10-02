@@ -156,6 +156,8 @@ def main():
         get_timestamp_from_outdir(config.outdir),
     )
 
+    logger.debug(f'Starting Agent run for...')
+    download_data_status = []
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
@@ -325,8 +327,8 @@ def main():
         directories_to_skip=list(directories_to_skip_uploading_for),
         successful=error_and_timeout_free,
     )
-
     logger.info('Done!')
+    logger.debug(f'Statuses for Agent Data processed: {download_data_status}')
 
     try:
         diagnostics.send_diagnostic_end_reading(
