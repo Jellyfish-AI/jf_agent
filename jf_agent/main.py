@@ -236,7 +236,7 @@ def main():
                 # Run Jira validation from JF ingest by default.
                 # Temporarily skip Git until we cut the validation over to JF ingest
                 logger.info("Running ingestion healthcheck validation!")
-                full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
+                # full_validate(config, creds, jellyfish_endpoint_info, skip_git=True)
             except Exception as err:
                 logger.error(
                     f"Failed to run healthcheck validation due to exception, moving on. Exception: {err}"
