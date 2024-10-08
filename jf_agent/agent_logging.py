@@ -16,6 +16,8 @@ import colorama
 import structlog
 from jf_ingest.logging_helper import AGENT_LOG_TAG
 
+from jf_agent.util import get_latest_agent_version
+
 '''
 Guidance on logging/printing in the agent:
 
@@ -353,13 +355,21 @@ def bind_default_agent_context(
     company_slug: Optional[str],
     upload_time: str,
 ) -> None:
+    commit_sha = os.getenv("SHA")
+    latest_commit_from_agent = get_latest_agent_version()
+    # Cloudwatch serializes booleans as 0 or 1, so cast this as a string for better readability
+    commit_is_latest = 'True' if commit_sha == latest_commit_from_agent else 'False'
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(
         run_mode=run_mode,
         company_slug=company_slug,
         upload_time=upload_time,
         agent_run_uuid=str(uuid.uuid4()),
-        jf_meta={'commit': os.getenv("SHA"), 'commit_build_time': os.getenv("BUILDTIME")},
+        jf_meta={
+            'commit': commit_sha,
+            'commit_build_time': os.getenv("BUILDTIME"),
+            'commit_is_latest': commit_is_latest,
+        },
     )
 
 
@@ -440,3 +450,42 @@ def close_out(config: AgentLoggingConfig) -> None:
     config.listener.queue.put(-1)
     config.listener.stop()
     logger.info('Log stream stopped.')
+
+
+def generate_logging_extras_dict_for_done_message(
+    download_data_status: Optional[list] = None,
+) -> dict:
+    """Helper function for creating a structured status log extra. This will be called and injected
+    as part of the final "Done!" log event from the agent.
+
+    Args:
+        download_data_status (Optional[list], optional): A list of status events from Jira and Git. Defaults to None.
+
+    Returns:
+        dict: A structured dictionary, reporting on the status of each status event. This will be passed as a log extra to the final "Done!" log event in Agent
+    """
+
+    if not download_data_status:
+        download_data_status = []
+
+    log_extras_status_dict = dict(
+        statuses=dict(
+            overall=(
+                'success'
+                if all(s.get('status', '') == 'success' for s in download_data_status)
+                else 'failed'
+            )
+        )
+    )
+    for status in download_data_status:
+        if status.get('type', '').lower() == 'jira':
+            log_extras_status_dict['statuses']['Jira'] = status.get('status', '')
+        if status.get('type', '').lower() == 'git':
+            if instance_slug := status.get('instance'):
+                if 'Git' not in log_extras_status_dict:
+                    log_extras_status_dict['statuses']['Git'] = []
+                log_extras_status_dict['statuses']['Git'].append(
+                    f"{instance_slug} = {status.get('status', '')}"
+                )
+
+    return log_extras_status_dict
