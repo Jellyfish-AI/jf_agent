@@ -56,9 +56,9 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
     if config.run_mode_is_print_all_jira_fields:
         print_all_jira_fields(config, jira_connection)
 
-    if (
-        True
-    ):  # ingest_config.jira_config.feature_flags.get('makara-custom-fields-mismatch-detection-and-repair', False):
+    if ingest_config.jira_config.feature_flags.get(
+        MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
+    ):
         try:
             ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
             if ids_to_redownload:
@@ -83,7 +83,11 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
                 f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
             )
             logging_helper.send_to_agent_log_file(traceback.format_exc())
-
+    else:
+        logging_helper.send_to_agent_log_file(
+            f'{MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG} was set to {ingest_config.jira_config.feature_flags.get(MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False)} - Detect and repair custom field logic will not be run',
+            level=logging.INFO,
+        )
     try:
         logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
         success = load_and_push_jira_to_s3(ingest_config)
