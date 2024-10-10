@@ -1,16 +1,28 @@
 import logging
-from contextlib import contextmanager
+from collections import namedtuple
 from itertools import islice
 from time import sleep
 from typing import Any, List
 
 import requests
-from jf_ingest import diagnostics, logging_helper
+from jf_ingest import logging_helper
 
 from jf_agent.exception import BadConfigException
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
+
+
+UserProvidedCreds = namedtuple(
+    'UserProvidedCreds',
+    [
+        'jellyfish_api_token',
+        'jira_username',
+        'jira_password',
+        'jira_bearer_token',
+        'git_instance_to_creds',
+    ],
+)
 
 
 def get_latest_agent_version():

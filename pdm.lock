@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:4b0bc5ce3716cf08d2c1692f584e69eb641cd12421334948cae67615e82c855e"
+content_hash = "sha256:2d0948705ea35a8915679f2dcd676d5819c7926284b06e4a2fdd8b2732ad39cb"
 
 [[metadata.targets]]
 requires_python = ">=3.10,<3.11"
@@ -461,7 +461,7 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.133"
+version = "0.0.135"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 groups = ["default"]
@@ -480,8 +480,8 @@ dependencies = [
     "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf_ingest-0.0.133-py3-none-any.whl", hash = "sha256:37d92467360af4f70d99f0d80c7299d768071b02d8fa56a1afe2f4b0145b1294"},
-    {file = "jf_ingest-0.0.133.tar.gz", hash = "sha256:19c9be848136b155de66c923ab779e3c712d49067bac4e37722b29b2a93dd14a"},
+    {file = "jf_ingest-0.0.135-py3-none-any.whl", hash = "sha256:31025afc14cf09fb35d54aac2a6b5a82cae927398f1bf28ec890d87916db1c9c"},
+    {file = "jf_ingest-0.0.135.tar.gz", hash = "sha256:a8bb3c1e1d2259d84758e1a1915c6a1f34b4361f880e4b8e73812e1c2ecf2cd2"},
 ]
 
 [[package]]

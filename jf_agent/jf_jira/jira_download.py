@@ -1,13 +1,175 @@
+import json
 import logging
+import math
+import queue
+import random
+import re
 import string
+import sys
+import threading
+import traceback
+from collections import defaultdict, namedtuple
+from typing import Dict, Optional
 
+from dateutil import parser
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.config import IngestionConfig
+from jf_ingest.jf_jira import load_and_push_jira_to_s3
+from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_from_jf_ingest
+from jf_ingest.jf_jira.custom_fields import (
+    IssueJCFVDBData,
+    JCFVDBData,
+    JCFVUpdate,
+    JCFVUpdateFullPayload,
+    identify_custom_field_mismatches,
+)
 from jf_ingest.utils import retry_for_status
 from jira.exceptions import JIRAError
+from jira.resources import dict2resource
+from jira.utils import json_loads
+from tqdm import tqdm
 
+from jf_agent.config_file_reader import ValidatedConfig
 from jf_agent.jf_jira.utils import retry_for_status
+from jf_agent.util import UserProvidedCreds, split
 
 logger = logging.getLogger(__name__)
+
+MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG = (
+    'makara-custom-fields-mismatch-detection-and-repair'
+)
+
+
+@diagnostics.capture_timing()
+@logging_helper.log_entry_exit(logger)
+def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -> dict:
+    from jf_agent.jf_jira import print_all_jira_fields
+
+    logger.info(
+        'Running Jira Download...',
+    )
+    download_status = 'success'
+
+    # Not really sure what this print_all_jira_fields is or who still uses it.
+    # Leaving it in for backwards compatibility
+    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+    if config.run_mode_is_print_all_jira_fields:
+        print_all_jira_fields(config, jira_connection)
+
+    if ingest_config.jira_config.feature_flags.get(
+        MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
+    ):
+        try:
+            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
+            if ids_to_redownload:
+                count_of_ids_to_redownload_previously = len(
+                    ingest_config.jira_config.jellyfish_issue_ids_for_redownload
+                )
+                ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(
+                    ids_to_redownload
+                )
+                count_of_additional_ids_to_redownload = (
+                    len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
+                    - count_of_ids_to_redownload_previously
+                )
+                logging_helper.send_to_agent_log_file(
+                    f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
+                    f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
+                )
+            else:
+                logger.info('No Jira Issues were marked as needing their custom fields repaired')
+        except Exception as e:
+            logger.warning(
+                f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
+            )
+            logging_helper.send_to_agent_log_file(traceback.format_exc())
+    else:
+        logging_helper.send_to_agent_log_file(
+            f'{MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG} was set to {ingest_config.jira_config.feature_flags.get(MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False)} - Detect and repair custom field logic will not be run',
+            level=logging.INFO,
+        )
+    try:
+        logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+        success = load_and_push_jira_to_s3(ingest_config)
+        download_status = 'success' if success else 'failed'
+        logger.info(
+            'Jira Download Complete',
+        )
+    except Exception as e:
+        download_status = 'failed'
+        logger.error(
+            'Error encountered when downloading Jira data. '
+            'This Jira submission will be marked as failed. '
+            f'Error: {e}'
+        )
+        logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
+    finally:
+        return {'type': 'Jira', 'status': download_status}
+
+
+@diagnostics.capture_timing()
+@logging_helper.log_entry_exit(logger)
+def detect_and_repair_custom_fields(
+    ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
+) -> set[str]:
+    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+    deployment_type = jira_connection.server_info()['deploymentType']
+
+    # NOTE: This is temporary! For initial roll out, we want to target only Cloud Instances
+    # After stable roll out, we'd like to target Server instances as well
+    if deployment_type != 'Cloud':
+        logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
+        return set()
+
+    kwargs = dict()
+
+    logger.info("Beginning detection of custom field mismatches")
+    jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
+        ingest_config, **kwargs
+    )
+
+    # Logging
+    update_counts = defaultdict(int)
+    for update in (
+        jcfv_update_payload.out_of_sync_jcfv
+        + jcfv_update_payload.missing_from_db_jcfv
+        + jcfv_update_payload.missing_from_jira_jcfv
+    ):
+        update_counts[f'{update.value_old} -> {update.value_new}'] += 1
+    for value_change, update_count in sorted(
+        update_counts.items(), key=lambda x: x[1], reverse=True
+    ):
+        if value_change.startswith('None -> '):
+            prefix = 'INSERT'
+        elif value_change.endswith(' -> None'):
+            prefix = 'DELETE'
+        else:
+            prefix = 'UPDATE'
+        logger.info(f'{update_count: >6d} | {prefix} | {value_change }')
+
+    if submit_issues_for_repair:
+        logger.info("Submitting list of issue IDs to repair to Jellyfish")
+
+        missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
+        missing_jira_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv
+        ]
+        missing_out_of_sync_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv
+        ]
+
+        all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
+        logger.info(
+            f'Submitting {len(all_ids)} issue IDs to Jellyfish that were marked for redownload'
+        )
+
+        # TODO: SUBMIT ALL_IDS TO JELLYFISH TO MARK THEM FOR REDOWNLOAD IN OUR SYSTEM
+
+        logger.info(
+            f'Done submitting issues for repair. {len(all_ids)} issues were marked for redownload'
+        )
+
+        return set([str(id) for id in all_ids])
 
 
 # Returns an array of User dicts
