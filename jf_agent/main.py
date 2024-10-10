@@ -157,6 +157,8 @@ def main():
         get_timestamp_from_outdir(config.outdir),
     )
 
+    logger.debug(f'Starting Agent run...')
+    download_data_status = []
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
 
@@ -326,7 +328,11 @@ def main():
         successful=error_and_timeout_free,
     )
 
-    logger.info('Done!')
+    # Add some additional, structured status logging as part of the final "Done!" logging message
+    log_extras_status_dict = agent_logging.generate_logging_extras_dict_for_done_message(
+        download_data_status
+    )
+    logger.info('Done!', extra=log_extras_status_dict)
 
     try:
         diagnostics.send_diagnostic_end_reading(

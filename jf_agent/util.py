@@ -25,6 +25,20 @@ UserProvidedCreds = namedtuple(
 )
 
 
+def get_latest_agent_version():
+    try:
+        request = requests.get(
+            url='https://api.github.com/repos/Jellyfish-AI/jf_agent/commits/master'
+        )
+        request.raise_for_status()
+        return request.json()['sha']
+    except Exception as e:
+        logging_helper.send_to_agent_log_file(
+            f'Exception {e} encountered when trying to get latest Agent version sha'
+        )
+        return ''
+
+
 def split(lst: List[Any], n: int) -> List[List[Any]]:
     """
     Split list `lst` into `n` approximately equal chunks
