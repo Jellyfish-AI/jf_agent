@@ -112,13 +112,11 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
 def detect_and_repair_custom_fields(
     ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
 ) -> set[str]:
-
-    if not ingest_config.jira_config.feature_flags[MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG]:
-        logger.info('Skipping detection and repair of custom fields, feature flag is disabled')
-        return set()
-
     jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     deployment_type = jira_connection.server_info()['deploymentType']
+
+    # NOTE: This is temporary! For initial roll out, we want to target only Cloud Instances
+    # After stable roll out, we'd like to target Server instances as well
     if deployment_type != 'Cloud':
         logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
         return set()
