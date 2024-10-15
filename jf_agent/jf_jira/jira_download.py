@@ -60,7 +60,24 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
     ):
         try:
-            detect_and_repair_custom_fields(ingest_config=ingest_config, submit_issues_for_repair=True)
+            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config, submit_issues_for_repair=True)
+            if ids_to_redownload:
+                count_of_ids_to_redownload_previously = len(
+                    ingest_config.jira_config.jellyfish_issue_ids_for_redownload
+                )
+                ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(
+                    ids_to_redownload
+                )
+                count_of_additional_ids_to_redownload = (
+                    len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
+                    - count_of_ids_to_redownload_previously
+                )
+                logging_helper.send_to_agent_log_file(
+                    f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
+                    f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
+                )
+            else:
+                logger.info('No Jira Issues were marked as needing their custom fields repaired')
         except Exception as e:
             logger.warning(
                 f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
@@ -116,6 +133,7 @@ def detect_and_repair_custom_fields(
         missing_out_of_sync_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv]
         all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
         logger.info(f'{len(all_ids)} issue IDs submitted to Jellyfish for redownload')
+        return set([str(id) for id in all_ids])
 
 
 # Returns an array of User dicts
