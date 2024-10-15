@@ -60,7 +60,22 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
     ):
         try:
-            detect_and_repair_custom_fields(ingest_config=ingest_config)
+            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
+            if ids_to_redownload:
+                count_of_ids_to_redownload_previously = len(
+                    ingest_config.jira_config.jellyfish_issue_ids_for_redownload
+                )
+                ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(
+                    ids_to_redownload
+                )
+                count_of_additional_ids_to_redownload = (
+                    len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
+                    - count_of_ids_to_redownload_previously
+                )
+                logging_helper.send_to_agent_log_file(
+                    f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
+                    f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
+                )
         except Exception as e:
             logger.warning(
                 f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
@@ -94,7 +109,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
 @logging_helper.log_entry_exit(logger)
 def detect_and_repair_custom_fields(
     ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
-) -> None:
+) -> Optional[set[str]]:
     jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     deployment_type = jira_connection.server_info()['deploymentType']
 
@@ -102,9 +117,21 @@ def detect_and_repair_custom_fields(
     # After stable roll out, we'd like to target Server instances as well
     if deployment_type != 'Cloud':
         logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
-        return
+        return set()
 
-    identify_custom_field_mismatches(ingest_config, mark_for_redownload=submit_issues_for_repair)
+    jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
+        ingest_config, mark_for_redownload=submit_issues_for_repair
+    )
+    if submit_issues_for_repair:
+        missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
+        missing_jira_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv
+        ]
+        missing_out_of_sync_ids = [
+            jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv
+        ]
+        all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
+        return set([str(id) for id in all_ids])
 
 
 # Returns an array of User dicts
