@@ -18,7 +18,7 @@ dependencies = [
     "click~=8.0.4",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
-    "jf-ingest==0.0.137",
+    "jf-ingest==0.0.138",
     "structlog>=24.4.0",
     "colorama>=0.4.6",
 ]
