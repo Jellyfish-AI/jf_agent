@@ -60,24 +60,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
     ):
         try:
-            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
-            if ids_to_redownload:
-                count_of_ids_to_redownload_previously = len(
-                    ingest_config.jira_config.jellyfish_issue_ids_for_redownload
-                )
-                ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(
-                    ids_to_redownload
-                )
-                count_of_additional_ids_to_redownload = (
-                    len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
-                    - count_of_ids_to_redownload_previously
-                )
-                logging_helper.send_to_agent_log_file(
-                    f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
-                    f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
-                )
-            else:
-                logger.info('No Jira Issues were marked as needing their custom fields repaired')
+            detect_and_repair_custom_fields(ingest_config=ingest_config, submit_issues_for_repair=True)
         except Exception as e:
             logger.warning(
                 f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
@@ -123,53 +106,16 @@ def detect_and_repair_custom_fields(
 
     kwargs = dict()
 
-    logger.info("Beginning detection of custom field mismatches")
+    logger.info(f'Beginning detection of custom field mismatches. Submit issues for redownload: {submit_issues_for_repair}')
     jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
-        ingest_config, **kwargs
+        ingest_config, mark_for_redownload=submit_issues_for_repair, **kwargs
     )
-
-    # Logging
-    update_counts = defaultdict(int)
-    for update in (
-        jcfv_update_payload.out_of_sync_jcfv
-        + jcfv_update_payload.missing_from_db_jcfv
-        + jcfv_update_payload.missing_from_jira_jcfv
-    ):
-        update_counts[f'{update.value_old} -> {update.value_new}'] += 1
-    for value_change, update_count in sorted(
-        update_counts.items(), key=lambda x: x[1], reverse=True
-    ):
-        if value_change.startswith('None -> '):
-            prefix = 'INSERT'
-        elif value_change.endswith(' -> None'):
-            prefix = 'DELETE'
-        else:
-            prefix = 'UPDATE'
-        logger.info(f'{update_count: >6d} | {prefix} | {value_change }')
-
     if submit_issues_for_repair:
-        logger.info("Submitting list of issue IDs to repair to Jellyfish")
-
         missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
-        missing_jira_ids = [
-            jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv
-        ]
-        missing_out_of_sync_ids = [
-            jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv
-        ]
-
+        missing_jira_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv]
+        missing_out_of_sync_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv]
         all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
-        logger.info(
-            f'Submitting {len(all_ids)} issue IDs to Jellyfish that were marked for redownload'
-        )
-
-        # TODO: SUBMIT ALL_IDS TO JELLYFISH TO MARK THEM FOR REDOWNLOAD IN OUR SYSTEM
-
-        logger.info(
-            f'Done submitting issues for repair. {len(all_ids)} issues were marked for redownload'
-        )
-
-        return set([str(id) for id in all_ids])
+        logger.info(f'{len(all_ids)} issue IDs submitted to Jellyfish for redownload')
 
 
 # Returns an array of User dicts
