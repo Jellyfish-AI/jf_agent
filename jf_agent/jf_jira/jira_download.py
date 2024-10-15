@@ -60,7 +60,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
     ):
         try:
-            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config, submit_issues_for_repair=True)
+            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
             if ids_to_redownload:
                 count_of_ids_to_redownload_previously = len(
                     ingest_config.jira_config.jellyfish_issue_ids_for_redownload
