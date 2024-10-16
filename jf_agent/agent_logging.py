@@ -174,6 +174,13 @@ class CustomQueueHandler(QueueHandler):
                 ),
                 headers=headers,
             )
+
+            resp = conn.getresponse()
+
+            if resp.status == 200:
+                self.batches_sent += 1
+                self.messages_to_send = []
+                self.last_message_send_time = now
         except:
             self.post_errors += 1
             if self.post_errors < self.post_error_threshold:
@@ -185,13 +192,6 @@ class CustomQueueHandler(QueueHandler):
                     'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.'
                 )
             return
-
-        resp = conn.getresponse()
-
-        if resp.status == 200:
-            self.batches_sent += 1
-            self.messages_to_send = []
-            self.last_message_send_time = now
 
     def handle(self, record: Union[logging.LogRecord, int]) -> None:
         now = datetime.now()
