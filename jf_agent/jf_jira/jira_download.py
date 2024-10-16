@@ -76,8 +76,6 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
                     f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
                     f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
                 )
-            else:
-                logger.info('No Jira Issues were marked as needing their custom fields repaired')
         except Exception as e:
             logger.warning(
                 f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
@@ -111,7 +109,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
 @logging_helper.log_entry_exit(logger)
 def detect_and_repair_custom_fields(
     ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
-) -> set[str]:
+) -> Optional[set[str]]:
     jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     deployment_type = jira_connection.server_info()['deploymentType']
 
@@ -121,35 +119,10 @@ def detect_and_repair_custom_fields(
         logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
         return set()
 
-    kwargs = dict()
-
-    logger.info("Beginning detection of custom field mismatches")
     jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
-        ingest_config, **kwargs
+        ingest_config, mark_for_redownload=submit_issues_for_repair
     )
-
-    # Logging
-    update_counts = defaultdict(int)
-    for update in (
-        jcfv_update_payload.out_of_sync_jcfv
-        + jcfv_update_payload.missing_from_db_jcfv
-        + jcfv_update_payload.missing_from_jira_jcfv
-    ):
-        update_counts[f'{update.value_old} -> {update.value_new}'] += 1
-    for value_change, update_count in sorted(
-        update_counts.items(), key=lambda x: x[1], reverse=True
-    ):
-        if value_change.startswith('None -> '):
-            prefix = 'INSERT'
-        elif value_change.endswith(' -> None'):
-            prefix = 'DELETE'
-        else:
-            prefix = 'UPDATE'
-        logger.info(f'{update_count: >6d} | {prefix} | {value_change }')
-
     if submit_issues_for_repair:
-        logger.info("Submitting list of issue IDs to repair to Jellyfish")
-
         missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
         missing_jira_ids = [
             jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_jira_jcfv
@@ -157,18 +130,7 @@ def detect_and_repair_custom_fields(
         missing_out_of_sync_ids = [
             jcfv.jira_issue_id for jcfv in jcfv_update_payload.out_of_sync_jcfv
         ]
-
         all_ids = set(missing_db_ids + missing_jira_ids + missing_out_of_sync_ids)
-        logger.info(
-            f'Submitting {len(all_ids)} issue IDs to Jellyfish that were marked for redownload'
-        )
-
-        # TODO: SUBMIT ALL_IDS TO JELLYFISH TO MARK THEM FOR REDOWNLOAD IN OUR SYSTEM
-
-        logger.info(
-            f'Done submitting issues for repair. {len(all_ids)} issues were marked for redownload'
-        )
-
         return set([str(id) for id in all_ids])
 
 
