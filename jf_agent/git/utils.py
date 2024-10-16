@@ -2,6 +2,8 @@ import fnmatch
 import logging
 from typing import Any, List
 
+from jf_ingest.config import GitProviderInJellyfishRepo
+
 logger = logging.getLogger(__name__)
 
 '''
@@ -27,6 +29,10 @@ PROVIDERS = (
 JF_INGEST_SUPPORTED_PROVIDERS = (
     GH_PROVIDER,
     ADO_PROVIDER,
+    # Agent and Jellyfish (Direct Connect) enums don't match 100%,
+    # so this list must account for both
+    GitProviderInJellyfishRepo.GITHUB.value,
+    GitProviderInJellyfishRepo.ADO.value,
 )
 
 
