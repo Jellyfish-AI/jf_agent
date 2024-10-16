@@ -376,7 +376,7 @@ def get_ingest_config(
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
     """
-    from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
+    from jf_agent.git.utils import GH_PROVIDER, JF_INGEST_SUPPORTED_PROVIDERS
 
     company_info = get_company_info(config, creds)
 
@@ -479,6 +479,12 @@ def get_ingest_config(
             endpoint_git_instance_info = list(endpoint_git_instances_info.values())[0]
             instance_creds = list(creds.git_instance_to_creds.values())[0]
             instance_slug = endpoint_git_instance_info['slug']
+
+        if agent_git_config.git_provider == GH_PROVIDER and not endpoint_git_instance_info.get(
+            'supports_graphql_endpoints', False
+        ):
+            # For legacy reasons, to use the JF Ingest adapter for Github you need to have this feature flag enabled
+            continue
 
         jf_ingest_git_auth_config = _get_jf_ingest_git_auth_config(
             company_slug=company_slug,
