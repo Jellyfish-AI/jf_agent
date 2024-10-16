@@ -279,12 +279,16 @@ def main():
                     # JF Ingest
                     from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
 
+                    # Extreme paranoia, normalize everything to lowercase
+                    lower_case_supported_providers = [
+                        provider.lower() for provider in JF_INGEST_SUPPORTED_PROVIDERS
+                    ]
                     directories_to_skip_uploading_for.update(
                         [
                             f'git_{git_config.instance_file_key}'
                             for git_config in ingest_config.git_configs
                             if git_config.git_provider.value.lower()
-                            in JF_INGEST_SUPPORTED_PROVIDERS
+                            in lower_case_supported_providers
                         ]
                     )
                     # Jira is supported by all customers, always skip it
