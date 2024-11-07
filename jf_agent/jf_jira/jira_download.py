@@ -1,37 +1,18 @@
-import json
 import logging
-import math
-import queue
-import random
-import re
 import string
-import sys
-import threading
 import traceback
-from collections import defaultdict, namedtuple
-from typing import Dict, Optional
+from typing import Optional
 
-from dateutil import parser
 from jf_ingest import diagnostics, logging_helper
 from jf_ingest.config import IngestionConfig
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_from_jf_ingest
-from jf_ingest.jf_jira.custom_fields import (
-    IssueJCFVDBData,
-    JCFVDBData,
-    JCFVUpdate,
-    JCFVUpdateFullPayload,
-    identify_custom_field_mismatches,
-)
+from jf_ingest.jf_jira.custom_fields import JCFVUpdateFullPayload, identify_custom_field_mismatches
 from jf_ingest.utils import retry_for_status
 from jira.exceptions import JIRAError
-from jira.resources import dict2resource
-from jira.utils import json_loads
-from tqdm import tqdm
 
 from jf_agent.config_file_reader import ValidatedConfig
 from jf_agent.jf_jira.utils import retry_for_status
-from jf_agent.util import UserProvidedCreds, split
 
 logger = logging.getLogger(__name__)
 
@@ -56,36 +37,27 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
     if config.run_mode_is_print_all_jira_fields:
         print_all_jira_fields(config, jira_connection)
 
-    if ingest_config.jira_config.feature_flags.get(
-        MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
-    ):
-        try:
-            ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
-            if ids_to_redownload:
-                count_of_ids_to_redownload_previously = len(
-                    ingest_config.jira_config.jellyfish_issue_ids_for_redownload
-                )
-                ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(
-                    ids_to_redownload
-                )
-                count_of_additional_ids_to_redownload = (
-                    len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
-                    - count_of_ids_to_redownload_previously
-                )
-                logging_helper.send_to_agent_log_file(
-                    f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
-                    f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
-                )
-        except Exception as e:
-            logger.warning(
-                f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
+    try:
+        ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
+        if ids_to_redownload:
+            count_of_ids_to_redownload_previously = len(
+                ingest_config.jira_config.jellyfish_issue_ids_for_redownload
             )
-            logging_helper.send_to_agent_log_file(traceback.format_exc())
-    else:
-        logging_helper.send_to_agent_log_file(
-            f'{MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG} was set to {ingest_config.jira_config.feature_flags.get(MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False)} - Detect and repair custom field logic will not be run',
-            level=logging.INFO,
+            ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(ids_to_redownload)
+            count_of_additional_ids_to_redownload = (
+                len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
+                - count_of_ids_to_redownload_previously
+            )
+            logging_helper.send_to_agent_log_file(
+                f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
+                f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
+            )
+    except Exception as e:
+        logger.warning(
+            f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
         )
+        logging_helper.send_to_agent_log_file(traceback.format_exc())
+
     try:
         logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
         success = load_and_push_jira_to_s3(ingest_config)
@@ -115,7 +87,9 @@ def detect_and_repair_custom_fields(
 
     # NOTE: This is temporary! For initial roll out, we want to target only Cloud Instances
     # After stable roll out, we'd like to target Server instances as well
-    if deployment_type != 'Cloud':
+    if deployment_type != 'Cloud' and not ingest_config.jira_config.feature_flags.get(
+        MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
+    ):
         logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
         return set()
 
