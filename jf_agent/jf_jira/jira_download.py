@@ -4,6 +4,7 @@ import traceback
 from typing import Optional
 
 from jf_ingest import diagnostics, logging_helper
+from jf_ingest.adaptive_throttler import AdaptiveThrottler
 from jf_ingest.config import IngestionConfig
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_from_jf_ingest
@@ -16,9 +17,7 @@ from jf_agent.jf_jira.utils import retry_for_status
 
 logger = logging.getLogger(__name__)
 
-MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG = (
-    'makara-custom-fields-mismatch-detection-and-repair'
-)
+MAKARA_JIRA_SVR_THREAD_COUNT_FLAG = 'makara-jira-server-dc-thread-count'
 
 
 @diagnostics.capture_timing()
@@ -52,6 +51,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
                 f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
                 f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
             )
+            logger.info('Detect and repair custom fields completed successfully')
     except Exception as e:
         logger.warning(
             f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
@@ -84,18 +84,33 @@ def detect_and_repair_custom_fields(
 ) -> Optional[set[str]]:
     jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     deployment_type = jira_connection.server_info()['deploymentType']
+    use_adaptive_throttler = False
 
-    # NOTE: This is temporary! For initial roll out, we want to target only Cloud Instances
-    # After stable roll out, we'd like to target Server instances as well
-    if deployment_type != 'Cloud' and not ingest_config.jira_config.feature_flags.get(
-        MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG, False
-    ):
-        logger.info('Skipping detection and repair of custom fields, deployment type is not Cloud')
-        return set()
+    # Default thread count of 10
+    thread_count = 10
+
+    # Enable use of adaptive throttler for Jira server/dc
+    # TEMP REMOVE BEFORE MERGING
+    if deployment_type != 'Cloud':
+        # If issue_download_concurrent_threads is set in the config, use that number of threads
+        # Otherwise, use the feature flag to determine thread count for Jira server/dc
+        # Default thread count of 5 if the feature flag is not set or unavailable
+        thread_count = (
+            ingest_config.jira_config.issue_download_concurrent_threads
+            if ingest_config.jira_config.issue_download_concurrent_threads
+            else ingest_config.jira_config.feature_flags.get(MAKARA_JIRA_SVR_THREAD_COUNT_FLAG, 5)
+        )
+
+        logger.info(f'Using adaptive throttler with {thread_count} threads for custom field repair')
+        use_adaptive_throttler = True
 
     jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
-        ingest_config, mark_for_redownload=submit_issues_for_repair
+        ingest_config,
+        nthreads=thread_count,
+        mark_for_redownload=submit_issues_for_repair,
+        use_throttler=use_adaptive_throttler,
     )
+
     if submit_issues_for_repair:
         missing_db_ids = [jcfv.jira_issue_id for jcfv in jcfv_update_payload.missing_from_db_jcfv]
         missing_jira_ids = [

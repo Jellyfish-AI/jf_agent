@@ -406,6 +406,11 @@ def get_ingest_config(
             project_id_to_pull_from[im.project_id] = max(
                 im.updated, project_id_to_pull_from[im.project_id]
             )
+
+        jf_issue_ids_for_redownload = endpoint_jira_info.get('issue_ids_to_redownload', set())
+        if isinstance(jf_issue_ids_for_redownload, list):
+            jf_issue_ids_for_redownload = set(jf_issue_ids_for_redownload)
+
         jira_config: JiraDownloadConfig = JiraDownloadConfig(
             company_slug=company_slug,
             #
@@ -448,10 +453,7 @@ def get_ingest_config(
             skip_issues=False,
             only_issues=False,
             recursively_download_parents=config.jira_recursively_download_parents,
-            jellyfish_issue_ids_for_redownload=endpoint_jira_info.get(
-                'issue_ids_to_redownload', []
-            ),
-            #
+            jellyfish_issue_ids_for_redownload=jf_issue_ids_for_redownload,
             # worklogs
             download_worklogs=config.jira_download_worklogs,
             # we are passed the raw unix timestamp for work logs, but jf_ingest
