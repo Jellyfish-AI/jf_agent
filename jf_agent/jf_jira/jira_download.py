@@ -4,7 +4,6 @@ import traceback
 from typing import Optional
 
 from jf_ingest import diagnostics, logging_helper
-from jf_ingest.adaptive_throttler import AdaptiveThrottler
 from jf_ingest.config import IngestionConfig
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_from_jf_ingest
