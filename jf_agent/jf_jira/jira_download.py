@@ -89,7 +89,6 @@ def detect_and_repair_custom_fields(
     thread_count = 10
 
     # Enable use of adaptive throttler for Jira server/dc
-    # TEMP REMOVE BEFORE MERGING
     if deployment_type != 'Cloud':
         # If issue_download_concurrent_threads is set in the config, use that number of threads
         # Otherwise, use the feature flag to determine thread count for Jira server/dc
