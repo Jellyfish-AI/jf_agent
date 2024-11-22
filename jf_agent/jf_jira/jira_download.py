@@ -83,10 +83,7 @@ def detect_and_repair_custom_fields(
 ) -> Optional[set[str]]:
     jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     deployment_type = jira_connection.server_info()['deploymentType']
-    use_adaptive_throttler = False
-
-    # Default thread count of 10
-    thread_count = 10
+    kwargs: dict[str, Union[str, int, bool]] = {}
 
     # Enable use of adaptive throttler for Jira server/dc
     if deployment_type != 'Cloud':
@@ -100,13 +97,12 @@ def detect_and_repair_custom_fields(
         )
 
         logger.info(f'Using adaptive throttler with {thread_count} threads for custom field repair')
-        use_adaptive_throttler = True
+        kwargs.update({'nthreads': thread_count, 'use_throttler': True})
 
     jcfv_update_payload: JCFVUpdateFullPayload = identify_custom_field_mismatches(
         ingest_config,
-        nthreads=thread_count,
         mark_for_redownload=submit_issues_for_repair,
-        use_throttler=use_adaptive_throttler,
+        **kwargs,
     )
 
     if submit_issues_for_repair:
