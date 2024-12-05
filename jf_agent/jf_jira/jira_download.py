@@ -30,6 +30,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         'Running Jira Download...',
     )
     download_status = 'success'
+    error_message = None
 
     # Not really sure what this print_all_jira_fields is or who still uses it.
     # Leaving it in for backwards compatibility
@@ -67,6 +68,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         )
     except Exception as e:
         download_status = 'failed'
+        error_message = str(e)
         logger.error(
             'Error encountered when downloading Jira data. '
             'This Jira submission will be marked as failed. '
@@ -74,7 +76,7 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         )
         logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     finally:
-        return {'type': 'Jira', 'status': download_status}
+        return {'type': 'Jira', 'status': download_status, 'error_message': error_message}
 
 
 @diagnostics.capture_timing()
