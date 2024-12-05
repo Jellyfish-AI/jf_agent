@@ -397,6 +397,7 @@ def load_and_dump_git(
             'instance': instance_slug,
             'instance_key': instance_key,
             'status': 'failed',
+            'error_message': str(e),
         }
 
     return {
