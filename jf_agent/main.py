@@ -42,127 +42,162 @@ from jf_agent.validation import ProjectMetadata, full_validate, validate_num_rep
 
 logger = logging.getLogger(__name__)
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+class FileSpanExporter(SpanExporter):
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.file = open(file_path, 'w')
+
+    def export(self, spans):
+        for span in spans:
+            self.file.write(span.to_json(indent=None) + '\n')
+        return True
+
+    def shutdown(self):
+        self.file.close()
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-m',
-        '--mode',
-        nargs='?',
-        default='download_and_send',
-        help=f'Run mode: {", ".join(VALID_RUN_MODES)} (default: download_and_send)',
-    )
-    parser.add_argument(
-        '-c',
-        '--config-file',
-        nargs='?',
-        default='./config.yml',
-        help='Path to config file (default: ./config.yml)',
-    )
-    parser.add_argument(
-        '-ob',
-        '--output-basedir',
-        nargs='?',
-        default='./output',
-        help='Path to output base directory (default: ./output)',
-    )
-    parser.add_argument(
-        '-od',
-        '--prev-output-dir',
-        nargs='?',
-        help='Path to directory containing already-downloaded files',
-    )
-    parser.add_argument(
-        '--jellyfish-api-base',
-        default=JELLYFISH_API_BASE,
-        help=(
-            f'For Jellyfish developers: override for JELLYFISH_API_BASE (which defaults to {JELLYFISH_API_BASE}) '
-            "-- if you're running the Jellyfish API locally you might use: "
-            "http://localhost:8000 (if running the agent container with --network host) or "
-            "http://172.17.0.1:8000 (if running the agent container with --network bridge)"
-        ),
-    )
-    parser.add_argument(
-        '--jellyfish-webhook-base',
-        default=JELLYFISH_WEBHOOK_BASE,
-        help=(
-            f'For Jellyfish developers: override for JELLYFISH_WEBHOOK_BASE (which defaults to {JELLYFISH_WEBHOOK_BASE}) '
-            "-- if you're running the Jellyfish webhook service locally you might use: "
-            "http://localhost:4999 (if running the agent container with --network host) or "
-            "http://172.17.0.1:4999 (if running the agent container with --network bridge)"
-        ),
-    )
-    parser.add_argument(
-        '-ius',
-        '--for-print-missing-repos-issues-updated-within-last-x-months',
-        type=int,
-        choices=range(1, 7),
-        help=(
-            'scan jira issues that have been updated since the given number of months back (max is 6) '
-            'for git repo data, leave blank to only check issues updated in the past month'
-        ),
-    )
-    parser.add_argument(
-        '-e',
-        '--env-file',
-        type=str,
-        help='File path to a .env credentials file. Useful for running the agent in a local developer context',
-    )
-    parser.add_argument(
-        '-db',
-        '--debug-requests',
-        action='store_true',
-        help='Enable http requests debug logging. WARNING, this is VERY verbose and WILL print out all headers '
-        'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.',
-    )
-    parser.add_argument(
-        '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
-    )
-    parser.add_argument(
-        '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
-    )
-    parser.add_argument(
-        '-f',
-        '--from-failure',
-        action='store_true',
-        help='To be run with -m send-only. Indicates that we have had a failure '
-        'but we will try to send the data anyways, but will *not* try to redownload.',
-    )
+    trace.set_tracer_provider(TracerProvider())
+    tracer = trace.get_tracer(__name__)
 
-    args = parser.parse_args()
+# Configure your span exporter
+    file_exporter = FileSpanExporter('spans.txt')
+    span_processor = BatchSpanProcessor(file_exporter)
+    trace.get_tracer_provider().add_span_processor(span_processor)
 
-    config = obtain_config(args)
+    with tracer.start_as_current_span("parse_args") as span:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '-m',
+            '--mode',
+            nargs='?',
+            default='download_and_send',
+            help=f'Run mode: {", ".join(VALID_RUN_MODES)} (default: download_and_send)',
+        )
+        parser.add_argument(
+            '-c',
+            '--config-file',
+            nargs='?',
+            default='./config.yml',
+            help='Path to config file (default: ./config.yml)',
+        )
+        parser.add_argument(
+            '-ob',
+            '--output-basedir',
+            nargs='?',
+            default='./output',
+            help='Path to output base directory (default: ./output)',
+        )
+        parser.add_argument(
+            '-od',
+            '--prev-output-dir',
+            nargs='?',
+            help='Path to directory containing already-downloaded files',
+        )
+        parser.add_argument(
+            '--jellyfish-api-base',
+            default=JELLYFISH_API_BASE,
+            help=(
+                f'For Jellyfish developers: override for JELLYFISH_API_BASE (which defaults to {JELLYFISH_API_BASE}) '
+                "-- if you're running the Jellyfish API locally you might use: "
+                "http://localhost:8000 (if running the agent container with --network host) or "
+                "http://172.17.0.1:8000 (if running the agent container with --network bridge)"
+            ),
+        )
+        parser.add_argument(
+            '--jellyfish-webhook-base',
+            default=JELLYFISH_WEBHOOK_BASE,
+            help=(
+                f'For Jellyfish developers: override for JELLYFISH_WEBHOOK_BASE (which defaults to {JELLYFISH_WEBHOOK_BASE}) '
+                "-- if you're running the Jellyfish webhook service locally you might use: "
+                "http://localhost:4999 (if running the agent container with --network host) or "
+                "http://172.17.0.1:4999 (if running the agent container with --network bridge)"
+            ),
+        )
+        parser.add_argument(
+            '-ius',
+            '--for-print-missing-repos-issues-updated-within-last-x-months',
+            type=int,
+            choices=range(1, 7),
+            help=(
+                'scan jira issues that have been updated since the given number of months back (max is 6) '
+                'for git repo data, leave blank to only check issues updated in the past month'
+            ),
+        )
+        parser.add_argument(
+            '-e',
+            '--env-file',
+            type=str,
+            help='File path to a .env credentials file. Useful for running the agent in a local developer context',
+        )
+        parser.add_argument(
+            '-db',
+            '--debug-requests',
+            action='store_true',
+            help='Enable http requests debug logging. WARNING, this is VERY verbose and WILL print out all headers '
+            'and bodies of all requests made by the agent, INCLUDING bearer tokens. Use only to debug errors.',
+        )
+        parser.add_argument(
+            '-s', '--since', nargs='?', default=None, help='DEPRECATED -- has no effect'
+        )
+        parser.add_argument(
+            '-u', '--until', nargs='?', default=None, help='DEPRECATED -- has no effect'
+        )
+        parser.add_argument(
+            '-f',
+            '--from-failure',
+            action='store_true',
+            help='To be run with -m send-only. Indicates that we have had a failure '
+            'but we will try to send the data anyways, but will *not* try to redownload.',
+        )
 
-    if args.env_file:
-        dotenv.load_dotenv(args.env_file)
+        args = parser.parse_args()
 
-    creds = obtain_creds(config)
-    logging_config = agent_logging.configure(
-        config.outdir,
-        config.jellyfish_webhook_base,
-        creds.jellyfish_api_token,
-        config.debug_http_requests,
-    )
+        config = obtain_config(args)
 
-    company_slug = None
-    try:
-        company_info = get_company_info(config, creds)
-        company_slug = company_info.get('company_slug')
-    except Exception as e:
-        logger.warning(f"Unable to get company slug from Jellyfish API: {e}")
+        if args.env_file:
+            dotenv.load_dotenv(args.env_file)
 
-    agent_logging.bind_default_agent_context(
-        config.run_mode,
-        company_slug,
-        get_timestamp_from_outdir(config.outdir),
-    )
+        creds = obtain_creds(config)
+        logging_config = agent_logging.configure(
+            config.outdir,
+            config.jellyfish_webhook_base,
+            creds.jellyfish_api_token,
+            config.debug_http_requests,
+        )
 
+<<<<<<< Updated upstream
     logger.debug(f'Starting Agent run...')
     download_data_status = []
     success = True
     jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+||||||| Stash base
+    success = True
+    jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+=======
+        company_slug = None
+        try:
+            company_info = get_company_info(config, creds)
+            company_slug = company_info.get('company_slug')
+        except Exception as e:
+            logger.warning(f"Unable to get company slug from Jellyfish API: {e}")
+>>>>>>> Stashed changes
 
-    directories_to_skip_uploading_for = set()
+        agent_logging.bind_default_agent_context(
+            config.run_mode,
+            company_slug,
+            get_timestamp_from_outdir(config.outdir),
+        )
+
+        success = True
+        jellyfish_endpoint_info = obtain_jellyfish_endpoint_info(config, creds)
+
+        directories_to_skip_uploading_for = set()
 
     # send start signal to Agent heartbeat monitor
     try:

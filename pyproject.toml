@@ -20,7 +20,16 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "structlog>=24.4.0",
     "colorama>=0.4.6",
+<<<<<<< Updated upstream
     "jf-ingest==0.0.149",
+||||||| Stash base
+=======
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.27.0",
+    "opentelemetry-instrumentation>=0.48b0",
+    "opentelemetry-instrumentation-requests>=0.48b0",
+>>>>>>> Stashed changes
 ]
 requires-python = ">=3.10"
 readme = "README.md"

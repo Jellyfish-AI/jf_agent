@@ -4,11 +4,22 @@
 [metadata]
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
+<<<<<<< Updated upstream
 lock_version = "4.5.0"
 content_hash = "sha256:d58999034370241bde9aa2b95e821fff9a0d891ae07e5f70014020e8fe5e9b3c"
 
 [[metadata.targets]]
 requires_python = ">=3.10,<3.11"
+||||||| Stash base
+lock_version = "4.5.0"
+content_hash = "sha256:442ae381f344ac1614544494f648a90d868edf55f5fc6f6ca0b51fde2aabb135"
+
+[[metadata.targets]]
+requires_python = ">=3.10,<3.11"
+=======
+lock_version = "4.4.2"
+content_hash = "sha256:dac68e5450d43e2b58c984d29954022dac79773c55260f04394a940b0e0ea1c6"
+>>>>>>> Stashed changes
 
 [[package]]
 name = "backports-tarfile"
@@ -16,7 +27,7 @@ version = "1.1.1"
 requires_python = ">=3.8"
 summary = "Backport of CPython tarfile module"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+marker = "python_version < \"3.12\""
 files = [
     {file = "backports.tarfile-1.1.1-py3-none-any.whl", hash = "sha256:73e0179647803d3726d82e76089d01d8549ceca9bace469953fcb4d97cf2d417"},
     {file = "backports_tarfile-1.1.1.tar.gz", hash = "sha256:9c2ef9696cb73374f7164e17fc761389393ca76777036f5aad42e8b93fcd8009"},
@@ -28,7 +39,6 @@ version = "24.4.2"
 requires_python = ">=3.8"
 summary = "The uncompromising code formatter."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "click>=8.0.0",
     "mypy-extensions>=0.4.3",
@@ -53,44 +63,9 @@ version = "2023.7.22"
 requires_python = ">=3.6"
 summary = "Python package for providing Mozilla's CA Bundle."
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "certifi-2023.7.22-py3-none-any.whl", hash = "sha256:92d6037539857d8206b8f6ae472e8b77db8058fec5937a1ef3f54304089edbb9"},
     {file = "certifi-2023.7.22.tar.gz", hash = "sha256:539cc1d13202e33ca466e88b2807e29f4c13049d6d87031a3c110744495cb082"},
-]
-
-[[package]]
-name = "cffi"
-version = "1.15.1"
-summary = "Foreign Function Interface for Python calling C code."
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"linux\""
-dependencies = [
-    "pycparser",
-]
-files = [
-    {file = "cffi-1.15.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:39d39875251ca8f612b6f33e6b1195af86d1b3e60086068be9cc053aa4376e21"},
-    {file = "cffi-1.15.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:285d29981935eb726a4399badae8f0ffdff4f5050eaa6d0cfc3f64b857b77185"},
-    {file = "cffi-1.15.1-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3eb6971dcff08619f8d91607cfc726518b6fa2a9eba42856be181c6d0d9515fd"},
-    {file = "cffi-1.15.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:21157295583fe8943475029ed5abdcf71eb3911894724e360acff1d61c1d54bc"},
-    {file = "cffi-1.15.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:5635bd9cb9731e6d4a1132a498dd34f764034a8ce60cef4f5319c0541159392f"},
-    {file = "cffi-1.15.1-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:2012c72d854c2d03e45d06ae57f40d78e5770d252f195b93f581acf3ba44496e"},
-    {file = "cffi-1.15.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dd86c085fae2efd48ac91dd7ccffcfc0571387fe1193d33b6394db7ef31fe2a4"},
-    {file = "cffi-1.15.1-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:fa6693661a4c91757f4412306191b6dc88c1703f780c8234035eac011922bc01"},
-    {file = "cffi-1.15.1-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:59c0b02d0a6c384d453fece7566d1c7e6b7bae4fc5874ef2ef46d56776d61c9e"},
-    {file = "cffi-1.15.1-cp310-cp310-win32.whl", hash = "sha256:cba9d6b9a7d64d4bd46167096fc9d2f835e25d7e4c121fb2ddfc6528fb0413b2"},
-    {file = "cffi-1.15.1-cp310-cp310-win_amd64.whl", hash = "sha256:ce4bcc037df4fc5e3d184794f27bdaab018943698f4ca31630bc7f84a7b69c6d"},
-    {file = "cffi-1.15.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:3d08afd128ddaa624a48cf2b859afef385b720bb4b43df214f85616922e6a5ac"},
-    {file = "cffi-1.15.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3799aecf2e17cf585d977b780ce79ff0dc9b78d799fc694221ce814c2c19db83"},
-    {file = "cffi-1.15.1-cp311-cp311-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a591fe9e525846e4d154205572a029f653ada1a78b93697f3b5a8f1f2bc055b9"},
-    {file = "cffi-1.15.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3548db281cd7d2561c9ad9984681c95f7b0e38881201e157833a2342c30d5e8c"},
-    {file = "cffi-1.15.1-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:91fc98adde3d7881af9b59ed0294046f3806221863722ba7d8d120c575314325"},
-    {file = "cffi-1.15.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:94411f22c3985acaec6f83c6df553f2dbe17b698cc7f8ae751ff2237d96b9e3c"},
-    {file = "cffi-1.15.1-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:03425bdae262c76aad70202debd780501fabeaca237cdfddc008987c0e0f59ef"},
-    {file = "cffi-1.15.1-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:cc4d65aeeaa04136a12677d3dd0b1c0c94dc43abac5860ab33cceb42b801c1e8"},
-    {file = "cffi-1.15.1-cp311-cp311-win32.whl", hash = "sha256:a0f100c8912c114ff53e1202d0078b425bee3649ae34d7b070e9697f93c5d52d"},
-    {file = "cffi-1.15.1-cp311-cp311-win_amd64.whl", hash = "sha256:04ed324bda3cda42b9b695d51bb7d54b680b9719cfab04227cdd1e04e5de3104"},
-    {file = "cffi-1.15.1.tar.gz", hash = "sha256:d400bfb9a37b1351253cb402671cea7e89bdecc294e8016a707f6d1d8ac934f9"},
 ]
 
 [[package]]
@@ -99,7 +74,6 @@ version = "3.4.0"
 requires_python = ">=3.8"
 summary = "Validate configuration and produce human readable error messages."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "cfgv-3.4.0-py2.py3-none-any.whl", hash = "sha256:b7265b1f29fd3316bfcd2b330d63d024f2bfd8bcb8b0272f8e19a504856c48f9"},
     {file = "cfgv-3.4.0.tar.gz", hash = "sha256:e52591d4c5f5dead8e0f673fb16db7949d2cfb3f7da4582893288f0ded8fe560"},
@@ -111,7 +85,6 @@ version = "3.2.0"
 requires_python = ">=3.7.0"
 summary = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "charset-normalizer-3.2.0.tar.gz", hash = "sha256:3bb3d25a8e6c0aedd251753a79ae98a093c7e7b471faa3aa9a93a81431987ace"},
     {file = "charset_normalizer-3.2.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0b87549028f680ca955556e3bd57013ab47474c3124dc069faa0b6545b6c9710"},
@@ -153,11 +126,6 @@ version = "8.0.4"
 requires_python = ">=3.6"
 summary = "Composable command line interface toolkit"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
-dependencies = [
-    "colorama; platform_system == \"Windows\"",
-    "importlib-metadata; python_version < \"3.8\"",
-]
 files = [
     {file = "click-8.0.4-py3-none-any.whl", hash = "sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1"},
     {file = "click-8.0.4.tar.gz", hash = "sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb"},
@@ -168,47 +136,10 @@ name = "colorama"
 version = "0.4.6"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 summary = "Cross-platform colored terminal text."
-groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+groups = ["default"]
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
-]
-
-[[package]]
-name = "cryptography"
-version = "41.0.3"
-requires_python = ">=3.7"
-summary = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"linux\""
-dependencies = [
-    "cffi>=1.12",
-]
-files = [
-    {file = "cryptography-41.0.3-cp37-abi3-macosx_10_12_universal2.whl", hash = "sha256:652627a055cb52a84f8c448185922241dd5217443ca194d5739b44612c5e6507"},
-    {file = "cryptography-41.0.3-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:8f09daa483aedea50d249ef98ed500569841d6498aa9c9f4b0531b9964658922"},
-    {file = "cryptography-41.0.3-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4fd871184321100fb400d759ad0cddddf284c4b696568204d281c902fc7b0d81"},
-    {file = "cryptography-41.0.3-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:84537453d57f55a50a5b6835622ee405816999a7113267739a1b4581f83535bd"},
-    {file = "cryptography-41.0.3-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:3fb248989b6363906827284cd20cca63bb1a757e0a2864d4c1682a985e3dca47"},
-    {file = "cryptography-41.0.3-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:42cb413e01a5d36da9929baa9d70ca90d90b969269e5a12d39c1e0d475010116"},
-    {file = "cryptography-41.0.3-cp37-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:aeb57c421b34af8f9fe830e1955bf493a86a7996cc1338fe41b30047d16e962c"},
-    {file = "cryptography-41.0.3-cp37-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:6af1c6387c531cd364b72c28daa29232162010d952ceb7e5ca8e2827526aceae"},
-    {file = "cryptography-41.0.3-cp37-abi3-win32.whl", hash = "sha256:0d09fb5356f975974dbcb595ad2d178305e5050656affb7890a1583f5e02a306"},
-    {file = "cryptography-41.0.3-cp37-abi3-win_amd64.whl", hash = "sha256:a983e441a00a9d57a4d7c91b3116a37ae602907a7618b882c8013b5762e80574"},
-    {file = "cryptography-41.0.3-pp310-pypy310_pp73-macosx_10_12_x86_64.whl", hash = "sha256:5259cb659aa43005eb55a0e4ff2c825ca111a0da1814202c64d28a985d33b087"},
-    {file = "cryptography-41.0.3-pp310-pypy310_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:67e120e9a577c64fe1f611e53b30b3e69744e5910ff3b6e97e935aeb96005858"},
-    {file = "cryptography-41.0.3-pp310-pypy310_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:7efe8041897fe7a50863e51b77789b657a133c75c3b094e51b5e4b5cec7bf906"},
-    {file = "cryptography-41.0.3-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:ce785cf81a7bdade534297ef9e490ddff800d956625020ab2ec2780a556c313e"},
-    {file = "cryptography-41.0.3-pp38-pypy38_pp73-macosx_10_12_x86_64.whl", hash = "sha256:57a51b89f954f216a81c9d057bf1a24e2f36e764a1ca9a501a6964eb4a6800dd"},
-    {file = "cryptography-41.0.3-pp38-pypy38_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:4c2f0d35703d61002a2bbdcf15548ebb701cfdd83cdc12471d2bae80878a4207"},
-    {file = "cryptography-41.0.3-pp38-pypy38_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:23c2d778cf829f7d0ae180600b17e9fceea3c2ef8b31a99e3c694cbbf3a24b84"},
-    {file = "cryptography-41.0.3-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:95dd7f261bb76948b52a5330ba5202b91a26fbac13ad0e9fc8a3ac04752058c7"},
-    {file = "cryptography-41.0.3-pp39-pypy39_pp73-macosx_10_12_x86_64.whl", hash = "sha256:41d7aa7cdfded09b3d73a47f429c298e80796c8e825ddfadc84c8a7f12df212d"},
-    {file = "cryptography-41.0.3-pp39-pypy39_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:d0d651aa754ef58d75cec6edfbd21259d93810b73f6ec246436a21b7841908de"},
-    {file = "cryptography-41.0.3-pp39-pypy39_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:ab8de0d091acbf778f74286f4989cf3d1528336af1b59f3e5d2ebca8b5fe49e1"},
-    {file = "cryptography-41.0.3-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:a74fbcdb2a0d46fe00504f571a2a540532f4c188e6ccf26f1f178480117b33c4"},
-    {file = "cryptography-41.0.3.tar.gz", hash = "sha256:6d192741113ef5e30d89dcb5b956ef4e1578f304708701b8b73d38e3e1461f34"},
 ]
 
 [[package]]
@@ -217,7 +148,6 @@ version = "1.1.8"
 requires_python = ">=3.7"
 summary = "Date parsing library designed to parse dates from HTML pages"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "python-dateutil",
     "pytz",
@@ -235,7 +165,6 @@ version = "5.1.1"
 requires_python = ">=3.5"
 summary = "Decorators for Humans"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "decorator-5.1.1-py3-none-any.whl", hash = "sha256:b8c3f85900b9dc423225913c5aace94729fe1fa9763b38939a95226f02d37186"},
     {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
@@ -247,13 +176,13 @@ version = "0.7.1"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 summary = "XML bomb protection for Python stdlib modules"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
     {file = "defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "deprecated"
 version = "1.2.14"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
@@ -269,11 +198,27 @@ files = [
 ]
 
 [[package]]
+||||||| Stash base
+=======
+name = "deprecated"
+version = "1.2.14"
+requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+summary = "Python @deprecated decorator to deprecate old python classes, functions or methods."
+groups = ["default"]
+dependencies = [
+    "wrapt<2,>=1.10",
+]
+files = [
+    {file = "Deprecated-1.2.14-py2.py3-none-any.whl", hash = "sha256:6fac8b097794a90302bdbb17b9b815e732d3c4720583ff1b198499d78470466c"},
+    {file = "Deprecated-1.2.14.tar.gz", hash = "sha256:e5323eb936458dccc2582dc6f9c322c852a775a27065ff2b0c4970b9d53d01b3"},
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "distlib"
 version = "0.3.7"
 summary = "Distribution utilities"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "distlib-0.3.7-py2.py3-none-any.whl", hash = "sha256:2e24928bc811348f0feb63014e97aaae3037f2cf48712d51ae61df7fd6075057"},
     {file = "distlib-0.3.7.tar.gz", hash = "sha256:9dafe54b34a028eafd95039d5e5d4851a13734540f1331060d31c9916e7147a8"},
@@ -285,7 +230,7 @@ version = "1.1.3"
 requires_python = ">=3.7"
 summary = "Backport of PEP 654 (exception groups)"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+marker = "python_version < \"3.11\""
 files = [
     {file = "exceptiongroup-1.1.3-py3-none-any.whl", hash = "sha256:343280667a4585d195ca1cf9cef84a4e178c4b6cf2274caef9859782b567d5e3"},
     {file = "exceptiongroup-1.1.3.tar.gz", hash = "sha256:097acd85d473d75af5bb98e41b61ff7fe35efe6675e4f9370ec6ec5126d160e9"},
@@ -297,13 +242,13 @@ version = "3.12.2"
 requires_python = ">=3.7"
 summary = "A platform independent file lock."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "filelock-3.12.2-py3-none-any.whl", hash = "sha256:cbb791cdea2a72f23da6ac5b5269ab0a0d161e9ef0100e653b69049a7706d1ec"},
     {file = "filelock-3.12.2.tar.gz", hash = "sha256:002740518d8aa59a26b0c76e10fb8c6e15eae825d34b6fdf670333fd7b938d81"},
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "googleapis-common-protos"
 version = "1.65.0"
 requires_python = ">=3.7"
@@ -339,12 +284,39 @@ files = [
 ]
 
 [[package]]
+||||||| Stash base
+=======
+name = "googleapis-common-protos"
+version = "1.65.0"
+requires_python = ">=3.7"
+summary = "Common protobufs used in Google APIs"
+groups = ["default"]
+dependencies = [
+    "protobuf!=3.20.0,!=3.20.1,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,<6.0.0.dev0,>=3.20.2",
+]
+files = [
+    {file = "googleapis_common_protos-1.65.0-py2.py3-none-any.whl", hash = "sha256:2972e6c496f435b92590fd54045060867f3fe9be2c82ab148fc8885035479a63"},
+    {file = "googleapis_common_protos-1.65.0.tar.gz", hash = "sha256:334a29d07cddc3aa01dee4988f9afd9b2916ee2ff49d6b757155dc0d197852c0"},
+]
+
+[[package]]
+name = "grpcio"
+version = "1.66.1"
+requires_python = ">=3.8"
+summary = "HTTP/2-based RPC framework"
+groups = ["default"]
+files = [
+    {file = "grpcio-1.66.1-cp310-cp310-macosx_12_0_universal2.whl", hash = "sha256:3750c5a00bd644c75f4507f77a804d0189d97a107eb1481945a0cf3af3e7a5ac"},
+    {file = "grpcio-1.66.1.tar.gz", hash = "sha256:35334f9c9745add3e357e3372756fd32d925bd52c41da97f4dfdafbde0bf0ee2"},
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "identify"
 version = "2.5.27"
 requires_python = ">=3.8"
 summary = "File identification library for Python"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "identify-2.5.27-py2.py3-none-any.whl", hash = "sha256:fdb527b2dfe24602809b2201e033c2a113d7bdf716db3ca8e3243f735dcecaba"},
     {file = "identify-2.5.27.tar.gz", hash = "sha256:287b75b04a0e22d727bc9a41f0d4f3c1bcada97490fa6eabb5b28f0e9097e733"},
@@ -356,7 +328,6 @@ version = "3.4"
 requires_python = ">=3.5"
 summary = "Internationalized Domain Names in Applications (IDNA)"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
     {file = "idna-3.4.tar.gz", hash = "sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4"},
@@ -368,9 +339,7 @@ version = "7.1.0"
 requires_python = ">=3.8"
 summary = "Read metadata from Python packages"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
-    "typing-extensions>=3.6.4; python_version < \"3.8\"",
     "zipp>=0.5",
 ]
 files = [
@@ -384,7 +353,6 @@ version = "2.0.0"
 requires_python = ">=3.7"
 summary = "brain-dead simple config-ini parsing"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
@@ -396,7 +364,6 @@ version = "5.13.2"
 requires_python = ">=3.8.0"
 summary = "A Python utility / library to sort Python imports."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "isort-5.13.2-py3-none-any.whl", hash = "sha256:8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6"},
     {file = "isort-5.13.2.tar.gz", hash = "sha256:48fdfcb9face5d58a4f6dde2e72a1fb8dcaf8ab26f95ab49fab84c2ddefb0109"},
@@ -408,7 +375,6 @@ version = "3.4.0"
 requires_python = ">=3.8"
 summary = "Utility functions for Python class constructs"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "more-itertools",
 ]
@@ -423,7 +389,6 @@ version = "5.3.0"
 requires_python = ">=3.8"
 summary = "Useful decorators and context managers"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "backports-tarfile; python_version < \"3.12\"",
 ]
@@ -438,7 +403,6 @@ version = "4.0.1"
 requires_python = ">=3.8"
 summary = "Functools like those found in stdlib"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "more-itertools",
 ]
@@ -448,24 +412,11 @@ files = [
 ]
 
 [[package]]
-name = "jeepney"
-version = "0.8.0"
-requires_python = ">=3.7"
-summary = "Low-level, pure Python DBus protocol wrapper."
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"linux\""
-files = [
-    {file = "jeepney-0.8.0-py3-none-any.whl", hash = "sha256:c0a454ad016ca575060802ee4d590dd912e35c122fa04e70306de3d076cce755"},
-    {file = "jeepney-0.8.0.tar.gz", hash = "sha256:5efe48d255973902f6badc3ce55e2aa6c5c3b3bc642059ef3a91247bcfcc5806"},
-]
-
-[[package]]
 name = "jf-ingest"
 version = "0.0.149"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "PyJWT<2.0",
     "jira~=3.1.1",
@@ -490,7 +441,6 @@ version = "3.1.1"
 requires_python = ">=3.6"
 summary = "Python library for interacting with JIRA via REST APIs."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "defusedxml",
     "keyring",
@@ -510,9 +460,7 @@ version = "0.6.0"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 summary = "A JSON streaming writer"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
-    "enum34; python_version < \"3.4\"",
     "six",
 ]
 files = [
@@ -526,16 +474,11 @@ version = "25.2.0"
 requires_python = ">=3.8"
 summary = "Store and access your passwords safely."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
-    "SecretStorage>=3.2; sys_platform == \"linux\"",
     "importlib-metadata>=4.11.4; python_version < \"3.12\"",
-    "importlib-resources; python_version < \"3.9\"",
     "jaraco-classes",
     "jaraco-context",
     "jaraco-functools",
-    "jeepney>=0.4.2; sys_platform == \"linux\"",
-    "pywin32-ctypes>=0.2.0; sys_platform == \"win32\"",
 ]
 files = [
     {file = "keyring-25.2.0-py3-none-any.whl", hash = "sha256:19f17d40335444aab84b19a0d16a77ec0758a9c384e3446ae2ed8bd6d53b67a5"},
@@ -548,7 +491,6 @@ version = "10.2.0"
 requires_python = ">=3.8"
 summary = "More routines for operating on iterables, beyond itertools"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "more-itertools-10.2.0.tar.gz", hash = "sha256:8fccb480c43d3e99a00087634c06dd02b0d50fbf088b380de5a41a015ec239e1"},
     {file = "more_itertools-10.2.0-py3-none-any.whl", hash = "sha256:686b06abe565edfab151cb8fd385a05651e1fdf8f0a14191e4439283421f8684"},
@@ -560,7 +502,6 @@ version = "1.0.0"
 requires_python = ">=3.5"
 summary = "Type system extensions for programs checked with the mypy type checker."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "mypy_extensions-1.0.0-py3-none-any.whl", hash = "sha256:4392f6c0eb8a5668a69e23d168ffa70f0be9ccfd32b5cc2d26a34ae5b844552d"},
     {file = "mypy_extensions-1.0.0.tar.gz", hash = "sha256:75dbf8955dc00442a438fc4d0666508a9a97b6bd41aa2f0ffe9d2f2725af0782"},
@@ -572,7 +513,6 @@ version = "1.8.0"
 requires_python = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*"
 summary = "Node.js virtual environment builder"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "setuptools",
 ]
@@ -587,13 +527,13 @@ version = "3.1.0"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "oauthlib-3.1.0-py2.py3-none-any.whl", hash = "sha256:df884cd6cbe20e32633f1db1072e9356f53638e4361bef4e8b03c9127c9328ea"},
     {file = "oauthlib-3.1.0.tar.gz", hash = "sha256:bee41cc35fcca6e988463cacc3bcb8a96224f470ca547e697b604cc697b2f889"},
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "opentelemetry-api"
 version = "1.27.0"
 requires_python = ">=3.8"
@@ -765,12 +705,187 @@ files = [
 ]
 
 [[package]]
+||||||| Stash base
+=======
+name = "opentelemetry-api"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Python API"
+groups = ["default"]
+dependencies = [
+    "deprecated>=1.2.6",
+    "importlib-metadata<=8.4.0,>=6.0",
+]
+files = [
+    {file = "opentelemetry_api-1.27.0-py3-none-any.whl", hash = "sha256:953d5871815e7c30c81b56d910c707588000fff7a3ca1c73e6531911d53065e7"},
+    {file = "opentelemetry_api-1.27.0.tar.gz", hash = "sha256:ed673583eaa5f81b5ce5e86ef7cdaf622f88ef65f0b9aab40b843dcae5bef342"},
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Collector Exporters"
+groups = ["default"]
+dependencies = [
+    "opentelemetry-exporter-otlp-proto-grpc==1.27.0",
+    "opentelemetry-exporter-otlp-proto-http==1.27.0",
+]
+files = [
+    {file = "opentelemetry_exporter_otlp-1.27.0-py3-none-any.whl", hash = "sha256:7688791cbdd951d71eb6445951d1cfbb7b6b2d7ee5948fac805d404802931145"},
+    {file = "opentelemetry_exporter_otlp-1.27.0.tar.gz", hash = "sha256:4a599459e623868cc95d933c301199c2367e530f089750e115599fccd67cb2a1"},
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-common"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Protobuf encoding"
+groups = ["default"]
+dependencies = [
+    "opentelemetry-proto==1.27.0",
+]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_common-1.27.0-py3-none-any.whl", hash = "sha256:675db7fffcb60946f3a5c43e17d1168a3307a94a930ecf8d2ea1f286f3d4f79a"},
+    {file = "opentelemetry_exporter_otlp_proto_common-1.27.0.tar.gz", hash = "sha256:159d27cf49f359e3798c4c3eb8da6ef4020e292571bd8c5604a2a573231dd5c8"},
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-grpc"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Collector Protobuf over gRPC Exporter"
+groups = ["default"]
+dependencies = [
+    "deprecated>=1.2.6",
+    "googleapis-common-protos~=1.52",
+    "grpcio<2.0.0,>=1.0.0",
+    "opentelemetry-api~=1.15",
+    "opentelemetry-exporter-otlp-proto-common==1.27.0",
+    "opentelemetry-proto==1.27.0",
+    "opentelemetry-sdk~=1.27.0",
+]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_grpc-1.27.0-py3-none-any.whl", hash = "sha256:56b5bbd5d61aab05e300d9d62a6b3c134827bbd28d0b12f2649c2da368006c9e"},
+    {file = "opentelemetry_exporter_otlp_proto_grpc-1.27.0.tar.gz", hash = "sha256:af6f72f76bcf425dfb5ad11c1a6d6eca2863b91e63575f89bb7b4b55099d968f"},
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-http"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Collector Protobuf over HTTP Exporter"
+groups = ["default"]
+dependencies = [
+    "deprecated>=1.2.6",
+    "googleapis-common-protos~=1.52",
+    "opentelemetry-api~=1.15",
+    "opentelemetry-exporter-otlp-proto-common==1.27.0",
+    "opentelemetry-proto==1.27.0",
+    "opentelemetry-sdk~=1.27.0",
+    "requests~=2.7",
+]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_http-1.27.0-py3-none-any.whl", hash = "sha256:688027575c9da42e179a69fe17e2d1eba9b14d81de8d13553a21d3114f3b4d75"},
+    {file = "opentelemetry_exporter_otlp_proto_http-1.27.0.tar.gz", hash = "sha256:2103479092d8eb18f61f3fbff084f67cc7f2d4a7d37e75304b8b56c1d09ebef5"},
+]
+
+[[package]]
+name = "opentelemetry-instrumentation"
+version = "0.48b0"
+requires_python = ">=3.8"
+summary = "Instrumentation Tools & Auto Instrumentation for OpenTelemetry Python"
+groups = ["default"]
+dependencies = [
+    "opentelemetry-api~=1.4",
+    "setuptools>=16.0",
+    "wrapt<2.0.0,>=1.0.0",
+]
+files = [
+    {file = "opentelemetry_instrumentation-0.48b0-py3-none-any.whl", hash = "sha256:a69750dc4ba6a5c3eb67986a337185a25b739966d80479befe37b546fc870b44"},
+    {file = "opentelemetry_instrumentation-0.48b0.tar.gz", hash = "sha256:94929685d906380743a71c3970f76b5f07476eea1834abd5dd9d17abfe23cc35"},
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-requests"
+version = "0.48b0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry requests instrumentation"
+groups = ["default"]
+dependencies = [
+    "opentelemetry-api~=1.12",
+    "opentelemetry-instrumentation==0.48b0",
+    "opentelemetry-semantic-conventions==0.48b0",
+    "opentelemetry-util-http==0.48b0",
+]
+files = [
+    {file = "opentelemetry_instrumentation_requests-0.48b0-py3-none-any.whl", hash = "sha256:d4f01852121d0bd4c22f14f429654a735611d4f7bf3cf93f244bdf1489b2233d"},
+    {file = "opentelemetry_instrumentation_requests-0.48b0.tar.gz", hash = "sha256:67ab9bd877a0352ee0db4616c8b4ae59736ddd700c598ed907482d44f4c9a2b3"},
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Python Proto"
+groups = ["default"]
+dependencies = [
+    "protobuf<5.0,>=3.19",
+]
+files = [
+    {file = "opentelemetry_proto-1.27.0-py3-none-any.whl", hash = "sha256:b133873de5581a50063e1e4b29cdcf0c5e253a8c2d8dc1229add20a4c3830ace"},
+    {file = "opentelemetry_proto-1.27.0.tar.gz", hash = "sha256:33c9345d91dafd8a74fc3d7576c5a38f18b7fdf8d02983ac67485386132aedd6"},
+]
+
+[[package]]
+name = "opentelemetry-sdk"
+version = "1.27.0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Python SDK"
+groups = ["default"]
+dependencies = [
+    "opentelemetry-api==1.27.0",
+    "opentelemetry-semantic-conventions==0.48b0",
+    "typing-extensions>=3.7.4",
+]
+files = [
+    {file = "opentelemetry_sdk-1.27.0-py3-none-any.whl", hash = "sha256:365f5e32f920faf0fd9e14fdfd92c086e317eaa5f860edba9cdc17a380d9197d"},
+    {file = "opentelemetry_sdk-1.27.0.tar.gz", hash = "sha256:d525017dea0ccce9ba4e0245100ec46ecdc043f2d7b8315d56b19aff0904fa6f"},
+]
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.48b0"
+requires_python = ">=3.8"
+summary = "OpenTelemetry Semantic Conventions"
+groups = ["default"]
+dependencies = [
+    "deprecated>=1.2.6",
+    "opentelemetry-api==1.27.0",
+]
+files = [
+    {file = "opentelemetry_semantic_conventions-0.48b0-py3-none-any.whl", hash = "sha256:a0de9f45c413a8669788a38569c7e0a11ce6ce97861a628cca785deecdc32a1f"},
+    {file = "opentelemetry_semantic_conventions-0.48b0.tar.gz", hash = "sha256:12d74983783b6878162208be57c9effcb89dc88691c64992d70bb89dc00daa1a"},
+]
+
+[[package]]
+name = "opentelemetry-util-http"
+version = "0.48b0"
+requires_python = ">=3.8"
+summary = "Web util for OpenTelemetry"
+groups = ["default"]
+files = [
+    {file = "opentelemetry_util_http-0.48b0-py3-none-any.whl", hash = "sha256:76f598af93aab50328d2a69c786beaedc8b6a7770f7a818cc307eb353debfffb"},
+    {file = "opentelemetry_util_http-0.48b0.tar.gz", hash = "sha256:60312015153580cc20f322e5cdc3d3ecad80a71743235bdb77716e742814623c"},
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "packaging"
 version = "23.1"
 requires_python = ">=3.7"
 summary = "Core utilities for Python packages"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "packaging-23.1-py3-none-any.whl", hash = "sha256:994793af429502c4ea2ebf6bf664629d07c1a9fe974af92966e4b8d2df7edc61"},
     {file = "packaging-23.1.tar.gz", hash = "sha256:a392980d2b6cffa644431898be54b0045151319d1e7ec34f0cfed48767dd334f"},
@@ -782,7 +897,6 @@ version = "0.11.2"
 requires_python = ">=3.7"
 summary = "Utility library for gitignore style pattern matching of file paths."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "pathspec-0.11.2-py3-none-any.whl", hash = "sha256:1d6ed233af05e679efb96b1851550ea95bbb64b7c490b0f5aa52996c11e92a20"},
     {file = "pathspec-0.11.2.tar.gz", hash = "sha256:e0d8d0ac2f12da61956eb2306b69f9469b42f4deb0f3cb6ed47b9cce9996ced3"},
@@ -794,10 +908,6 @@ version = "3.10.0"
 requires_python = ">=3.7"
 summary = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
-dependencies = [
-    "typing-extensions>=4.7.1; python_version < \"3.8\"",
-]
 files = [
     {file = "platformdirs-3.10.0-py3-none-any.whl", hash = "sha256:d7c24979f292f916dc9cbf8648319032f551ea8c49a4c9bf2fb556a02070ec1d"},
     {file = "platformdirs-3.10.0.tar.gz", hash = "sha256:b45696dab2d7cc691a3226759c0d3b00c47c8b6e293d96f6436f733303f77f6d"},
@@ -809,7 +919,6 @@ version = "1.5.0"
 requires_python = ">=3.8"
 summary = "plugin and hook calling mechanisms for python"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "pluggy-1.5.0-py3-none-any.whl", hash = "sha256:44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669"},
     {file = "pluggy-1.5.0.tar.gz", hash = "sha256:2cffa88e94fdc978c4c574f15f9e59b7f4201d439195c3715ca9e2486f1d0cf1"},
@@ -821,7 +930,6 @@ version = "3.8.0"
 requires_python = ">=3.9"
 summary = "A framework for managing and maintaining multi-language pre-commit hooks."
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "cfgv>=2.0.0",
     "identify>=1.0.0",
@@ -835,6 +943,7 @@ files = [
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "protobuf"
 version = "4.25.5"
 requires_python = ">=3.8"
@@ -852,12 +961,26 @@ files = [
 ]
 
 [[package]]
+||||||| Stash base
+=======
+name = "protobuf"
+version = "4.25.4"
+requires_python = ">=3.8"
+summary = ""
+groups = ["default"]
+files = [
+    {file = "protobuf-4.25.4-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:eecd41bfc0e4b1bd3fa7909ed93dd14dd5567b98c941d6c1ad08fdcab3d6884b"},
+    {file = "protobuf-4.25.4-py3-none-any.whl", hash = "sha256:bfbebc1c8e4793cfd58589acfb8a1026be0003e852b9da7db5a4285bde996978"},
+    {file = "protobuf-4.25.4.tar.gz", hash = "sha256:0dc4a62cc4052a036ee2204d26fe4d835c62827c855c8a03f29fe6da146b380d"},
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "psutil"
 version = "5.9.6"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 summary = "Cross-platform lib for process and system monitoring in Python."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "psutil-5.9.6-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:c69596f9fc2f8acd574a12d5f8b7b1ba3765a641ea5d60fb4736bf3c08a8214a"},
     {file = "psutil-5.9.6-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:92e0cc43c524834af53e9d3369245e6cc3b130e78e26100d1f63cdb0abeb3d3c"},
@@ -869,23 +992,10 @@ files = [
 ]
 
 [[package]]
-name = "pycparser"
-version = "2.21"
-requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-summary = "C parser in Python"
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"linux\""
-files = [
-    {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
-    {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
-]
-
-[[package]]
 name = "pyjwt"
 version = "1.7.1"
 summary = "JSON Web Token implementation in Python"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "PyJWT-1.7.1-py2.py3-none-any.whl", hash = "sha256:5c6eca3c2940464d106b99ba83b00c6add741c9becaec087fb7ccdefea71350e"},
     {file = "PyJWT-1.7.1.tar.gz", hash = "sha256:8d59a976fb773f3e6a39c85636357c4f0e242707394cadadd9814f5cbaa20e96"},
@@ -897,9 +1007,7 @@ version = "8.3.2"
 requires_python = ">=3.8"
 summary = "pytest: simple powerful testing with Python"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
-    "colorama; sys_platform == \"win32\"",
     "exceptiongroup>=1.0.0rc8; python_version < \"3.11\"",
     "iniconfig",
     "packaging",
@@ -917,7 +1025,6 @@ version = "2.8.2"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 summary = "Extensions to the standard Python datetime module"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "six>=1.5",
 ]
@@ -932,7 +1039,6 @@ version = "1.0.0"
 requires_python = ">=3.8"
 summary = "Read key-value pairs from a .env file and set them as environment variables"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "python-dotenv-1.0.0.tar.gz", hash = "sha256:a8df96034aae6d2d50a4ebe8216326c61c3eb64836776504fcca410e5937a3ba"},
     {file = "python_dotenv-1.0.0-py3-none-any.whl", hash = "sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a"},
@@ -944,11 +1050,9 @@ version = "3.15.0"
 requires_python = ">=3.7.0"
 summary = "Interact with GitLab API"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "requests-toolbelt>=0.10.1",
     "requests>=2.25.0",
-    "typing-extensions>=4.0.0; python_version < \"3.8\"",
 ]
 files = [
     {file = "python-gitlab-3.15.0.tar.gz", hash = "sha256:c9e65eb7612a9fbb8abf0339972eca7fd7a73d4da66c9b446ffe528930aff534"},
@@ -960,22 +1064,9 @@ name = "pytz"
 version = "2023.3.post1"
 summary = "World timezone definitions, modern and historical"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "pytz-2023.3.post1-py2.py3-none-any.whl", hash = "sha256:ce42d816b81b68506614c11e8937d3aa9e41007ceb50bfdcb0749b921bf646c7"},
     {file = "pytz-2023.3.post1.tar.gz", hash = "sha256:7b4fddbeb94a1eba4b557da24f19fdf9db575192544270a9101d8509f9f43d7b"},
-]
-
-[[package]]
-name = "pywin32-ctypes"
-version = "0.2.2"
-requires_python = ">=3.6"
-summary = "A (partial) reimplementation of pywin32 using ctypes/cffi"
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"win32\""
-files = [
-    {file = "pywin32-ctypes-0.2.2.tar.gz", hash = "sha256:3426e063bdd5fd4df74a14fa3cf80a0b42845a87e1d1e81f6549f9daec593a60"},
-    {file = "pywin32_ctypes-0.2.2-py3-none-any.whl", hash = "sha256:bf490a1a709baf35d688fe0ecf980ed4de11d2b3e37b51e5442587a75d9957e7"},
 ]
 
 [[package]]
@@ -984,7 +1075,6 @@ version = "6.0.1"
 requires_python = ">=3.6"
 summary = "YAML parser and emitter for Python"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "PyYAML-6.0.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d858aa552c999bc8a8d57426ed01e40bef403cd8ccdd0fc5f6f04a00414cac2a"},
     {file = "PyYAML-6.0.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:fd66fc5d0da6d9815ba2cebeb4205f95818ff4b79c3ebe268e75d961704af52f"},
@@ -1009,7 +1099,6 @@ version = "2023.8.8"
 requires_python = ">=3.6"
 summary = "Alternative regular expression module, to replace re."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "regex-2023.8.8-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:88900f521c645f784260a8d346e12a1590f79e96403971241e64c3a265c8ecdb"},
     {file = "regex-2023.8.8-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3611576aff55918af2697410ff0293d6071b7e00f4b09e005d614686ac4cd57c"},
@@ -1049,7 +1138,6 @@ version = "2.31.0"
 requires_python = ">=3.7"
 summary = "Python HTTP for Humans."
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "certifi>=2017.4.17",
     "charset-normalizer<4,>=2",
@@ -1066,7 +1154,6 @@ name = "requests-jwt"
 version = "0.6.0"
 summary = "This package allows for HTTP JSON Web Token (JWT) authentication using the requests library."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "PyJWT",
     "requests",
@@ -1081,7 +1168,6 @@ name = "requests-mock"
 version = "1.11.0"
 summary = "Mock out responses from the requests package"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "requests<3,>=2.3",
     "six",
@@ -1097,7 +1183,6 @@ version = "1.3.1"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "OAuthlib authentication support for Requests."
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "oauthlib>=3.0.0",
     "requests>=2.0.0",
@@ -1113,7 +1198,6 @@ version = "1.0.0"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "A utility belt for advanced users of python-requests"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "requests<3.0.0,>=2.0.1",
 ]
@@ -1123,28 +1207,11 @@ files = [
 ]
 
 [[package]]
-name = "secretstorage"
-version = "3.3.3"
-requires_python = ">=3.6"
-summary = "Python bindings to FreeDesktop.org Secret Service API"
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and sys_platform == \"linux\""
-dependencies = [
-    "cryptography>=2.0",
-    "jeepney>=0.6",
-]
-files = [
-    {file = "SecretStorage-3.3.3-py3-none-any.whl", hash = "sha256:f356e6628222568e3af06f2eba8df495efa13b3b63081dafd4f7d9a7b7bc9f99"},
-    {file = "SecretStorage-3.3.3.tar.gz", hash = "sha256:2403533ef369eca6d2ba81718576c5e0f564d5cca1b58f73a8b23e7d4eeebd77"},
-]
-
-[[package]]
 name = "setuptools"
 version = "68.1.2"
 requires_python = ">=3.8"
 summary = "Easily download, build, install, upgrade, and uninstall Python packages"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "setuptools-68.1.2-py3-none-any.whl", hash = "sha256:3d8083eed2d13afc9426f227b24fd1659489ec107c0e86cec2ffdde5c92e790b"},
     {file = "setuptools-68.1.2.tar.gz", hash = "sha256:3d4dfa6d95f1b101d695a6160a7626e15583af71a5f52176efa5d39a054d475d"},
@@ -1156,7 +1223,6 @@ version = "1.16.0"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 summary = "Python 2 and 3 compatibility utilities"
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
@@ -1167,7 +1233,6 @@ name = "stashy"
 version = "0.7"
 summary = "Python API client for the  Atlassian Bitbucket Server (formerly known as Stash) REST API"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "decorator>=3.4.0",
     "requests>=2.5.1",
@@ -1182,7 +1247,6 @@ version = "24.4.0"
 requires_python = ">=3.8"
 summary = "Structured Logging for Python"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "structlog-24.4.0-py3-none-any.whl", hash = "sha256:597f61e80a91cc0749a9fd2a098ed76715a1c8a01f73e336b746504d1aad7610"},
     {file = "structlog-24.4.0.tar.gz", hash = "sha256:b27bfecede327a6d2da5fbc96bd859f114ecc398a6389d664f62085ee7ae6fc4"},
@@ -1194,7 +1258,7 @@ version = "2.0.1"
 requires_python = ">=3.7"
 summary = "A lil' TOML parser"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+marker = "python_version < \"3.11\""
 files = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
@@ -1206,10 +1270,6 @@ version = "4.66.2"
 requires_python = ">=3.7"
 summary = "Fast, Extensible Progress Meter"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
-dependencies = [
-    "colorama; platform_system == \"Windows\"",
-]
 files = [
     {file = "tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9"},
     {file = "tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531"},
@@ -1220,23 +1280,18 @@ name = "typing-extensions"
 version = "4.12.2"
 requires_python = ">=3.8"
 summary = "Backported and Experimental Type Hints for Python 3.8+"
+<<<<<<< Updated upstream
 groups = ["default", "dev"]
 marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+||||||| Stash base
+groups = ["dev"]
+marker = "python_version >= \"3.10\" and python_version < \"3.11\""
+=======
+groups = ["default", "dev"]
+>>>>>>> Stashed changes
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
     {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
-]
-
-[[package]]
-name = "tzdata"
-version = "2023.3"
-requires_python = ">=2"
-summary = "Provider of IANA time zone data"
-groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\" and platform_system == \"Windows\""
-files = [
-    {file = "tzdata-2023.3-py2.py3-none-any.whl", hash = "sha256:7e65763eef3120314099b6939b5546db7adce1e7d6f2e179e3df563c70511eda"},
-    {file = "tzdata-2023.3.tar.gz", hash = "sha256:11ef1e08e54acb0d4f95bdb1be05da659673de4acbd21bf9c69e94cc5e907a3a"},
 ]
 
 [[package]]
@@ -1245,11 +1300,6 @@ version = "5.0.1"
 requires_python = ">=3.7"
 summary = "tzinfo object for the local timezone"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
-dependencies = [
-    "backports-zoneinfo; python_version < \"3.9\"",
-    "tzdata; platform_system == \"Windows\"",
-]
 files = [
     {file = "tzlocal-5.0.1-py3-none-any.whl", hash = "sha256:f3596e180296aaf2dbd97d124fe76ae3a0e3d32b258447de7b939b3fd4be992f"},
     {file = "tzlocal-5.0.1.tar.gz", hash = "sha256:46eb99ad4bdb71f3f72b7d24f4267753e240944ecfc16f25d2719ba89827a803"},
@@ -1261,7 +1311,6 @@ version = "2.0.4"
 requires_python = ">=3.7"
 summary = "HTTP library with thread-safe connection pooling, file post, and more."
 groups = ["default", "dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "urllib3-2.0.4-py3-none-any.whl", hash = "sha256:de7df1803967d2c2a98e4b11bb7d6bd9210474c46e8a0401514e3a42a75ebde4"},
     {file = "urllib3-2.0.4.tar.gz", hash = "sha256:8d22f86aae8ef5e410d4f539fde9ce6b2113a001bb4d189e0aed70642d602b11"},
@@ -1273,11 +1322,9 @@ version = "20.24.3"
 requires_python = ">=3.7"
 summary = "Virtual Python Environment builder"
 groups = ["dev"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 dependencies = [
     "distlib<1,>=0.3.7",
     "filelock<4,>=3.12.2",
-    "importlib-metadata>=6.6; python_version < \"3.8\"",
     "platformdirs<4,>=3.9.1",
 ]
 files = [
@@ -1286,6 +1333,7 @@ files = [
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "wrapt"
 version = "1.16.0"
 requires_python = ">=3.6"
@@ -1308,12 +1356,26 @@ files = [
 ]
 
 [[package]]
+||||||| Stash base
+=======
+name = "wrapt"
+version = "1.16.0"
+requires_python = ">=3.6"
+summary = "Module for decorators, wrappers and monkey patching."
+groups = ["default"]
+files = [
+    {file = "wrapt-1.16.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ffa565331890b90056c01db69c0fe634a776f8019c143a5ae265f9c6bc4bd6d4"},
+    {file = "wrapt-1.16.0-py3-none-any.whl", hash = "sha256:6906c4100a8fcbf2fa735f6059214bb13b97f75b1a61777fcf6432121ef12ef1"},
+    {file = "wrapt-1.16.0.tar.gz", hash = "sha256:5f370f952971e7d17c7d1ead40e49f32345a7f7a5373571ef44d800d06b1899d"},
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "zipp"
 version = "3.18.1"
 requires_python = ">=3.8"
 summary = "Backport of pathlib-compatible object wrapper for zip files"
 groups = ["default"]
-marker = "python_version >= \"3.10\" and python_version < \"3.11\""
 files = [
     {file = "zipp-3.18.1-py3-none-any.whl", hash = "sha256:206f5a15f2af3dbaee80769fb7dc6f249695e940acca08dfb2a4769fe61e538b"},
     {file = "zipp-3.18.1.tar.gz", hash = "sha256:2884ed22e7d8961de1c9a05142eb69a247f120291bc0206a00a7642f09b5b715"},
