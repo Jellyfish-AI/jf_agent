@@ -475,6 +475,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
     resp = requests.get(
         f'{base_url}/endpoints/agent/pull-state',
         headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+        params={'use_pagination': True},
     )
 
     if not resp.ok:
