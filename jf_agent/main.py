@@ -493,10 +493,10 @@ def obtain_jellyfish_endpoint_info(config, creds):
 
     # Most likely we'll need to pull additional Jira issue metadata. This is done
     # using cursor based pagination to prevent timeouts.
-    if jira_info.get('issue_metadata_cursor'):
+    if cursor := jira_info.get('issue_metadata_cursor'):
         logger.info('Pulling additional Jira issue metadata from Jellyfish...')
         addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
-            base_url, creds.jellyfish_api_token, jira_info['issue_metadata_cursor']
+            base_url, creds.jellyfish_api_token, cursor
         )
         jira_info['issue_metadata'].update(addtl_jira_issue_metadata)
         logger.info(f'Pulled a total of {len(jira_info["issue_metadata"])} Jira issue metadata')
