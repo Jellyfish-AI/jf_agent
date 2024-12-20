@@ -489,6 +489,12 @@ def obtain_jellyfish_endpoint_info(config, creds):
     git_instance_info = agent_config_from_api.get('git_instance_info')
     jf_options = agent_config_from_api.get("jf_options", {})
 
+    if jira_info.get('issue_metadata_cursor'):
+        addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
+            base_url, creds.jellyfish_api_token, jira_info['jira_issue_metadata_cursor']
+        )
+        jira_info['issue_metadata'].update(addtl_jira_issue_metadata)
+
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
         logger.error(
@@ -544,6 +550,29 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 raise BadConfigException()
 
     return JellyfishEndpointInfo(jira_info, git_instance_info, jf_options)
+
+
+def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: int) -> dict:
+    headers = {'Jellyfish-API-Token': api_token}
+    next_cursor = cursor
+    endpoint = f'{base_url}/endpoints/agent/pull-state/jira-issue-metadata'
+    jira_issues = {}
+
+    while next_cursor:
+        r = requests.get(endpoint, headers=headers, params=params)
+
+        if not r.ok:
+            logger.error(
+                f"ERROR: Couldn't get additional Jira issues from {endpoint} "
+                f'using provided JELLYFISH_API_TOKEN (HTTP {r.status_code})'
+            )
+            raise BadConfigException()
+
+        data = r.json()
+        jira_issues.update(data['jira_issues'])
+        next_cursor = data.get('next_cursor', None)
+
+    return jira_issues
 
 
 @diagnostics.capture_timing()
