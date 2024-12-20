@@ -491,7 +491,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
     jf_options = agent_config_from_api.get("jf_options", {})
 
     # Most likely we'll need to pull additional Jira issue metadata. This is done
-    # using batches to prevent timeouts.
+    # using cursor based pagination to prevent timeouts.
     if jira_info.get('issue_metadata_cursor'):
         logger.info('Pulling additional Jira issue metadata from Jellyfish...')
         addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
