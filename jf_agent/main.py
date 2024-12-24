@@ -18,6 +18,7 @@ import requests
 from jf_ingest import diagnostics, logging_helper
 from jf_ingest.config import GitProvider, IngestionConfig, IngestionType
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
+from jf_ingest.utils import retry_for_status as jf_ingest_retry_for_status
 
 from jf_agent import (
     JELLYFISH_API_BASE,
@@ -583,15 +584,16 @@ def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: i
         )
         start_time = time.perf_counter()
 
-        r: requests.Response = retry_for_status(
+        r: requests.Response = jf_ingest_retry_for_status(
             requests.get,
             endpoint,
             headers=headers,
             params={'cursor': next_cursor},
         )
-        r.raise_for_status()
 
-        logger.info(f'Request {req_count + 1} took {time.perf_counter() - start_time:.2f}s')
+        logger.info(
+            f'Issue metadata request {req_count + 1} took {time.perf_counter() - start_time:.2f}s'
+        )
 
         rj = r.json()
         jira_issues.update(rj['issue_metadata'])
@@ -599,7 +601,7 @@ def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: i
         req_count += 1
 
         logger.info(
-            f'Pulled {len(jira_issues)} Jira issue metadata so far in {req_count} requests '
+            f'Pulled {len(jira_issues)} Jira issue metadata so far in {req_count} request(s) '
             f'and {time.perf_counter() - full_start_time:.2f}s.'
         )
 
