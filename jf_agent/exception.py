@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class BadConfigException(Exception):
-    def __exit__(
+    def __init__(
         self,
         msg: str = 'BadConfigException (see earlier messages)',
         exc: Optional[Exception] = None,
