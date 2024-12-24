@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 import threading
+import time
 import traceback
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -495,11 +496,20 @@ def obtain_jellyfish_endpoint_info(config, creds):
     # using cursor based pagination to prevent timeouts.
     if cursor := jira_info.get('issue_metadata_cursor'):
         logger.info('Pulling additional Jira issue metadata from Jellyfish...')
-        addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
-            base_url, creds.jellyfish_api_token, cursor
-        )
+
+        try:
+            addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
+                base_url, creds.jellyfish_api_token, cursor
+            )
+        except Exception as e:
+            raise BadConfigException(
+                f'Couldn\'t get additional Jira issues from Jellyfish API: {e}', e
+            )
+
         jira_info['issue_metadata'].update(addtl_jira_issue_metadata)
-        logger.info(f'Pulled a total of {len(jira_info["issue_metadata"])} Jira issue metadata')
+        logger.info(
+            f'Pulled a total of {len(jira_info["issue_metadata"])} additional Jira issue metadata'
+        )
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
@@ -565,30 +575,40 @@ def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: i
     next_cursor = cursor
     jira_issues = {}
     req_count = 0
+    full_start_time = time.perf_counter()
 
     while next_cursor:
-        r = retry_for_status(
+        logger.info(
+            f'Pulling Jira issue metadata with cursor {next_cursor} (request {req_count})...'
+        )
+        start_time = time.perf_counter()
+
+        r: requests.Response = retry_for_status(
             requests.get,
             endpoint,
             headers=headers,
             params={'cursor': next_cursor},
         )
+        r.raise_for_status()
 
-        if not r.ok:
-            logger.error(
-                f'ERROR: Couldn\'t get additional Jira issues from {endpoint} '
-                f'using provided JELLYFISH_API_TOKEN (HTTP {r.status_code})'
-            )
-            raise BadConfigException()
+        logger.info(f'Request {req_count + 1} took {time.perf_counter() - start_time:.2f}s')
 
         rj = r.json()
         jira_issues.update(rj['issue_metadata'])
         next_cursor = rj['next_cursor']
         req_count += 1
 
+        logger.info(
+            f'Pulled {len(jira_issues)} Jira issue metadata so far in {req_count} requests '
+            f'and {time.perf_counter() - full_start_time:.2f}s.'
+        )
+
+    full_duration = time.perf_counter() - full_start_time
     logger.info(
-        f'Pulled {len(jira_issues)} additional Jira issue metadata in {req_count} request(s)'
+        f'Done pulling Jira issue metadata. '
+        f'Took {full_duration:.2f}s in {req_count} requests to pull {len(jira_issues)} issue metadata'
     )
+
     return jira_issues
 
 
