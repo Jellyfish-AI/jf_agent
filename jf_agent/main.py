@@ -503,9 +503,7 @@ def obtain_jellyfish_endpoint_info(config, creds):
                 base_url, creds.jellyfish_api_token, cursor
             )
         except Exception as e:
-            raise BadConfigException(
-                f'Couldn\'t get additional Jira issues from Jellyfish API: {e}', e
-            )
+            raise BadConfigException(f'Couldn\'t get additional Jira issues from Jellyfish API', e)
 
         jira_info['issue_metadata'].update(addtl_jira_issue_metadata)
         logger.info(
