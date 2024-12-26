@@ -472,17 +472,22 @@ def obtain_creds(config):
     )
 
 
-def obtain_jellyfish_endpoint_info(config, creds):
+def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata: bool = False):
     logger.info('Pulling agent state from Jellyfish API (agent/pull-state)...')
-    logger.info('Skip JF ingest formatted issue metadata: True')
     base_url = config.jellyfish_api_base
+
+    params = {'use_pagination': True}
+
+    if skip_jf_ingest_issue_metadata:
+        logger.info('Skipping JF ingest issue metadata pull from Jellyfish API')
+        params['skip_jf_ingest_issue_metadata'] = True
 
     try:
         resp = jf_ingest_retry_for_status(
             requests.get,
             f'{base_url}/endpoints/agent/pull-state',
             headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
-            params={'use_pagination': True, 'skip_jf_ingest_issue_metadata': False},
+            params=params,
         )
     except Exception as e:
         # Base URL is our jellyfish URL. NOT sensitive client data
@@ -498,15 +503,6 @@ def obtain_jellyfish_endpoint_info(config, creds):
     jira_info = agent_config_from_api.get('jira_info')
     git_instance_info = agent_config_from_api.get('git_instance_info')
     jf_options = agent_config_from_api.get("jf_options", {})
-
-    p = agent_config_from_api.get('pagination')
-    s = agent_config_from_api.get('skip_jf_ingest')
-    truthy = jira_info.get('issue_metadata_for_jf_ingest')
-    logger.info(f'p = {p}, s = {s}, truthy = {truthy}')
-    keys = list(agent_config_from_api['jira_info'].keys())
-    logger.info(f'keys = {keys}')
-    logger.info(f'jf ingest issue metadata type = {type(truthy)}')
-    exit(0)
 
     # Most likely we'll need to pull additional Jira issue metadata. This is done
     # using cursor based pagination to prevent timeouts.
