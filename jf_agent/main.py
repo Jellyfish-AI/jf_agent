@@ -16,7 +16,7 @@ from pathlib import Path
 import dotenv
 import requests
 from jf_ingest import diagnostics, logging_helper
-from jf_ingest.config import GitProvider, IngestionConfig, IngestionType
+from jf_ingest.config import GitProvider, IngestionConfig, IngestionType, IssueMetadata
 from jf_ingest.jf_jira import load_and_push_jira_to_s3
 from jf_ingest.utils import retry_for_status as jf_ingest_retry_for_status
 
@@ -473,25 +473,40 @@ def obtain_creds(config):
 
 
 def obtain_jellyfish_endpoint_info(config, creds):
+    logger.info('Pulling agent state from Jellyfish API (agent/pull-state)...')
+    logger.info('Skip JF ingest formatted issue metadata: True')
     base_url = config.jellyfish_api_base
-    resp = requests.get(
-        f'{base_url}/endpoints/agent/pull-state',
-        headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
-        params={'use_pagination': True},
-    )
 
-    if not resp.ok:
+    try:
+        resp = jf_ingest_retry_for_status(
+            requests.get,
+            f'{base_url}/endpoints/agent/pull-state',
+            headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+            params={'use_pagination': True, 'skip_jf_ingest_issue_metadata': False},
+        )
+    except Exception as e:
         # Base URL is our jellyfish URL. NOT sensitive client data
         logger.error(
             f"ERROR: Couldn't get agent config info from {base_url}/agent/pull-state "
-            f'using provided JELLYFISH_API_TOKEN (HTTP {resp.status_code})'
+            f'using provided JELLYFISH_API_TOKEN (Error: {e})'
         )
-        raise BadConfigException()
+        raise BadConfigException(exc=e)
+
+    logger.info('Successfully pulled agent config from Jellyfish API (agent/pull-state)')
 
     agent_config_from_api = resp.json()
     jira_info = agent_config_from_api.get('jira_info')
     git_instance_info = agent_config_from_api.get('git_instance_info')
     jf_options = agent_config_from_api.get("jf_options", {})
+
+    p = agent_config_from_api.get('pagination')
+    s = agent_config_from_api.get('skip_jf_ingest')
+    truthy = jira_info.get('issue_metadata_for_jf_ingest')
+    logger.info(f'p = {p}, s = {s}, truthy = {truthy}')
+    keys = list(agent_config_from_api['jira_info'].keys())
+    logger.info(f'keys = {keys}')
+    logger.info(f'jf ingest issue metadata type = {type(truthy)}')
+    exit(0)
 
     # Most likely we'll need to pull additional Jira issue metadata. This is done
     # using cursor based pagination to prevent timeouts.
@@ -506,9 +521,29 @@ def obtain_jellyfish_endpoint_info(config, creds):
             raise BadConfigException(f'Couldn\'t get additional Jira issues from Jellyfish API', e)
 
         jira_info['issue_metadata'].update(addtl_jira_issue_metadata)
-        logger.info(
-            f'Pulled a total of {len(jira_info["issue_metadata"])} additional Jira issue metadata'
-        )
+        logger.info(f'Pulled a total of {len(jira_info["issue_metadata"])} Jira issue metadata')
+
+    # if we set the flag to skip pulling jf ingest issue metadata, recreate them here
+    if not jira_info.get('issue_metadata_for_jf_ingest'):
+        logger.info('Recreating Jira issue metadata in JF ingest formatting...')
+        metadata_objs: list[IssueMetadata] = []
+
+        for issue_id, issue_data in jira_info['issue_metadata'].items():
+            metadata_objs.append(
+                IssueMetadata(
+                    id=str(issue_id),
+                    key=issue_data['issue_key'],
+                    updated=issue_data['updated'],
+                    parent_field_issue_key=issue_data['parent_field_issue_key'],
+                    epic_link_field_issue_key=issue_data['epic_link_field_issue_key'],
+                    project_id=str(issue_data['project_id']),
+                )
+            )
+
+        logger.info(f'Created {len(metadata_objs)} Jira issue metadata objects in JF ingest format')
+
+        # Converting the metadata objects to JSON string for backward compatibility
+        jira_info['issue_metadata_for_jf_ingest'] = IssueMetadata.to_json_str(metadata_objs)
 
     # if no git info has returned from the endpoint, then an instance may not have been provisioned
     if len(config.git_configs) > 0 and not len(git_instance_info.values()):
@@ -572,41 +607,56 @@ def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: i
     endpoint = f'{base_url}/endpoints/agent/jira-issue-metadata'
 
     next_cursor = cursor
+    limit = 25_000
     jira_issues = {}
+
     req_count = 0
     full_start_time = time.perf_counter()
 
     while next_cursor:
-        logger.info(
-            f'Pulling Jira issue metadata with cursor {next_cursor} (request {req_count})...'
-        )
-        start_time = time.perf_counter()
+        try:
+            logger.info(
+                f'Pulling {limit} Jira issue metadata with cursor {next_cursor} (request {req_count})...'
+            )
+            start_time = time.perf_counter()
 
-        r: requests.Response = jf_ingest_retry_for_status(
-            requests.get,
-            endpoint,
-            headers=headers,
-            params={'cursor': next_cursor},
-        )
+            r: requests.Response = jf_ingest_retry_for_status(
+                requests.get,
+                endpoint,
+                headers=headers,
+                params={'cursor': next_cursor, 'limit': limit},
+            )
 
-        logger.info(
-            f'Issue metadata request {req_count + 1} took {time.perf_counter() - start_time:.2f}s'
-        )
+            logger.info(
+                f'Issue metadata request {req_count + 1} took {time.perf_counter() - start_time:.2f}s'
+            )
 
-        rj = r.json()
-        jira_issues.update(rj['issue_metadata'])
-        next_cursor = rj['next_cursor']
-        req_count += 1
+            rj = r.json()
+            jira_issues.update(rj['issue_metadata'])
+            next_cursor = rj['next_cursor']
+            limit = rj['limit']
+            req_count += 1
 
-        logger.info(
-            f'Pulled {len(jira_issues)} Jira issue metadata so far in {req_count} request(s) '
-            f'and {time.perf_counter() - full_start_time:.2f}s.'
-        )
+            logger.info(
+                f'Pulled {len(jira_issues)} Jira issue metadata so far in {req_count} request(s) '
+                f'and {time.perf_counter() - full_start_time:.2f}s. '
+            )
+        except Exception as e:
+            logger.error(f'Error encountered when pulling Jira issue metadata: {e}', exc_info=True)
+
+            # If we encounter an error, we should halve the limit and retry (unless the new limit is
+            # less than 1000, in which case we should raise an exception)
+            limit = limit // 2
+
+            if limit < 1000:
+                raise e
+
+            logger.info(f'Retrying with limit {limit}...')
 
     full_duration = time.perf_counter() - full_start_time
     logger.info(
         f'Done pulling Jira issue metadata. '
-        f'Took {full_duration:.2f}s in {req_count} requests to pull {len(jira_issues)} issue metadata'
+        f'Took {full_duration:.2f} seconds/{req_count} requests to pull {len(jira_issues)} issue metadata'
     )
 
     return jira_issues
