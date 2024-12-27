@@ -237,6 +237,8 @@ class CustomQueueHandler(QueueHandler):
         except:
             return False
 
+        return True
+
 
 @dataclass
 class AgentLoggingConfig:
