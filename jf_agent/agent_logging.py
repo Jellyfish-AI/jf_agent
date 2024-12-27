@@ -217,6 +217,42 @@ class CustomQueueHandler(QueueHandler):
         ):
             self.post_logs_to_jellyfish(now)
 
+    def test_connection_to_jf_endpoint(self) -> bool:
+        """
+        Test the connection to the Jellyfish endpoint
+
+        Returns:
+            bool: True if the connection was successful, False otherwise
+        """
+        headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
+        now = datetime.now()
+        test_msg = [
+            {
+                'message': 'Testing connection from agent',
+                'timestamp': int(now.timestamp()),
+                'initiated_at': self.initiated_at,
+            }
+        ]
+
+        try:
+            conn = self.get_connection()
+            conn.request(
+                "POST",
+                self.webhook_path,
+                body=json.dumps({'logs': test_msg, 'create_stream': True}),
+                headers=headers,
+            )
+            resp = conn.getresponse()
+
+            if not (200 <= resp.status < 300):
+                raise Exception(f"Received non-success HTTP status code: {resp.status}")
+        except Exception as e:
+            full_url = f"{self.webhook_base}{self.webhook_path}"
+            print(f"Error connecting to Jellyfish log endpoint {full_url}: {e}")
+            return False
+
+        return True
+
 
 @dataclass
 class AgentLoggingConfig:
@@ -376,6 +412,9 @@ def bind_default_agent_context(
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> AgentLoggingConfig:
+    logging_handlers = []
+    logging_listener = None
+
     # Remove default handlers that are added when logging is used before configuring
     logging.getLogger().handlers.clear()
 
@@ -391,6 +430,7 @@ def configure(
     console_log_handler.setFormatter(readable_log_formatter(use_color=True))
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
+    logging_handlers.append(console_log_handler)
 
     # Send log messages to using more structured format
     # All DEBUG level and above errors will go to the log file
@@ -399,13 +439,20 @@ def configure(
     logfile_handler.setFormatter(readable_log_formatter(use_color=False))
     # Set Log File Handler to DEBUG to catch as much debugging information as possible
     logfile_handler.setLevel(logging.DEBUG)
+    logging_handlers.append(logfile_handler)
 
     log_queue = Queue(-1)  # no size bound
     log_queue_handler = CustomQueueHandler(log_queue, webhook_base, api_token)
-    log_queue_handler.setFormatter(json_log_formatter())
-    log_queue_handler.setLevel(logging.DEBUG)
-    queue_listener = CustomQueueListener(log_queue, log_queue_handler, respect_handler_level=True)
-    queue_listener.start()
+
+    if log_queue_handler.test_connection_to_jf_endpoint():
+        log_queue_handler.setFormatter(json_log_formatter())
+        log_queue_handler.setLevel(logging.DEBUG)
+        queue_listener = CustomQueueListener(
+            log_queue, log_queue_handler, respect_handler_level=True
+        )
+        queue_listener.start()
+        logging_listener = queue_listener
+        logging_handlers.append(log_queue_handler)
 
     if debug_requests:
         import http.client
@@ -426,8 +473,8 @@ def configure(
     config = AgentLoggingConfig(
         level=logging.DEBUG,
         datefmt='%Y-%m-%d %H:%M:%S',
-        handlers=[logfile_handler, console_log_handler, log_queue_handler],
-        listener=queue_listener,
+        handlers=logging_handlers,
+        listener=logging_listener,
     )
 
     logging.basicConfig(
@@ -438,7 +485,18 @@ def configure(
     )
 
     logger = logging.getLogger(__name__)
-    logger.info('Logging setup complete with handlers for log file, stdout, and streaming.')
+    log_msg = 'Logging setup complete with handlers for log file, console'
+
+    if logging_listener:
+        logger.info(
+            'Successful connection to JF streaming logs endpoint - Streaming logs to Jellyfish.'
+        )
+        logger.info(f'{log_msg}, streaming.')
+    else:
+        logger.info(
+            'Connection failed to JF streaming logs endpoint - Not streaming logs to Jellyfish.'
+        )
+        logger.info(f'{log_msg}.')
 
     return config
 
