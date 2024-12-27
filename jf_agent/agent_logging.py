@@ -225,7 +225,6 @@ class CustomQueueHandler(QueueHandler):
             bool: True if the connection was successful, False otherwise
         """
         headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
-        conn = self.get_connection()
         now = datetime.now()
         test_msg = [
             {
@@ -236,10 +235,11 @@ class CustomQueueHandler(QueueHandler):
         ]
 
         try:
+            conn = self.get_connection()
             conn.request(
                 "POST",
                 self.webhook_path,
-                body=json.dumps({'logs': test_msg, 'create_stream': False}),
+                body=json.dumps({'logs': test_msg, 'create_stream': True}),
                 headers=headers,
             )
             resp = conn.getresponse()
