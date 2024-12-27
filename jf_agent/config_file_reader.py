@@ -454,6 +454,7 @@ def get_ingest_config(
             only_issues=False,
             recursively_download_parents=config.jira_recursively_download_parents,
             jellyfish_issue_ids_for_redownload=jf_issue_ids_for_redownload,
+            issue_jql_filter=config.jira_issue_jql,
             #
             # worklogs
             download_worklogs=config.jira_download_worklogs,

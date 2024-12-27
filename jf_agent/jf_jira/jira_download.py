@@ -38,26 +38,26 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
     if config.run_mode_is_print_all_jira_fields:
         print_all_jira_fields(config, jira_connection)
 
-    try:
-        ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
-        if ids_to_redownload:
-            count_of_ids_to_redownload_previously = len(
-                ingest_config.jira_config.jellyfish_issue_ids_for_redownload
-            )
-            ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(ids_to_redownload)
-            count_of_additional_ids_to_redownload = (
-                len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
-                - count_of_ids_to_redownload_previously
-            )
-            logging_helper.send_to_agent_log_file(
-                f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
-                f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
-            )
-    except Exception as e:
-        logger.warning(
-            f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
-        )
-        logging_helper.send_to_agent_log_file(traceback.format_exc())
+    # try:
+    #     ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
+    #     if ids_to_redownload:
+    #         count_of_ids_to_redownload_previously = len(
+    #             ingest_config.jira_config.jellyfish_issue_ids_for_redownload
+    #         )
+    #         ingest_config.jira_config.jellyfish_issue_ids_for_redownload.update(ids_to_redownload)
+    #         count_of_additional_ids_to_redownload = (
+    #             len(ingest_config.jira_config.jellyfish_issue_ids_for_redownload)
+    #             - count_of_ids_to_redownload_previously
+    #         )
+    #         logging_helper.send_to_agent_log_file(
+    #             f'Detect and Repair Custom Fields found {len(ids_to_redownload)} to redownload, '
+    #             f'which gave us an additional {count_of_additional_ids_to_redownload} unique IDs to redownload'
+    #         )
+    # except Exception as e:
+    #     logger.warning(
+    #         f'Exception {e} encountered when attempting to run {detect_and_repair_custom_fields.__name__}.'
+    #     )
+    #     logging_helper.send_to_agent_log_file(traceback.format_exc())
 
     try:
         logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
