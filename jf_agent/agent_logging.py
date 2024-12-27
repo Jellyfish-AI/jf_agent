@@ -219,22 +219,36 @@ class CustomQueueHandler(QueueHandler):
 
     def test_connection_to_jf_endpoint(self) -> bool:
         """
-        Test the connection to the Jellyfish endpoint. This is used to check if the endpoint is reachable
+        Test the connection to the Jellyfish endpoint
 
         Returns:
             bool: True if the connection was successful, False otherwise
         """
+        headers = {'Content-Type': 'application/json', 'X-JF-API-Token': self.api_token}
         conn = self.get_connection()
+        now = datetime.now()
+        test_msg = [
+            {
+                'message': 'Testing connection from agent',
+                'timestamp': int(now.timestamp()),
+                'initiated_at': self.initiated_at,
+            }
+        ]
 
         try:
-            conn.request("HEAD", self.webhook_path)
+            conn.request(
+                "POST",
+                self.webhook_path,
+                body=json.dumps({'logs': test_msg, 'create_stream': False}),
+                headers=headers,
+            )
             resp = conn.getresponse()
 
             if not (200 <= resp.status < 300):
-                raise Exception(
-                    f"Received non-success HTTP status code {resp.status} from Jellyfish log endpoint"
-                )
-        except:
+                raise Exception(f"Received non-success HTTP status code: {resp.status}")
+        except Exception as e:
+            full_url = f"{self.webhook_base}{self.webhook_path}"
+            print(f"Error connecting to Jellyfish log endpoint {full_url}: {e}")
             return False
 
         return True
