@@ -472,14 +472,14 @@ def obtain_creds(config):
     )
 
 
-def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata: bool = False):
+def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata: bool = True):
     logger.info('Pulling agent state from Jellyfish API (agent/pull-state)...')
     base_url = config.jellyfish_api_base
 
     params = {'use_pagination': True}
 
     if skip_jf_ingest_issue_metadata:
-        logger.info('Skipping JF ingest issue metadata pull from Jellyfish API')
+        logger.info('Skipping JF ingest formatted issue metadata pull from Jellyfish API, will')
         params['skip_jf_ingest_issue_metadata'] = True
 
     try:
@@ -520,6 +520,7 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
         logger.info(f'Pulled a total of {len(jira_info["issue_metadata"])} Jira issue metadata')
 
     # if we set the flag to skip pulling jf ingest issue metadata, recreate them here
+    # using the existing issue metadata (which consists of the same data)
     if not jira_info.get('issue_metadata_for_jf_ingest'):
         logger.info('Recreating Jira issue metadata in JF ingest formatting...')
         metadata_objs: list[IssueMetadata] = []
