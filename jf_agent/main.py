@@ -479,7 +479,7 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
     params = {'use_pagination': True}
 
     if skip_jf_ingest_issue_metadata:
-        logger.info('Skipping JF ingest formatted issue metadata pull from Jellyfish API, will')
+        logger.info('Skipping JF ingest formatted issue metadata pull from Jellyfish API')
         params['skip_jf_ingest_issue_metadata'] = True
 
     try:
