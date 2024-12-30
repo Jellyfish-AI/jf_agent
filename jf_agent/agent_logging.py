@@ -411,7 +411,7 @@ def bind_default_agent_context(
 
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
-) -> AgentLoggingConfig:
+) -> tuple[AgentLoggingConfig, bool]:
     logging_handlers = []
     logging_listener = None
 
@@ -492,13 +492,15 @@ def configure(
             'Successful connection to JF streaming logs endpoint - Streaming logs to Jellyfish.'
         )
         logger.info(f'{log_msg}, streaming.')
+        webhook_connection_success = True
     else:
         logger.info(
             'Connection failed to JF streaming logs endpoint - Not streaming logs to Jellyfish.'
         )
         logger.info(f'{log_msg}.')
+        webhook_connection_success = False
 
-    return config
+    return config, webhook_connection_success
 
 
 def close_out(config: AgentLoggingConfig) -> None:
