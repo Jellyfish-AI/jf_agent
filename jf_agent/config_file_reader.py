@@ -164,7 +164,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
     jira_exclude_project_categories = set(jira_config.get('exclude_project_categories', []))
-    jira_issue_jql = jira_config.get('issue_jql', '')
+    jira_issue_jql = jira_config.get('issue_jql')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
     jira_download_sprints = jira_config.get('download_sprints', True)
     jira_recursively_download_parents = jira_config.get('recursively_download_parents', False)
