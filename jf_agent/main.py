@@ -140,7 +140,7 @@ def main():
         dotenv.load_dotenv(args.env_file)
 
     creds = obtain_creds(config)
-    logging_config = agent_logging.configure(
+    logging_config, webhook_connection_success = agent_logging.configure(
         config.outdir,
         config.jellyfish_webhook_base,
         creds.jellyfish_api_token,
@@ -168,20 +168,21 @@ def main():
     directories_to_skip_uploading_for = set()
 
     # send start signal to Agent heartbeat monitor
-    try:
-        diagnostics.send_diagnostic_start_reading(
-            jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
-            jellyfish_api_token=creds.jellyfish_api_token,
-            timestamp_key=get_timestamp_from_outdir(config.outdir),
-            will_run_git=bool(config.git_configs),
-            will_run_jira=bool(config.jira_url),
-            will_send=not config.run_mode == 'send_only',
-        )
-    except Exception as e:
-        logging_helper.send_to_agent_log_file(
-            f'Error encountered when attempting to send diagnostic heart beat start (Error: {e})',
-            level=logging.ERROR,
-        )
+    if webhook_connection_success:
+        try:
+            diagnostics.send_diagnostic_start_reading(
+                jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
+                jellyfish_api_token=creds.jellyfish_api_token,
+                timestamp_key=get_timestamp_from_outdir(config.outdir),
+                will_run_git=bool(config.git_configs),
+                will_run_jira=bool(config.jira_url),
+                will_send=not config.run_mode == 'send_only',
+            )
+        except Exception as e:
+            logging_helper.send_to_agent_log_file(
+                f'Error encountered when attempting to send diagnostic heart beat start (Error: {e})',
+                level=logging.ERROR,
+            )
 
     logger.info(f'Will write output files into {config.outdir}')
     diagnostics.open_file(config.outdir)
@@ -341,20 +342,21 @@ def main():
     )
     logger.info('Done!', extra=log_extras_status_dict)
 
-    try:
-        diagnostics.send_diagnostic_end_reading(
-            jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
-            jellyfish_api_token=creds.jellyfish_api_token,
-            timestamp_key=get_timestamp_from_outdir(config.outdir),
-            git_success=None,
-            jira_success=None,
-        )
-    except Exception as e:
-        logging_helper.send_to_agent_log_file(
-            f'Error encountered when attempting to send the Agent heart beat end marker. Error: {e}',
-            level=logging.ERROR,
-        )
-    agent_logging.close_out(logging_config)
+    if webhook_connection_success:
+        try:
+            diagnostics.send_diagnostic_end_reading(
+                jellyfish_webhook_base=JELLYFISH_WEBHOOK_BASE,
+                jellyfish_api_token=creds.jellyfish_api_token,
+                timestamp_key=get_timestamp_from_outdir(config.outdir),
+                git_success=None,
+                jira_success=None,
+            )
+        except Exception as e:
+            logging_helper.send_to_agent_log_file(
+                f'Error encountered when attempting to send the Agent heart beat end marker. Error: {e}',
+                level=logging.ERROR,
+            )
+        agent_logging.close_out(logging_config)
 
     return success
 
