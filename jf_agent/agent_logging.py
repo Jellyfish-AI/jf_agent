@@ -139,6 +139,7 @@ class CustomQueueHandler(QueueHandler):
         self.post_errors = 0
         self.post_error_threshold = 10
         self.batches_sent = 0
+        self.req_timeout = 10.0
         self._set_webhook_url()
 
     def _set_webhook_url(self):
@@ -152,9 +153,9 @@ class CustomQueueHandler(QueueHandler):
         '''establish an HTTP[S] connection to the jellyfish webhook service'''
 
         conn = (
-            HTTPSConnection(self.webhook_base[8:])
+            HTTPSConnection(self.webhook_base[8:], timeout=self.req_timeout)
             if self.secure
-            else HTTPConnection(self.webhook_base[7:])
+            else HTTPConnection(self.webhook_base[7:], timeout=self.req_timeout)
         )
         return conn
 
@@ -453,6 +454,9 @@ def configure(
         queue_listener.start()
         logging_listener = queue_listener
         logging_handlers.append(log_queue_handler)
+    else:
+        del log_queue
+        del log_queue_handler
 
     if debug_requests:
         import http.client
@@ -480,7 +484,7 @@ def configure(
     logging.basicConfig(
         level=config.level,
         datefmt=config.datefmt,
-        handlers=[logfile_handler, console_log_handler, log_queue_handler],
+        handlers=logging_handlers,
         force=True,
     )
 
