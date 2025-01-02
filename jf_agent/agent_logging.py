@@ -67,6 +67,15 @@ CONSOLE_RENDERER_STYLE = {
     "event": colorama.Fore.WHITE,
 }
 
+logger: Optional[logging.Logger] = None
+
+
+def _log_msg(msg: str, level: int) -> None:
+    if logger:
+        logger.log(level, msg)
+    else:
+        print(f'{logging.getLevelName(level)}: {msg}')
+
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
@@ -185,12 +194,14 @@ class CustomQueueHandler(QueueHandler):
         except:
             self.post_errors += 1
             if self.post_errors < self.post_error_threshold:
-                print(
-                    'Error: could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.'
+                _log_msg(
+                    'Error: could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.',
+                    logging.WARNING,
                 )
             elif self.post_errors == self.post_error_threshold:
-                print(
-                    'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.'
+                _log_msg(
+                    'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.',
+                    logging.ERROR,
                 )
             return
 
@@ -249,7 +260,7 @@ class CustomQueueHandler(QueueHandler):
                 raise Exception(f"Received non-success HTTP status code: {resp.status}")
         except Exception as e:
             full_url = f"{self.webhook_base}{self.webhook_path}"
-            print(f"Error connecting to Jellyfish log endpoint {full_url}: {e}")
+            _log_msg(f"Error connecting to Jellyfish log endpoint {full_url}: {e}", logging.WARNING)
             return False
 
         return True
@@ -259,7 +270,7 @@ class CustomQueueHandler(QueueHandler):
 class AgentLoggingConfig:
     level: int
     datefmt: str
-    handlers: List[str]
+    handlers: List[logging.Handler]
     listener: QueueListener
 
 
@@ -413,8 +424,8 @@ def bind_default_agent_context(
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> tuple[AgentLoggingConfig, bool]:
-    logging_handlers = []
-    logging_listener = None
+    logging_handlers: list[logging.Handler] = []
+    logging_listener: Optional[CustomQueueListener] = None
 
     # Remove default handlers that are added when logging is used before configuring
     logging.getLogger().handlers.clear()
@@ -488,6 +499,7 @@ def configure(
         force=True,
     )
 
+    global logger
     logger = logging.getLogger(__name__)
     log_msg = 'Logging setup complete with handlers for log file, console'
 
@@ -499,7 +511,7 @@ def configure(
         webhook_connection_success = True
     else:
         logger.info(
-            'Connection failed to JF streaming logs endpoint - Not streaming logs to Jellyfish.'
+            'Connection failed to JF streaming logs endpoint - Continuing without streaming logs to Jellyfish.'
         )
         logger.info(f'{log_msg}.')
         webhook_connection_success = False
@@ -509,11 +521,10 @@ def configure(
 
 def close_out(config: AgentLoggingConfig) -> None:
     # send a custom sentinel so the final log batch sends, then stop the listener
-    logger = logging.getLogger(__name__)
-    logger.info('Closing the agent log stream.')
+    _log_msg('Closing the agent log stream.', logging.INFO)
     config.listener.queue.put(-1)
     config.listener.stop()
-    logger.info('Log stream stopped.')
+    _log_msg('Log stream stopped.', logging.INFO)
 
 
 def generate_logging_extras_dict_for_done_message(
