@@ -195,7 +195,7 @@ class CustomQueueHandler(QueueHandler):
             self.post_errors += 1
             if self.post_errors < self.post_error_threshold:
                 _log_msg(
-                    'Error: could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.',
+                    'Could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.',
                     logging.WARNING,
                 )
             elif self.post_errors == self.post_error_threshold:
@@ -260,7 +260,10 @@ class CustomQueueHandler(QueueHandler):
                 raise Exception(f"Received non-success HTTP status code: {resp.status}")
         except Exception as e:
             full_url = f"{self.webhook_base}{self.webhook_path}"
-            _log_msg(f"Error connecting to Jellyfish log endpoint {full_url}: {e}", logging.WARNING)
+            _log_msg(
+                f"Unsuccessful connection to Jellyfish log endpoint {full_url}: {e}",
+                logging.WARNING,
+            )
             return False
 
         return True
