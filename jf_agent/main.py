@@ -196,6 +196,7 @@ def main():
             config.outdir,
             JELLYFISH_WEBHOOK_BASE,
             creds.jellyfish_api_token,
+            webhook_connection_success,
         ),
     )
     try:
