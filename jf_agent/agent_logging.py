@@ -261,7 +261,7 @@ class CustomQueueHandler(QueueHandler):
         except Exception as e:
             full_url = f"{self.webhook_base}{self.webhook_path}"
             _log_msg(
-                f"Unsuccessful connection to Jellyfish log endpoint {full_url}: {e}",
+                f"Unsuccessful connection to Jellyfish logging endpoint {full_url}: {e}",
                 logging.WARNING,
             )
             return False
