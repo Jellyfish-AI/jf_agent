@@ -67,15 +67,6 @@ CONSOLE_RENDERER_STYLE = {
     "event": colorama.Fore.WHITE,
 }
 
-logger: Optional[logging.Logger] = None
-
-
-def _log_msg(msg: str, level: int) -> None:
-    if logger:
-        logger.log(level, msg)
-    else:
-        print(f'{logging.getLevelName(level)}: {msg}')
-
 
 # For styling in log files, I think it's best to always use new lines even when we use
 # the special character to ignore them. Leverage always_use_newlines for this
@@ -194,14 +185,12 @@ class CustomQueueHandler(QueueHandler):
         except:
             self.post_errors += 1
             if self.post_errors < self.post_error_threshold:
-                _log_msg(
-                    'Could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.',
-                    logging.WARNING,
+                print(
+                    'Error: could not post logs to Jellyfish. Queue was not cleared and another attempt will be made.'
                 )
             elif self.post_errors == self.post_error_threshold:
-                _log_msg(
-                    'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.',
-                    logging.ERROR,
+                print(
+                    'Max errors when posting logs to Jellyfish. Giving up, but continuing with the agent run.'
                 )
             return
 
@@ -260,10 +249,7 @@ class CustomQueueHandler(QueueHandler):
                 raise Exception(f"Received non-success HTTP status code: {resp.status}")
         except Exception as e:
             full_url = f"{self.webhook_base}{self.webhook_path}"
-            _log_msg(
-                f"Unsuccessful connection to Jellyfish logging endpoint {full_url}: {e}",
-                logging.WARNING,
-            )
+            print(f"Unsuccessful connection to Jellyfish logging endpoint {full_url}: {e}")
             return False
 
         return True
@@ -524,10 +510,11 @@ def configure(
 
 def close_out(config: AgentLoggingConfig) -> None:
     # send a custom sentinel so the final log batch sends, then stop the listener
-    _log_msg('Closing the agent log stream.', logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info('Closing the agent log stream.')
     config.listener.queue.put(-1)
     config.listener.stop()
-    _log_msg('Log stream stopped.', logging.INFO)
+    logger.info('Log stream stopped.')
 
 
 def generate_logging_extras_dict_for_done_message(
