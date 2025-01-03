@@ -488,7 +488,6 @@ def configure(
         force=True,
     )
 
-    global logger
     logger = logging.getLogger(__name__)
     log_msg = 'Logging setup complete with handlers for log file, console'
 
