@@ -249,7 +249,7 @@ class CustomQueueHandler(QueueHandler):
                 raise Exception(f"Received non-success HTTP status code: {resp.status}")
         except Exception as e:
             full_url = f"{self.webhook_base}{self.webhook_path}"
-            print(f"Error connecting to Jellyfish log endpoint {full_url}: {e}")
+            print(f"Unsuccessful connection to Jellyfish logging endpoint {full_url}: {e}")
             return False
 
         return True
@@ -259,7 +259,7 @@ class CustomQueueHandler(QueueHandler):
 class AgentLoggingConfig:
     level: int
     datefmt: str
-    handlers: List[str]
+    handlers: List[logging.Handler]
     listener: QueueListener
 
 
@@ -413,8 +413,8 @@ def bind_default_agent_context(
 def configure(
     outdir: str, webhook_base: str, api_token: str, debug_requests=False
 ) -> tuple[AgentLoggingConfig, bool]:
-    logging_handlers = []
-    logging_listener = None
+    logging_handlers: list[logging.Handler] = []
+    logging_listener: Optional[CustomQueueListener] = None
 
     # Remove default handlers that are added when logging is used before configuring
     logging.getLogger().handlers.clear()
@@ -499,7 +499,7 @@ def configure(
         webhook_connection_success = True
     else:
         logger.info(
-            'Connection failed to JF streaming logs endpoint - Not streaming logs to Jellyfish.'
+            'Connection failed to JF streaming logs endpoint - Continuing without streaming logs to Jellyfish.'
         )
         logger.info(f'{log_msg}.')
         webhook_connection_success = False
