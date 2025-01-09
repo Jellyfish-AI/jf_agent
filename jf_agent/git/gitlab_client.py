@@ -54,7 +54,7 @@ class GitLabClient:
             merge_request.source_project = target_project
 
         try:
-            merge_request.note_list = merge_request.notes.list(as_list=False)
+            merge_request.note_list = merge_request.notes.list(iterator=True)
         except (requests.exceptions.RetryError, gitlab.exceptions.GitlabGetError) as e:
             log_and_print_request_error(
                 e,
@@ -107,27 +107,27 @@ class GitLabClient:
         group = self.get_group(group_id)
         if group is None:
             return []
-        return group.projects.list(as_list=False, include_subgroups=True)
+        return group.projects.list(iterator=True, include_subgroups=True)
 
     def list_group_members(self, group_id):
         group = self.get_group(group_id)
         if group is None:
             return []
-        return group.members.list(as_list=False)
+        return group.members.list(iterator=True)
 
     def list_project_branches(self, project_id):
         project = self.get_project(project_id)
-        return project.branches.list(as_list=False)
+        return project.branches.list(iterator=True)
 
     def list_project_merge_requests(self, project_id, state_filter=None):
         project = self.get_project(project_id)
         return project.mergerequests.list(
-            state=state_filter, as_list=False, order_by='updated_at', sort='desc'
+            state=state_filter, iterator=True, order_by='updated_at', sort='desc'
         )
 
     def list_project_commits(self, project_id, since_date, branch_name=None):
         project = self.get_project(project_id)
-        return project.commits.list(since=since_date, ref_name=branch_name, as_list=False)
+        return project.commits.list(since=since_date, ref_name=branch_name, iterator=True)
 
     def get_project_commit(self, project_id, sha):
         project = self.get_project(project_id)
