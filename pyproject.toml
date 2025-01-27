@@ -20,7 +20,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "structlog>=24.4.0",
     "colorama>=0.4.6",
-    "jf-ingest==0.0.167",
+    "jf-ingest==0.0.168",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
