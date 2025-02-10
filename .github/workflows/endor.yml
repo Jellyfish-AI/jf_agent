@@ -20,7 +20,7 @@ jobs:
       run: pip install --user pdm
     - name: Endor Labs Scan Pull Request
       if: github.event_name == 'pull_request'
-      uses: endorlabs/github-action@v1.1.1
+      uses: endorlabs/github-action@v1.1.7
       with:
         namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
@@ -31,7 +31,7 @@ jobs:
         additional_args: "--exit-on-policy-warning"
     - name: Endor Labs Scan Push to main
       if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-      uses: endorlabs/github-action@v1.1.1
+      uses: endorlabs/github-action@v1.1.7
       with:
         namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
