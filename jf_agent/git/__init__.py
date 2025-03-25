@@ -358,11 +358,24 @@ def load_and_dump_git(
                     git_conn=git_connection,
                 )
         elif config.git_provider == 'gitlab':
-            from jf_agent.git.gitlab_adapter import GitLabAdapter
+            if jf_options.get('use_jf_ingest_gitlab', False):
+                for jf_ingest_git_config in jf_ingest_config.git_configs:
+                    if jf_ingest_git_config.instance_slug == instance_slug:
+                        logger.info(
+                            f'Setting up JF Ingest adapter for instance {jf_ingest_git_config.instance_slug}'
+                        )
+                        git_adapter: JFIngestGitAdapter = JFIngestGitAdapter.get_git_adapter(
+                            jf_ingest_git_config
+                        )
+                        git_adapter.load_and_dump_git(
+                            git_config=jf_ingest_git_config, ingest_config=jf_ingest_config
+                        )
+            else:
+                from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-            GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
-                endpoint_git_instance_info
-            )
+                GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
+                    endpoint_git_instance_info
+                )
         elif config.git_provider == ADO_PROVIDER:
             for jf_ingest_git_config in jf_ingest_config.git_configs:
                 if jf_ingest_git_config.instance_slug == instance_slug:
