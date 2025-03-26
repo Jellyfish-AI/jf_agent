@@ -282,11 +282,15 @@ def main():
                     # Mark some agent upload directories as skippable during out
                     # data uploading phase, because they already get uploaded via
                     # JF Ingest
-                    from jf_agent.git.utils import JF_INGEST_SUPPORTED_PROVIDERS
+                    from jf_agent.git.utils import GL_PROVIDER, JF_INGEST_SUPPORTED_PROVIDERS
+
+                    ingest_providers = JF_INGEST_SUPPORTED_PROVIDERS
+                    if jellyfish_endpoint_info.jf_options.get('use_jf_ingest_gitlab', False):
+                        ingest_providers = ingest_providers + (GL_PROVIDER,)
 
                     # Extreme paranoia, normalize everything to lowercase
                     lower_case_supported_providers = [
-                        provider.lower() for provider in JF_INGEST_SUPPORTED_PROVIDERS
+                        provider.lower() for provider in ingest_providers
                     ]
                     directories_to_skip_uploading_for.update(
                         [

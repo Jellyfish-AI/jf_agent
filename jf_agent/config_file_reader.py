@@ -376,7 +376,7 @@ def get_ingest_config(
     Handles converting our agent config to the jf_ingest IngestionConfig
     shared dataclass.
     """
-    from jf_agent.git.utils import GH_PROVIDER, JF_INGEST_SUPPORTED_PROVIDERS
+    from jf_agent.git.utils import GH_PROVIDER, GL_PROVIDER, JF_INGEST_SUPPORTED_PROVIDERS
 
     company_info = get_company_info(config, creds)
 
@@ -467,10 +467,15 @@ def get_ingest_config(
 
     git_configs: List[JFIngestGitConfig] = []
     is_mult_git_mode = len(config.git_configs) > 1
+    ingest_providers = JF_INGEST_SUPPORTED_PROVIDERS
+
+    if jf_options.get('use_jf_ingest_gitlab', False):
+        ingest_providers = ingest_providers + (GL_PROVIDER,)
+
     for agent_git_config in config.git_configs:
         agent_git_config: GitConfig = agent_git_config
 
-        if agent_git_config.git_provider not in JF_INGEST_SUPPORTED_PROVIDERS:
+        if agent_git_config.git_provider not in ingest_providers:
             continue
 
         if is_mult_git_mode:
