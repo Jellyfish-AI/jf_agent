@@ -341,8 +341,12 @@ def _get_jf_ingest_git_auth_config(
                 verify=not skip_ssl_verification,
             )
         if config.git_provider == GL_PROVIDER:
-            return None
-
+            return JFIngestGitAuthConfig(
+                company_slug=company_slug,
+                token=git_creds['gitlab_token'],
+                base_url=config.git_url,
+                verify=not skip_ssl_verification,
+            )
         if config.git_provider == ADO_PROVIDER:
             return JFIngestAzureDevopsAuthConfig(
                 company_slug=company_slug,
