@@ -1,22 +1,23 @@
 import logging
 import os
-import psutil
 import shutil
+import traceback
+from typing import Optional
 
+import psutil
 import requests
-
-from jf_agent.data_manifests.git.generator import get_instance_slug
 from jf_agent.config_file_reader import get_ingest_config
-from jf_agent.git import get_git_client, get_nested_repos_from_git, GithubGqlClient
+from jf_agent.data_manifests.git.generator import get_instance_slug
+from jf_agent.git import GithubGqlClient, get_git_client, get_nested_repos_from_git
+from jf_agent.util import upload_file
 from jf_ingest.validation import (
-    validate_jira,
     GitConnectionHealthCheckResult,
-    JiraConnectionHealthCheckResult,
     IngestionHealthCheckResult,
     IngestionType,
+    JiraConnectionHealthCheckResult,
+    validate_git,
+    validate_jira,
 )
-
-from jf_agent.util import upload_file
 
 from jf_agent import write_file
 
@@ -56,11 +57,12 @@ def full_validate(
     Runs the full validation suite.
     """
 
-    jira_connection_healthcheck_result: JiraConnectionHealthCheckResult = None
-    git_connection_healthcheck_result: GitConnectionHealthCheckResult = None
+    jira_connection_healthcheck_result: Optional[JiraConnectionHealthCheckResult] = None
+    git_connection_healthcheck_result: Optional[list[GitConnectionHealthCheckResult]] = None
 
     logger.info('Validating configuration...')
 
+    ingest_config = None
     try:
         ingest_config = get_ingest_config(
             config,
@@ -69,36 +71,22 @@ def full_validate(
             jellyfish_endpoint_info.git_instance_info,
             jf_options=jellyfish_endpoint_info.jf_options,
         )
+    except Exception as e:
+        print(f"Failed to validate configuration due to exception of type {e.__class__.__name__}!")
+        print(traceback.format_exc())
+
+    if ingest_config:
         if ingest_config.jira_config and not skip_jira:
             jira_connection_healthcheck_result = validate_jira(ingest_config.jira_config)
         else:
             msg = 'Skipping Jira Validation.'
             logger.info(f"{'' if skip_jira else 'No Jira config found'}. " + msg)
 
-    # Probably few/no cases that we would hit an exception here, but we want to catch them if there are any
-    # We will continue to validate git but will indicate Jira config failed.
-    except Exception as e:
-        print(f"Failed to validate Jira due to exception of type {e.__class__.__name__}!")
-
-        # Printing this to stdout rather than logger in case the exception has any sensitive info.
-        print(e)
-
-    # Check for Git configs
-    if config.git_configs and not skip_git:
-        try:
-            git_connection_healthcheck_result = validate_git(
-                config, creds, jellyfish_endpoint_info.git_instance_info
-            )
-
-        except Exception as e:
-            print(f"Failed to validate Git due to exception of type {e.__class__.__name__}!")
-
-            # Printing this to stdout rather than logger in case the exception has any sensitive info.
-            print(e)
-
-    else:
-        msg = 'Skipping Git Validation.'
-        logger.info(f"{'' if skip_git else 'No Git config found'}. " + msg)
+        if ingest_config.git_configs and not skip_git:
+            git_connection_healthcheck_result = validate_git(ingest_config.git_configs)
+        else:
+            msg = 'Skipping Git Validation.'
+            logger.info(f"{'' if skip_git else 'No Git config found'}. " + msg)
 
     # Finally, display memory usage statistics.
     validate_memory(config)
@@ -160,97 +148,6 @@ def validate_num_repos(git_configs, creds):
                     logger.warning(msg=msg)
 
     return metadata_by_project
-
-
-def validate_git(
-    config, creds, endpoint_git_instances_info
-) -> list[GitConnectionHealthCheckResult]:
-    """
-    Validates git config and credentials.
-    """
-
-    git_configs = config.git_configs
-
-    healthcheck_result_list = []
-
-    for i, git_config in enumerate(git_configs, start=1):
-        instance_slug = get_instance_slug(git_config, endpoint_git_instances_info)
-
-        successful = True
-
-        included_inaccessible_repos_list = git_config.git_include_repos
-
-        accessible_projects_and_repos = {}
-
-        print(f"\nGit details for instance {i}/{len(git_configs)}:")
-        print(f"  Instance slug: {instance_slug}")
-        print(f"  Provider: {git_config.git_provider}")
-        print(f"  Included projects: {git_config.git_include_projects}")
-        if len(git_config.git_exclude_projects) > 0:
-            print(f"  Excluded projects: {git_config.git_exclude_projects}")
-        print(f"  Included repos: {git_config.git_include_repos}")
-        if len(git_config.git_exclude_repos) > 0:
-            print(f"  Excluded repos: {git_config.git_exclude_repos}")
-        if len(git_config.git_include_branches) > 0:
-            print(f"  Included Branches: {git_config.git_include_branches}")
-
-        print('==> Testing Git connection...')
-
-        try:
-            client = get_git_client(
-                git_config,
-                list(creds.git_instance_to_creds.values())[i - 1],
-                skip_ssl_verification=config.skip_ssl_verification,
-            )
-
-            project_repo_dict = get_nested_repos_from_git(client, git_config)
-
-            accessible_projects_and_repos = project_repo_dict
-
-            all_repos = sum(project_repo_dict.values(), [])
-
-            if not all_repos:
-                print(
-                    " =============================================================================/n \033[91mERROR: No projects and repositories available to agent: Please Check Configuration\033[0m /n ============================================================================="
-                )
-                continue
-
-            print("  All projects and repositories available to agent:")
-            for project_name, repo_list in project_repo_dict.items():
-                print(f"  -- {project_name}")
-
-                for repo in repo_list:
-                    print(f"    -- {repo}")
-
-            included_inaccessible_repos_list = [
-                r
-                for r in included_inaccessible_repos_list
-                if not _check_repo_included(r, all_repos)
-            ]
-
-            if included_inaccessible_repos_list:
-                successful = False
-                print(
-                    f"  WARNING: the following repos are explicitly defined as included repos, but agent doesn't seem"
-                    f" to see this repository -- possibly missing permissions."
-                )
-                for inaccessible_repo in included_inaccessible_repos_list:
-                    print(f"    - {inaccessible_repo}")
-
-        except Exception as e:
-            print(f"Git connection unsuccessful! Exception: {e}")
-            successful = False
-
-        healthcheck_result = GitConnectionHealthCheckResult(
-            successful=successful,
-            instance_slug=instance_slug,
-            included_inaccessible_repos=included_inaccessible_repos_list,
-            accessible_projects_and_repos=accessible_projects_and_repos,
-        )
-
-        healthcheck_result_list.append(healthcheck_result)
-
-    return healthcheck_result_list
 
 
 def _check_repo_included(repo: str | int, all_repos: list[str]) -> bool:
