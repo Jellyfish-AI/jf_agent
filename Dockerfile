@@ -1,4 +1,4 @@
-FROM python:3.10.12 AS py-deps
+FROM python:3.10.15 AS py-deps
 
 RUN pip install -U pip setuptools wheel
 RUN pip install pdm
@@ -11,7 +11,7 @@ COPY pyproject.toml pdm.lock README.md ./
 RUN mkdir __pypackages__ && pdm sync --prod --no-editable -v
 
 # When upgrading Python versions, please update '.python-version' to match
-FROM python:3.10.12-slim
+FROM python:3.10.15-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
