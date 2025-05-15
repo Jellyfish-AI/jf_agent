@@ -248,5 +248,5 @@ git:
     # Gitlab only: whether to keep the base URL while paging or to use the URL returned by the response headers.
     # This is useful when the Gitlab instance is behind a proxy and the base URL is not accessible.
     # Leverages the keep_base_url arg provided by the gitlab API client: https://python-gitlab.readthedocs.io/en/stable/api/gitlab.html
-    # It is recommened that you DO NOT use this flag
+    # It is recommended that you DO NOT use this flag
     keep_base_url: False
