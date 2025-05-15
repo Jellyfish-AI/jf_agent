@@ -60,7 +60,7 @@ jira:
   # Generally, however, we recommend leaving this as False.
   filter_boards_by_projects: False
 
-  # When provided, we will recurively download all parents until we run out of parents
+  # When provided, we will recursively download all parents until we run out of parents
   # to download. WARNING: This may greatly increase Agent run time!
   recursively_download_parents: False
 
