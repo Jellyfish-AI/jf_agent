@@ -51,8 +51,16 @@ jira:
 
   # Whether the agent should download sprints.  If omitted, defaults to True.
   download_sprints: True
+  # If False, the agent will attempt to download all boards it can see via
+  # the Jira Boards API. If set to True then we will only filter for boards
+  # that are associated with the projects you have specified in the
+  # `include_projects` or `exclude_projects` fields. This is useful if you
+  # have a large number of boards in your Jira instance and you only want
+  # to pull data from boards that are associated with the projects you are pulling.
+  # Generally, however, we recommend leaving this as False.
+  filter_boards_by_projects: False
 
-  # When provided, we will recurively download all parents until we run out of parents
+  # When provided, we will recursively download all parents until we run out of parents
   # to download. WARNING: This may greatly increase Agent run time!
   recursively_download_parents: False
 
@@ -233,3 +241,12 @@ git:
     url: https://bitbucket-org2.yourcompany.com
     instance_slug: git_instance_slug_2
     creds_envvar_prefix: ORG2
+  - provider: gitlab
+    url: https://gitlab.yourcompany.com
+    instance_slug: git_instance_slug_3
+    creds_envvar_prefix: ORG3
+    # Gitlab only: whether to keep the base URL while paging or to use the URL returned by the response headers.
+    # This is useful when the Gitlab instance is behind a proxy and the base URL is not accessible.
+    # Leverages the keep_base_url arg provided by the gitlab API client: https://python-gitlab.readthedocs.io/en/stable/api/gitlab.html
+    # It is recommended that you DO NOT use this flag
+    keep_base_url: False

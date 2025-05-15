@@ -12,6 +12,7 @@ from jf_ingest import logging_helper
 from jf_ingest.config import AzureDevopsAuthConfig as JFIngestAzureDevopsAuthConfig
 from jf_ingest.config import GitAuthConfig as JFIngestGitAuthConfig
 from jf_ingest.config import GitConfig as JFIngestGitConfig
+from jf_ingest.config import GitLabAuthConfig as JFIngestGitLabAuthConfig
 from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
 
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
@@ -37,6 +38,7 @@ class GitConfig:
     git_redact_names_and_urls: bool
     gitlab_per_page_override: bool
     git_verbose: bool
+    gitlab_keep_base_url: bool
     # For multi-git
     creds_envvar_prefix: str
     # legacy fields ==================
@@ -70,6 +72,7 @@ ValidatedConfig = namedtuple(
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
+        'jira_filter_boards_by_projects',
         'jira_recursively_download_parents',
         'jira_skip_saving_data_locally',
         'git_configs',
@@ -167,6 +170,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_issue_jql = jira_config.get('issue_jql')
     jira_download_worklogs = jira_config.get('download_worklogs', True)
     jira_download_sprints = jira_config.get('download_sprints', True)
+    jira_filter_boards_by_projects = jira_config.get('filter_boards_by_projects', False)
     jira_recursively_download_parents = jira_config.get('recursively_download_parents', False)
     jira_skip_saving_data_locally = jira_config.get('skip_saving_data_locally', False)
 
@@ -278,6 +282,7 @@ def obtain_config(args) -> ValidatedConfig:
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
+        jira_filter_boards_by_projects,
         jira_recursively_download_parents,
         jira_skip_saving_data_locally,
         git_configs,  # array of GitConfig
@@ -341,11 +346,12 @@ def _get_jf_ingest_git_auth_config(
                 verify=not skip_ssl_verification,
             )
         if config.git_provider == GL_PROVIDER:
-            return JFIngestGitAuthConfig(
+            return JFIngestGitLabAuthConfig(
                 company_slug=company_slug,
                 token=git_creds['gitlab_token'],
                 base_url=config.git_url,
                 verify=not skip_ssl_verification,
+                keep_base_url=config.gitlab_keep_base_url,
             )
         if config.git_provider == ADO_PROVIDER:
             return JFIngestAzureDevopsAuthConfig(
@@ -444,6 +450,7 @@ def get_ingest_config(
             #
             # Sprints/Boards Info
             download_sprints=config.jira_download_sprints,
+            filter_boards_by_projects=config.jira_filter_boards_by_projects,
             #
             # Issues
             full_redownload=False,
@@ -662,6 +669,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
         git_verbose=git_config.get('verbose', False),
         creds_envvar_prefix=creds_envvar_prefix,
+        gitlab_keep_base_url=git_config.get('keep_base_url', False),
         # legacy fields ===========
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
