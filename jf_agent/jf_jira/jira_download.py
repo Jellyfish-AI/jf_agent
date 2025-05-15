@@ -1,7 +1,8 @@
 import logging
 import string
 import traceback
-from typing import Optional
+import time
+from typing import Optional, Tuple, Dict, Any
 
 from jf_ingest import diagnostics, logging_helper
 from jf_ingest.config import IngestionConfig
@@ -10,6 +11,7 @@ from jf_ingest.jf_jira.auth import get_jira_connection as get_jira_connection_fr
 from jf_ingest.jf_jira.custom_fields import JCFVUpdateFullPayload, identify_custom_field_mismatches
 from jf_ingest.utils import retry_for_status
 from jira.exceptions import JIRAError
+import requests.exceptions
 
 from jf_agent.config_file_reader import ValidatedConfig
 from jf_agent.jf_jira.utils import retry_for_status
@@ -20,10 +22,25 @@ MAKARA_CUSTOM_FIELD_MISMATCH_AND_DETECTION_FLAG = (
     'makara-custom-fields-mismatch-detection-and-repair'
 )
 
+# Maximum number of connection retry attempts
+MAX_CONNECTION_RETRIES = 3
+# Delay between retries in seconds
+RETRY_DELAY = 2
+
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -> dict:
+    """
+    Run the JIRA download process with connection error handling and fallback mechanism.
+    
+    Args:
+        config: The validated configuration
+        ingest_config: The ingestion configuration
+        
+    Returns:
+        A dictionary with status information about the download
+    """
     from jf_agent.jf_jira import print_all_jira_fields
 
     logger.info(
@@ -31,15 +48,35 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
     )
     download_status = 'success'
     error_message = None
+    used_fallback = False
 
+    # Get JIRA connection with fallback capability
+    jira_connection, connection_used_fallback = get_jira_connection_with_fallback(
+        ingest_config.jira_config, 
+        config.fallback_jira_url if hasattr(config, 'fallback_jira_url') else None
+    )
+    
+    if jira_connection is None:
+        return {
+            'type': 'Jira', 
+            'status': 'failed', 
+            'error_message': 'Failed to establish connection to any JIRA endpoint'
+        }
+    
+    if connection_used_fallback:
+        used_fallback = True
+        logger.info('Using fallback JIRA endpoint')
+        
     # Not really sure what this print_all_jira_fields is or who still uses it.
     # Leaving it in for backwards compatibility
-    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
     if config.run_mode_is_print_all_jira_fields:
         print_all_jira_fields(config, jira_connection)
 
     try:
-        ids_to_redownload = detect_and_repair_custom_fields(ingest_config=ingest_config)
+        ids_to_redownload = detect_and_repair_custom_fields(
+            ingest_config=ingest_config,
+            jira_connection=jira_connection
+        )
         if ids_to_redownload:
             count_of_ids_to_redownload_previously = len(
                 ingest_config.jira_config.jellyfish_issue_ids_for_redownload
@@ -61,11 +98,31 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
 
     try:
         logger.info(f'Attempting to use JF Ingest for Jira Ingestion')
+        # We need to update the connection in the ingest_config if we used the fallback
+        original_connection = None
+        if connection_used_fallback:
+            # Store the original connection for restoration later if needed
+            original_connection = ingest_config.jira_config.connection
+            ingest_config.jira_config.connection = jira_connection
+            
         success = load_and_push_jira_to_s3(ingest_config)
+        
+        # Restore the original connection if we modified it
+        if connection_used_fallback and original_connection:
+            ingest_config.jira_config.connection = original_connection
+            
         download_status = 'success' if success else 'failed'
         logger.info(
             'Jira Download Complete',
         )
+    except (JIRAError, requests.exceptions.RequestException) as e:
+        download_status = 'failed'
+        error_message = str(e)
+        logger.error(
+            f'Connection error encountered when downloading Jira data: {e}. '
+            'This Jira submission will be marked as failed.'
+        )
+        logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     except Exception as e:
         download_status = 'failed'
         error_message = str(e)
@@ -76,15 +133,94 @@ def run_jira_download(config: ValidatedConfig, ingest_config: IngestionConfig) -
         )
         logging_helper.send_to_agent_log_file(traceback.format_exc(), level=logging.ERROR)
     finally:
-        return {'type': 'Jira', 'status': download_status, 'error_message': error_message}
+        return {
+            'type': 'Jira', 
+            'status': download_status, 
+            'error_message': error_message,
+            'used_fallback': used_fallback
+        }
+
+
+def get_jira_connection_with_fallback(jira_config, fallback_url: Optional[str] = None) -> Tuple[Any, bool]:
+    """
+    Attempts to establish a JIRA connection with fallback to an alternative endpoint.
+    
+    Args:
+        jira_config: JIRA configuration containing connection parameters
+        fallback_url: Optional fallback URL to use if primary connection fails
+        
+    Returns:
+        Tuple containing (jira_connection, used_fallback_flag)
+    """
+    # Try primary connection with retries
+    for attempt in range(MAX_CONNECTION_RETRIES):
+        try:
+            logger.info(f"Connecting to primary JIRA endpoint (attempt {attempt+1}/{MAX_CONNECTION_RETRIES})")
+            jira_connection = get_jira_connection_from_jf_ingest(jira_config)
+            # Test connection by making a simple API call
+            jira_connection.server_info()
+            logger.info("Successfully connected to primary JIRA endpoint")
+            return jira_connection, False
+        except (JIRAError, requests.exceptions.RequestException) as e:
+            logger.warning(f"Connection attempt {attempt+1} to primary JIRA endpoint failed: {str(e)}")
+            if attempt < MAX_CONNECTION_RETRIES - 1:
+                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                time.sleep(RETRY_DELAY)
+                
+    # Primary connection failed, try fallback if provided
+    if fallback_url:
+        logger.info(f"Primary connection failed. Attempting to connect to fallback JIRA endpoint: {fallback_url}")
+        # Save original URL
+        original_url = jira_config.url
+        
+        try:
+            # Override URL with fallback
+            jira_config.url = fallback_url
+            
+            # Try connecting to fallback
+            for attempt in range(MAX_CONNECTION_RETRIES):
+                try:
+                    logger.info(f"Connecting to fallback JIRA endpoint (attempt {attempt+1}/{MAX_CONNECTION_RETRIES})")
+                    jira_connection = get_jira_connection_from_jf_ingest(jira_config)
+                    # Test connection
+                    jira_connection.server_info()
+                    logger.info("Successfully connected to fallback JIRA endpoint")
+                    return jira_connection, True
+                except (JIRAError, requests.exceptions.RequestException) as e:
+                    logger.warning(f"Fallback connection attempt {attempt+1} failed: {str(e)}")
+                    if attempt < MAX_CONNECTION_RETRIES - 1:
+                        logger.info(f"Retrying fallback in {RETRY_DELAY} seconds...")
+                        time.sleep(RETRY_DELAY)
+        finally:
+            # Restore original URL
+            jira_config.url = original_url
+    
+    logger.error("Failed to connect to both primary and fallback JIRA endpoints")
+    return None, False
 
 
 @diagnostics.capture_timing()
 @logging_helper.log_entry_exit(logger)
 def detect_and_repair_custom_fields(
-    ingest_config: IngestionConfig, submit_issues_for_repair: Optional[bool] = True
+    ingest_config: IngestionConfig, 
+    jira_connection: Optional[Any] = None,
+    submit_issues_for_repair: Optional[bool] = True
 ) -> Optional[set[str]]:
-    jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+    """
+    Detect and repair custom fields with optional connection parameter.
+    
+    Args:
+        ingest_config: The ingestion configuration
+        jira_connection: Optional JIRA connection (will be retrieved if not provided)
+        submit_issues_for_repair: Whether to submit issues for repair
+        
+    Returns:
+        Set of issue IDs to redownload
+    """
+    # Use provided connection or get a new one
+    if jira_connection is None:
+        jira_connection = get_jira_connection_from_jf_ingest(ingest_config.jira_config)
+        
     deployment_type = jira_connection.server_info()['deploymentType']
 
     # NOTE: This is temporary! For initial roll out, we want to target only Cloud Instances
