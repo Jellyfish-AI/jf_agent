@@ -38,7 +38,7 @@ class GitConfig:
     git_redact_names_and_urls: bool
     gitlab_per_page_override: bool
     git_verbose: bool
-    git_gitlab_keep_base_url: bool  # Option used only for Gitlab
+    gitlab_keep_base_url: bool
     # For multi-git
     creds_envvar_prefix: str
     # legacy fields ==================
@@ -351,7 +351,7 @@ def _get_jf_ingest_git_auth_config(
                 token=git_creds['gitlab_token'],
                 base_url=config.git_url,
                 verify=not skip_ssl_verification,
-                keep_base_url=config.keep_base_url,
+                keep_base_url=config.gitlab_keep_base_url,
             )
         if config.git_provider == ADO_PROVIDER:
             return JFIngestAzureDevopsAuthConfig(
@@ -669,7 +669,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
         git_verbose=git_config.get('verbose', False),
         creds_envvar_prefix=creds_envvar_prefix,
-        git_gitlab_keep_base_url=git_config.get('keep_base_url', False),
+        gitlab_keep_base_url=git_config.get('keep_base_url', False),
         # legacy fields ===========
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
