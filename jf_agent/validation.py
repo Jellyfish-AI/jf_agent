@@ -1,15 +1,12 @@
 import logging
 import os
 import shutil
+import subprocess
 import traceback
 from typing import Optional
 
 import psutil
 import requests
-from jf_agent.config_file_reader import get_ingest_config
-from jf_agent.data_manifests.git.generator import get_instance_slug
-from jf_agent.git import GithubGqlClient, get_git_client, get_nested_repos_from_git
-from jf_agent.util import upload_file
 from jf_ingest.validation import (
     GitConnectionHealthCheckResult,
     IngestionHealthCheckResult,
@@ -20,6 +17,10 @@ from jf_ingest.validation import (
 )
 
 from jf_agent import write_file
+from jf_agent.config_file_reader import get_ingest_config
+from jf_agent.data_manifests.git.generator import get_instance_slug
+from jf_agent.git import GithubGqlClient, get_git_client, get_nested_repos_from_git
+from jf_agent.util import upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,12 @@ def validate_memory(config):
             f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)} MB"
         )
 
-        output_dir_size = os.popen(f'du -hs {config.outdir}').readlines()[0].split("\t")[0]
+        proc = subprocess.run(
+            ['du', '-hs', os.path.expanduser(config.outdir)],
+            encoding='utf-8',
+            stdout=subprocess.PIPE,
+        )
+        output_dir_size = proc.stdout.split("\t")[0]
         usage = shutil.disk_usage(config.outdir)
 
         print(

@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:b461ab419c6752b61cff1929610088c9ef1152092864c34c583b6c4261c104ea"
+content_hash = "sha256:39e9fc33f12b1dfd4795dcc7370a5e33f510c746db48701ef08243c94d28a0fe"
 
 [[metadata.targets]]
 requires_python = "~=3.10.15"
@@ -62,7 +62,7 @@ name = "cffi"
 version = "1.15.1"
 summary = "Foreign Function Interface for Python calling C code."
 groups = ["default"]
-marker = "platform_python_implementation != \"PyPy\""
+marker = "platform_python_implementation != \"PyPy\" and sys_platform == \"linux\""
 dependencies = [
     "pycparser",
 ]
@@ -175,6 +175,7 @@ version = "44.0.2"
 requires_python = "!=3.9.0,!=3.9.1,>=3.7"
 summary = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
 groups = ["default"]
+marker = "sys_platform == \"linux\""
 dependencies = [
     "cffi>=1.12; platform_python_implementation != \"PyPy\"",
 ]
@@ -343,24 +344,6 @@ files = [
 ]
 
 [[package]]
-name = "gssapi"
-version = "1.9.0"
-requires_python = ">=3.8"
-summary = "Python GSSAPI Wrapper"
-groups = ["default"]
-marker = "sys_platform != \"win32\""
-dependencies = [
-    "decorator",
-]
-files = [
-    {file = "gssapi-1.9.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:261e00ac426d840055ddb2199f4989db7e3ce70fa18b1538f53e392b4823e8f1"},
-    {file = "gssapi-1.9.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:14a1ae12fdf1e4c8889206195ba1843de09fe82587fa113112887cd5894587c6"},
-    {file = "gssapi-1.9.0-cp310-cp310-win32.whl", hash = "sha256:2a9c745255e3a810c3e8072e267b7b302de0705f8e9a0f2c5abc92fe12b9475e"},
-    {file = "gssapi-1.9.0-cp310-cp310-win_amd64.whl", hash = "sha256:dfc1b4c0bfe9f539537601c9f187edc320daf488f694e50d02d0c1eb37416962"},
-    {file = "gssapi-1.9.0.tar.gz", hash = "sha256:f468fac8f3f5fca8f4d1ca19e3cd4d2e10bd91074e7285464b22715d13548afe"},
-]
-
-[[package]]
 name = "identify"
 version = "2.5.27"
 requires_python = ">=3.8"
@@ -475,26 +458,28 @@ files = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.214"
+version = "0.0.218"
 requires_python = ">=3.10"
 summary = "library used for ingesting jira data"
 groups = ["default"]
 dependencies = [
-    "jira[opt]==3.1.1",
+    "filemagic>=1.6",
+    "jira==3.1.1",
     "opentelemetry-distro>=0.38b0",
     "opentelemetry-exporter-otlp>=1.17.0",
     "psutil>=5.9.6",
-    "pyjwt>2",
+    "pyJWT>=2.10.1",
     "python-dateutil>=2.8.2",
     "python-gitlab>=5.1.0",
     "pytz>=2023.3.post1",
+    "requests-jwt>=0.6.0",
     "requests-mock==1.11.0",
     "requests>=2.31.0",
     "tqdm>=4.66.1",
 ]
 files = [
-    {file = "jf_ingest-0.0.214-py3-none-any.whl", hash = "sha256:45be153d6efdcf0f77da8544953008afdb27ab374568695afb7a0099991fc9cb"},
-    {file = "jf_ingest-0.0.214.tar.gz", hash = "sha256:9aebed97fb66abf2f8bd689989a48643d793f684abf6bd401ceb2c72c660580d"},
+    {file = "jf_ingest-0.0.218-py3-none-any.whl", hash = "sha256:1c68b01d41c1209fde3f5105c9244fc10907356eaa214713c6348f5c9c488b5f"},
+    {file = "jf_ingest-0.0.218.tar.gz", hash = "sha256:f3b18cbb8663e2fa65dec913b6f24765006b95b57a69583f1fd1bb958a46dba6"},
 ]
 
 [[package]]
@@ -510,25 +495,6 @@ dependencies = [
     "requests-toolbelt",
     "requests>=2.10.0",
     "setuptools>=20.10.1",
-]
-files = [
-    {file = "jira-3.1.1-py3-none-any.whl", hash = "sha256:200c4d19f8be5ae39da3578597b78e21f3db69520c354be782bee9bd8bf21d09"},
-    {file = "jira-3.1.1.tar.gz", hash = "sha256:e2fde55d04a421c590cb197cf6b2d01176028004387d3e4cedff653dba408238"},
-]
-
-[[package]]
-name = "jira"
-version = "3.1.1"
-extras = ["opt"]
-requires_python = ">=3.6"
-summary = "Python library for interacting with JIRA via REST APIs."
-groups = ["default"]
-dependencies = [
-    "PyJWT",
-    "filemagic>=1.6",
-    "jira==3.1.1",
-    "requests-jwt",
-    "requests-kerberos",
 ]
 files = [
     {file = "jira-3.1.1-py3-none-any.whl", hash = "sha256:200c4d19f8be5ae39da3578597b78e21f3db69520c354be782bee9bd8bf21d09"},
@@ -569,19 +535,6 @@ dependencies = [
 files = [
     {file = "keyring-25.2.0-py3-none-any.whl", hash = "sha256:19f17d40335444aab84b19a0d16a77ec0758a9c384e3446ae2ed8bd6d53b67a5"},
     {file = "keyring-25.2.0.tar.gz", hash = "sha256:7045f367268ce42dba44745050164b431e46f6e92f99ef2937dfadaef368d8cf"},
-]
-
-[[package]]
-name = "krb5"
-version = "0.7.1"
-requires_python = ">=3.8"
-summary = "Kerberos API bindings for Python"
-groups = ["default"]
-marker = "sys_platform != \"win32\""
-files = [
-    {file = "krb5-0.7.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:cbdcd2c4514af5ca32d189bc31f30fee2ab297dcbff74a53bd82f92ad1f6e0ef"},
-    {file = "krb5-0.7.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:40ad837d563865946cffd65a588f24876da2809aa5ce4412de49442d7cf11d50"},
-    {file = "krb5-0.7.1.tar.gz", hash = "sha256:ed5f13d5031489b10d8655c0ada28a81c2391b3ecb8a08c6d739e1e5835bc450"},
 ]
 
 [[package]]
@@ -897,7 +850,7 @@ version = "2.21"
 requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 summary = "C parser in Python"
 groups = ["default"]
-marker = "platform_python_implementation != \"PyPy\""
+marker = "platform_python_implementation != \"PyPy\" and sys_platform == \"linux\""
 files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
@@ -912,38 +865,6 @@ groups = ["default"]
 files = [
     {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
     {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
-]
-
-[[package]]
-name = "pyspnego"
-version = "0.11.2"
-requires_python = ">=3.8"
-summary = "Windows Negotiate Authentication Client and Server"
-groups = ["default"]
-dependencies = [
-    "cryptography",
-    "sspilib>=0.1.0; sys_platform == \"win32\"",
-]
-files = [
-    {file = "pyspnego-0.11.2-py3-none-any.whl", hash = "sha256:74abc1fb51e59360eb5c5c9086e5962174f1072c7a50cf6da0bda9a4bcfdfbd4"},
-    {file = "pyspnego-0.11.2.tar.gz", hash = "sha256:994388d308fb06e4498365ce78d222bf4f3570b6df4ec95738431f61510c971b"},
-]
-
-[[package]]
-name = "pyspnego"
-version = "0.11.2"
-extras = ["kerberos"]
-requires_python = ">=3.8"
-summary = "Windows Negotiate Authentication Client and Server"
-groups = ["default"]
-dependencies = [
-    "gssapi>=1.6.0; sys_platform != \"win32\"",
-    "krb5>=0.3.0; sys_platform != \"win32\"",
-    "pyspnego==0.11.2",
-]
-files = [
-    {file = "pyspnego-0.11.2-py3-none-any.whl", hash = "sha256:74abc1fb51e59360eb5c5c9086e5962174f1072c7a50cf6da0bda9a4bcfdfbd4"},
-    {file = "pyspnego-0.11.2.tar.gz", hash = "sha256:994388d308fb06e4498365ce78d222bf4f3570b6df4ec95738431f61510c971b"},
 ]
 
 [[package]]
@@ -1122,22 +1043,6 @@ files = [
 ]
 
 [[package]]
-name = "requests-kerberos"
-version = "0.15.0"
-requires_python = ">=3.6"
-summary = "A Kerberos authentication handler for python-requests"
-groups = ["default"]
-dependencies = [
-    "cryptography>=1.3",
-    "pyspnego[kerberos]",
-    "requests>=1.1.0",
-]
-files = [
-    {file = "requests_kerberos-0.15.0-py2.py3-none-any.whl", hash = "sha256:ba9b0980b8489c93bfb13854fd118834e576d6700bfea3745cb2e62278cd16a6"},
-    {file = "requests_kerberos-0.15.0.tar.gz", hash = "sha256:437512e424413d8113181d696e56694ffa4259eb9a5fc4e803926963864eaf4e"},
-]
-
-[[package]]
 name = "requests-mock"
 version = "1.11.0"
 summary = "Mock out responses from the requests package"
@@ -1216,23 +1121,6 @@ groups = ["default", "dev"]
 files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
-]
-
-[[package]]
-name = "sspilib"
-version = "0.2.0"
-requires_python = ">=3.8"
-summary = "SSPI API bindings for Python"
-groups = ["default"]
-marker = "sys_platform == \"win32\""
-files = [
-    {file = "sspilib-0.2.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:34f566ba8b332c91594e21a71200de2d4ce55ca5a205541d4128ed23e3c98777"},
-    {file = "sspilib-0.2.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:5b11e4f030de5c5de0f29bcf41a6e87c9fd90cb3b0f64e446a6e1d1aef4d08f5"},
-    {file = "sspilib-0.2.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e82f87d77a9da62ce1eac22f752511a99495840177714c772a9d27b75220f78"},
-    {file = "sspilib-0.2.0-cp310-cp310-win32.whl", hash = "sha256:e436fa09bcf353a364a74b3ef6910d936fa8cd1493f136e517a9a7e11b319c57"},
-    {file = "sspilib-0.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:850a17c98d2b8579b183ce37a8df97d050bc5b31ab13f5a6d9e39c9692fe3754"},
-    {file = "sspilib-0.2.0-cp310-cp310-win_arm64.whl", hash = "sha256:a4d788a53b8db6d1caafba36887d5ac2087e6b6be6f01eb48f8afea6b646dbb5"},
-    {file = "sspilib-0.2.0.tar.gz", hash = "sha256:4d6cd4290ca82f40705efeb5e9107f7abcd5e647cb201a3d04371305938615b8"},
 ]
 
 [[package]]
