@@ -174,9 +174,10 @@ def validate_memory(config):
             f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)} MB"
         )
 
-        outdir = "~/output && touch ouch.txt"
         proc = subprocess.run(
-            ['du', '-hs', os.path.expanduser(outdir)], encoding='utf-8', stdout=subprocess.PIPE
+            ['du', '-hs', os.path.expanduser(config.outdir)],
+            encoding='utf-8',
+            stdout=subprocess.PIPE,
         )
         output_dir_size = proc.stdout.split("\t")[0]
         usage = shutil.disk_usage(config.outdir)
