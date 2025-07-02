@@ -22,7 +22,7 @@ dependencies = [
     "colorama>=0.4.6",
     "jf-ingest==0.0.218",
 ]
-requires-python = "~=3.10.15"
+requires-python = ">=3.12,<3.13"
 readme = "README.md"
 license = {text = "MIT"}
 
@@ -46,7 +46,7 @@ dev = [
 ]
 
 [tool.pdm.options]
-lock = ["--strategy", "inherit_metadata", "--python", ">=3.10,<3.11"]
+lock = ["--strategy", "inherit_metadata", "--python", ">=3.12,<3.13"]
 
 [tool.isort]
 profile = "black"
