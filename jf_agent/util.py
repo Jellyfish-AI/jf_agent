@@ -24,6 +24,9 @@ UserProvidedCreds = namedtuple(
     ],
 )
 
+def test_function():
+    print('This is a test function, please ignore.')
+
 
 def get_latest_agent_version():
     try:
