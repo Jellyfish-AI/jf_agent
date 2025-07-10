@@ -26,7 +26,6 @@ UserProvidedCreds = namedtuple(
 
 def test_function():
     print('This is a test function, please ignore.')
-    print('Adding another commit to test updates.')
 
 
 def get_latest_agent_version():
