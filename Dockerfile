@@ -1,4 +1,4 @@
-FROM python:3.10.15 AS py-deps
+FROM python:3.12.11 AS py-deps
 
 RUN pip install -U pip setuptools wheel
 RUN pip install pdm
@@ -11,7 +11,7 @@ COPY pyproject.toml pdm.lock README.md ./
 RUN mkdir __pypackages__ && pdm sync --prod --no-editable -v
 
 # When upgrading Python versions, please update '.python-version' to match
-FROM python:3.10.15-slim
+FROM python:3.12.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -21,11 +21,9 @@ ENV SHA="${SHA}"
 ARG BUILDTIME=unknown
 ENV BUILDTIME="${BUILDTIME}"
 
-#COPY --from=py-deps /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
-
 ENV PYTHONPATH="${PYTHONPATH}":/python/pkgs
-COPY --from=py-deps /python/__pypackages__/3.10/lib /python/pkgs
-COPY --from=py-deps /python/__pypackages__/3.10/bin/* /bin/
+COPY --from=py-deps /python/__pypackages__/3.12/lib /python/pkgs
+COPY --from=py-deps /python/__pypackages__/3.12/bin/* /bin/
 
 RUN apt-get update && apt-get -y upgrade && apt-get -y install curl jq && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /home/jf_agent && \
