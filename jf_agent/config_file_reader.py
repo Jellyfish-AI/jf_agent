@@ -308,8 +308,6 @@ def _get_git_config_from_yaml(yaml_config) -> List[GitConfig]:
 
     git_config = yaml_config.get('git')
 
-    logging_helper.send_to_agent_log_file(f"git_config: {git_config}")
-
     # support for no git instances
     if not git_config:
         return []
