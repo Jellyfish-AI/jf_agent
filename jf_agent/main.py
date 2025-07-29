@@ -279,6 +279,9 @@ def main():
                         endpoint_git_instances_info=jellyfish_endpoint_info.git_instance_info,
                         jf_options=jellyfish_endpoint_info.jf_options,
                     )
+                    logging_helper.send_to_agent_log_file(
+                        "\n".join([gc.__dict__ for gc in ingest_config.git_configs])
+                    )
                     # Mark some agent upload directories as skippable during out
                     # data uploading phase, because they already get uploaded via
                     # JF Ingest
@@ -840,6 +843,7 @@ def download_data(
                     else f"Starting Git download for {len(config.git_configs)} provided git configurations"
                 ),
             )
+            logger.info(f"git_config: {git_config}")
             futures.append(
                 executor.submit(
                     _download_git_data,

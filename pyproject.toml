@@ -20,7 +20,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "structlog>=24.4.0",
     "colorama>=0.4.6",
-    "jf-ingest==0.0.223",
+    "jf-ingest==0.0.224",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
@@ -35,15 +35,6 @@ build-backend = "pdm.backend"
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
-
-[tool.pdm.dev-dependencies]
-dev = [
-    "requests-mock",
-    "pytest>=7.4.0",
-    "black==24.4.2",
-    "isort==5.13.2",
-    "pre-commit>=3.6.0",
-]
 
 [tool.pdm.options]
 lock = ["--strategy", "inherit_metadata", "--python", ">=3.12,<3.13"]
@@ -98,3 +89,12 @@ exclude = '''
   | \.txt$
 )
 '''
+
+[dependency-groups]
+dev = [
+    "requests-mock",
+    "pytest>=7.4.0",
+    "black==24.4.2",
+    "isort==5.13.2",
+    "pre-commit>=3.6.0",
+]
