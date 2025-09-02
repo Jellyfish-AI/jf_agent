@@ -102,7 +102,7 @@ class Manifest(ABC):
         with open(file_name, 'w') as f:
             f.write(self.to_json_str())
 
-    def upload_to_s3(self, jellyfish_api_base: str, jellyfish_api_token: str) -> None:
+    def upload_to_s3(self, jellyfish_api_base: str, jellyfish_api_token: str, skip_ssl_verification: bool = False) -> None:
         headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
 
         logger.info(f'Attempting to upload {self.get_unique_key()} manifest to s3...')
@@ -111,6 +111,7 @@ class Manifest(ABC):
             f'{jellyfish_api_base}/endpoints/agent/upload_manifest',
             headers=headers,
             data=gzip.compress(bytes(self.to_json_str(), encoding='utf-8')),
+            verify=not skip_ssl_verification,
         )
         r.raise_for_status()
 
