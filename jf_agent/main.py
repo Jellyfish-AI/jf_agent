@@ -495,6 +495,7 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
             f'{base_url}/endpoints/agent/pull-state',
             headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
             params=params,
+            verify=not config.skip_ssl_verification,
         )
     except Exception as e:
         # Base URL is our jellyfish URL. NOT sensitive client data
@@ -518,7 +519,7 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
 
         try:
             addtl_jira_issue_metadata = _get_additional_jira_issue_metadata(
-                base_url, creds.jellyfish_api_token, cursor
+                base_url, creds.jellyfish_api_token, cursor, config.skip_ssl_verification
             )
         except Exception as e:
             raise BadConfigException(f'Couldn\'t get additional Jira issues from Jellyfish API', e)
@@ -606,7 +607,7 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
     return JellyfishEndpointInfo(jira_info, git_instance_info, jf_options)
 
 
-def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: int) -> dict:
+def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: int, skip_ssl_verification: bool = False) -> dict:
     headers = {'Jellyfish-API-Token': api_token}
     endpoint = f'{base_url}/endpoints/agent/jira-issue-metadata'
 
@@ -629,6 +630,7 @@ def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: i
                 endpoint,
                 headers=headers,
                 params={'cursor': next_cursor, 'limit': limit},
+                verify=not skip_ssl_verification,
             )
 
             logger.info(
@@ -723,6 +725,7 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
         manifest.upload_to_s3(
             jellyfish_api_base=config.jellyfish_api_base,
             jellyfish_api_token=creds.jellyfish_api_token,
+            skip_ssl_verification=config.skip_ssl_verification,
         )
 
     logger.info(f'Successfully uploaded {len(manifests)} manifest(s) to Jellyfish!')
@@ -908,6 +911,7 @@ def send_data(config: ValidatedConfig, creds, directories_to_skip: list[str], su
             f'{base_url}/endpoints/ingest/signed-url?timestamp={timestamp}',
             headers=headers,
             json=payload,
+            verify=not config.skip_ssl_verification,
         )
         r.raise_for_status()
 
@@ -1040,6 +1044,7 @@ def get_issues_to_scan_from_jellyfish(config, creds, updated_within_last_x_month
         f'{base_url}/endpoints/agent/unlinked-dev-issues',
         headers={'Jellyfish-API-Token': api_token},
         params=params,
+        verify=not config.skip_ssl_verification,
     )
 
     # try and grab any specific error messages sent over

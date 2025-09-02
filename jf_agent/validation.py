@@ -105,7 +105,7 @@ def full_validate(
 
     if upload:
         submit_health_check_to_jellyfish(
-            config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir
+            config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir, config.skip_ssl_verification
         )
     else:
         logger.info("This healthcheck report will not be uploaded.")
@@ -193,7 +193,7 @@ def validate_memory(config):
 
 
 def get_healthcheck_signed_urls(
-    jellyfish_api_base: str, jellyfish_api_token: str, files: list[str]
+    jellyfish_api_base: str, jellyfish_api_token: str, files: list[str], skip_ssl_verification: bool = False
 ):
     headers = {'Jellyfish-API-Token': jellyfish_api_token}
 
@@ -203,6 +203,7 @@ def get_healthcheck_signed_urls(
         f'{jellyfish_api_base}/endpoints/agent/healthcheck/signed-url',
         headers=headers,
         json=payload,
+        verify=not skip_ssl_verification,
     )
     r.raise_for_status()
 
@@ -210,7 +211,7 @@ def get_healthcheck_signed_urls(
 
 
 def submit_health_check_to_jellyfish(
-    jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str
+    jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str, skip_ssl_verification: bool = False
 ) -> None:
     """
     Uploads the given IngestionHealthCheckResult to Jellyfish
@@ -221,6 +222,7 @@ def submit_health_check_to_jellyfish(
         jellyfish_api_base=jellyfish_api_base,
         jellyfish_api_token=jellyfish_api_token,
         files=[HEALTHCHECK_JSON_FILENAME, agent_log_filename],
+        skip_ssl_verification=skip_ssl_verification,
     )
 
     # Uploading healthcheck.json

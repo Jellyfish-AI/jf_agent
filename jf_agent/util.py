@@ -25,10 +25,11 @@ UserProvidedCreds = namedtuple(
 )
 
 
-def get_latest_agent_version():
+def get_latest_agent_version(skip_ssl_verification: bool = False):
     try:
         request = requests.get(
-            url='https://api.github.com/repos/Jellyfish-AI/jf_agent/commits/master'
+            url='https://api.github.com/repos/Jellyfish-AI/jf_agent/commits/master',
+            verify=not skip_ssl_verification,
         )
         request.raise_for_status()
         return request.json()['sha']
@@ -63,6 +64,7 @@ def get_company_info(config, creds) -> dict:
     resp = requests.get(
         f'{base_url}/endpoints/agent/company',
         headers={'Jellyfish-API-Token': creds.jellyfish_api_token},
+        verify=not config.skip_ssl_verification,
     )
 
     if not resp.ok:
