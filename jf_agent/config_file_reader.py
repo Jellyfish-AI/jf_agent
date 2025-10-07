@@ -686,6 +686,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_verbose=git_config.get('verbose', False),
         creds_envvar_prefix=creds_envvar_prefix,
         gitlab_keep_base_url=git_config.get('keep_base_url', False),
+        github_check_mannequin_users=pull_mannequin_user_prs,
         # ADO only
         ado_api_version=git_config.get('ado_api_version', None),
         # legacy fields ===========
