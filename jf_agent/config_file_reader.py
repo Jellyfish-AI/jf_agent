@@ -47,6 +47,8 @@ class GitConfig:
     # legacy fields ==================
     git_include_bbcloud_projects: List
     git_exclude_bbcloud_projects: List
+    # For ADO only
+    ado_api_version: Optional[str] = None
 
 
 # todo convert to dataclass
@@ -357,12 +359,16 @@ def _get_jf_ingest_git_auth_config(
                 keep_base_url=config.gitlab_keep_base_url,
             )
         if config.git_provider == ADO_PROVIDER:
-            return JFIngestAzureDevopsAuthConfig(
+            ado_auth_config = JFIngestAzureDevopsAuthConfig(
                 company_slug=company_slug,
                 token=git_creds['ado_token'],
                 base_url=config.git_url,
                 verify=not skip_ssl_verification,
             )
+            if config.ado_api_version:
+                ado_auth_config.api_version = config.ado_api_version
+
+            return ado_auth_config
 
     except Exception as e:
         logging_helper.log_standard_error(
@@ -680,7 +686,8 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_verbose=git_config.get('verbose', False),
         creds_envvar_prefix=creds_envvar_prefix,
         gitlab_keep_base_url=git_config.get('keep_base_url', False),
-        github_check_mannequin_users=pull_mannequin_user_prs,
+        # ADO only
+        ado_api_version=git_config.get('ado_api_version', None),
         # legacy fields ===========
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
