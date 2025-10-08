@@ -366,7 +366,7 @@ def _get_jf_ingest_git_auth_config(
                 verify=not skip_ssl_verification,
             )
             if config.ado_api_version:
-                ado_auth_config.api_version = config.ado_api_version
+                ado_auth_config.api_version = str(config.ado_api_version)
 
             return ado_auth_config
 
