@@ -218,6 +218,11 @@ git:
   # Cloud).
   verbose: False
 
+  # This field sets the API Version needed when working with ADO. This is different from
+  # the server version, like 2022.1. 2022.1, for example, maps to server version 7.1
+  # If this is left omitted than the default ado_api_version of '7.0' will be used.
+  ado_api_version: '7.0' # Only for Azure Devops (ADO); defaults to '7.0' if omitted
+
 ######################################
 # 3b. Multiple instance config example
 #
