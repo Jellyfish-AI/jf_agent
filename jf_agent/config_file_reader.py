@@ -14,6 +14,7 @@ from jf_ingest.config import GitAuthConfig as JFIngestGitAuthConfig
 from jf_ingest.config import GitConfig as JFIngestGitConfig
 from jf_ingest.config import GitLabAuthConfig as JFIngestGitLabAuthConfig
 from jf_ingest.config import IngestionConfig, IngestionType, IssueMetadata, JiraDownloadConfig
+from jf_ingest.jf_git.clients.azure_devops import ADO_DEFAULT_API_URL
 
 from jf_agent import JELLYFISH_API_BASE, VALID_RUN_MODES
 from jf_agent.exception import BadConfigException
@@ -548,6 +549,13 @@ def get_ingest_config(
                     repo_info['prs_backpopulated_to']
                 )
 
+        # NOTE: The ADO Git adapter does not support pulling users from ADO Server instances
+        skip_pulling_users = False
+        if type(jf_ingest_git_auth_config) == JFIngestAzureDevopsAuthConfig:
+            if base_url := jf_ingest_git_auth_config.base_url:
+                # ADO Server
+                skip_pulling_users = ADO_DEFAULT_API_URL not in base_url
+
         pull_from = _make_datetimes_timezone_aware(endpoint_git_instance_info['pull_from'])
         git_configs.append(
             JFIngestGitConfig(
@@ -570,6 +578,7 @@ def get_ingest_config(
                 git_redact_names_and_urls=agent_git_config.git_redact_names_and_urls,
                 git_strip_text_content=agent_git_config.git_strip_text_content,
                 check_ghc_mannequin_user_prs=agent_git_config.github_check_mannequin_users,
+                skip_pulling_users=skip_pulling_users,
             )
         )
 
