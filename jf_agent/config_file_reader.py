@@ -42,12 +42,12 @@ class GitConfig:
     gitlab_per_page_override: bool
     git_verbose: bool
     gitlab_keep_base_url: bool
-    github_check_mannequin_users: bool
     # For multi-git
     creds_envvar_prefix: str
     # legacy fields ==================
     git_include_bbcloud_projects: List
     git_exclude_bbcloud_projects: List
+    github_check_mannequin_users: bool = False
     # For ADO only
     ado_api_version: Optional[str] = None
 
@@ -672,12 +672,6 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         )
         raise BadConfigException()
 
-    # Mannequin users only exist in GitHub Cloud
-    pull_mannequin_user_prs = False
-    if git_provider == 'github':
-        if not isinstance(git_url, str) or GITHUB_DEFAULT_API_URL in git_url:
-            pull_mannequin_user_prs = True
-
     return GitConfig(
         git_provider=git_provider,
         git_instance_slug=git_instance_slug,
@@ -695,10 +689,10 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         git_verbose=git_config.get('verbose', False),
         creds_envvar_prefix=creds_envvar_prefix,
         gitlab_keep_base_url=git_config.get('keep_base_url', False),
-        github_check_mannequin_users=pull_mannequin_user_prs,
         # ADO only
         ado_api_version=git_config.get('ado_api_version', None),
         # legacy fields ===========
         git_include_bbcloud_projects=list(git_include_bbcloud_projects),
         git_exclude_bbcloud_projects=list(git_exclude_bbcloud_projects),
+        github_check_mannequin_users=False,
     )
