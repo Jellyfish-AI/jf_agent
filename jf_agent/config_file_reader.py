@@ -487,7 +487,6 @@ def get_ingest_config(
         )
 
     git_configs: List[JFIngestGitConfig] = []
-    is_mult_git_mode = len(config.git_configs) > 1
     ingest_providers = JF_INGEST_SUPPORTED_PROVIDERS
 
     if jf_options.get('use_jf_ingest_gitlab', False):
@@ -499,13 +498,11 @@ def get_ingest_config(
         if agent_git_config.git_provider not in ingest_providers:
             continue
 
-        if is_mult_git_mode:
-            instance_slug = agent_git_config.git_instance_slug
+        if instance_slug := getattr(agent_git_config, 'git_instance_slug', None):
             endpoint_git_instance_info = endpoint_git_instances_info.get(instance_slug)
             instance_creds = creds.git_instance_to_creds.get(instance_slug)
         else:
-            # If there's only one git config set, then this is "single git" mode.
-            # The instance slug is likely not to be provided
+            # If there's only one git config set, the instance slug may not be provided.
             endpoint_git_instance_info = list(endpoint_git_instances_info.values())[0]
             instance_creds = list(creds.git_instance_to_creds.values())[0]
             instance_slug = endpoint_git_instance_info['slug']
