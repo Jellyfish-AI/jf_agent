@@ -6,7 +6,7 @@ authors = [
     {name = "jellyfish-oss", email = "oss@jellyfish.co"},
 ]
 dependencies = [
-    "urllib3>=1.26.5",
+    "urllib3>=2.6.3",
     "pyyaml>=4.21b",
     "jira<4,>=3.1.1",
     "tqdm>=4.66.2",
