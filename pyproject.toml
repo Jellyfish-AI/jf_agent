@@ -27,17 +27,8 @@ readme = "README.md"
 license = {text = "MIT"}
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-[tool.pdm]
-[[tool.pdm.source]]
-url = "https://pypi.python.org/simple"
-verify_ssl = true
-name = "pypi"
-
-[tool.pdm.options]
-lock = ["--strategy", "inherit_metadata", "--python", ">=3.12,<3.13"]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.isort]
 profile = "black"
@@ -45,7 +36,7 @@ profile = "black"
 [tool.black]
 line-length = 100
 skip-string-normalization = true
-target_version = ['py310']
+target_version = ['py312']
 include = '\.pyi?$'
 exclude = '''
 (

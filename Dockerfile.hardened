@@ -1,8 +1,5 @@
 # Build stage
-# When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.12 AS builder
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+FROM docker.io/chainguard/python:latest-dev as builder
 
 USER root
 WORKDIR /python
@@ -22,10 +19,8 @@ RUN uv sync --locked --no-dev --no-editable
 
 ################################################################################
 # Runtime stage
-# When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.12-slim
+FROM docker.io/chainguard/wolfi-base:latest
 
-ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -38,18 +33,11 @@ ENV BUILDTIME="${BUILDTIME}"
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/uv/python /opt/uv/python
-RUN ls /opt/env/bin
-
-# nonroot is the standard user in distroless images and hardened distros
-RUN groupadd --gid 65532 nonroot && \
-    useradd --uid 65532 --gid 65532 --home-dir /home/nonroot --shell /bin/bash nonroot && \
-    mkdir -p /home/nonroot && \
-    chown -R nonroot:nonroot /home/nonroot
 
 WORKDIR /home/nonroot
-
 USER nonroot
 
 ENTRYPOINT ["python", "-m", "jf_agent.rollback_on_fail"]
