@@ -1,7 +1,9 @@
 # Build stage
 FROM docker.io/chainguard/python:latest-dev as builder
 
+# hadolint ignore=DL3002
 USER root
+
 WORKDIR /python
 COPY pyproject.toml uv.lock README.md ./
 ENV UV_COMPILE_BYTECODE=1

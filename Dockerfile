@@ -4,7 +4,9 @@ FROM python:3.12.12 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# hadolint ignore=DL3002
 USER root
+
 WORKDIR /python
 COPY pyproject.toml uv.lock README.md ./
 ENV UV_COMPILE_BYTECODE=1
@@ -40,7 +42,6 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/uv/python /opt/uv/python
-RUN ls /opt/env/bin
 
 # nonroot is the standard user in distroless images and hardened distros
 RUN groupadd --gid 65532 nonroot && \
@@ -49,7 +50,6 @@ RUN groupadd --gid 65532 nonroot && \
     chown -R nonroot:nonroot /home/nonroot
 
 WORKDIR /home/nonroot
-
 USER nonroot
 
 ENTRYPOINT ["python", "-m", "jf_agent.rollback_on_fail"]
