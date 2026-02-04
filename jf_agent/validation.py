@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import subprocess
 import traceback
 from typing import Optional
 
@@ -105,7 +104,10 @@ def full_validate(
 
     if upload:
         submit_health_check_to_jellyfish(
-            config.jellyfish_api_base, creds.jellyfish_api_token, config_outdir, config.skip_ssl_verification
+            config.jellyfish_api_base,
+            creds.jellyfish_api_token,
+            config_outdir,
+            config.skip_ssl_verification,
         )
     else:
         logger.info("This healthcheck report will not be uploaded.")
@@ -174,12 +176,8 @@ def validate_memory(config):
             f"  Available memory: {round(psutil.virtual_memory().available / (1024 * 1024), 2)} MB"
         )
 
-        proc = subprocess.run(
-            ['du', '-hs', os.path.expanduser(config.outdir)],
-            encoding='utf-8',
-            stdout=subprocess.PIPE,
-        )
-        output_dir_size = proc.stdout.split("\t")[0]
+        output_dir_path = os.path.expanduser(config.outdir)
+        output_dir_size = _format_bytes(_get_directory_size_bytes(output_dir_path))
         usage = shutil.disk_usage(config.outdir)
 
         print(
@@ -192,8 +190,35 @@ def validate_memory(config):
         return False
 
 
+def _get_directory_size_bytes(path: str) -> int:
+    total_size = 0
+    for root, _, files in os.walk(path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            try:
+                total_size += os.path.getsize(file_path)
+            except OSError:
+                # Ignore files that disappear or cannot be accessed
+                continue
+    return total_size
+
+
+def _format_bytes(num_bytes: int) -> str:
+    units = ["B", "K", "M", "G", "T"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return str(int(size))
+            return f"{size:.1f}{unit}"
+        size /= 1024
+
+
 def get_healthcheck_signed_urls(
-    jellyfish_api_base: str, jellyfish_api_token: str, files: list[str], skip_ssl_verification: bool = False
+    jellyfish_api_base: str,
+    jellyfish_api_token: str,
+    files: list[str],
+    skip_ssl_verification: bool = False,
 ):
     headers = {'Jellyfish-API-Token': jellyfish_api_token}
 
@@ -211,7 +236,10 @@ def get_healthcheck_signed_urls(
 
 
 def submit_health_check_to_jellyfish(
-    jellyfish_api_base: str, jellyfish_api_token: str, config_outdir: str, skip_ssl_verification: bool = False
+    jellyfish_api_base: str,
+    jellyfish_api_token: str,
+    config_outdir: str,
+    skip_ssl_verification: bool = False,
 ) -> None:
     """
     Uploads the given IngestionHealthCheckResult to Jellyfish
