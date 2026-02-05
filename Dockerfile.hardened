@@ -1,8 +1,6 @@
 # Build stage
-# When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.11 AS builder
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# hadolint ignore=DL3007
+FROM docker.io/chainguard/python:latest-dev AS builder
 
 # hadolint ignore=DL3002
 USER root
@@ -11,6 +9,7 @@ WORKDIR /python
 COPY pyproject.toml uv.lock README.md ./
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
 
 # uv will install python based on pyproject.toml. It won't use chainguards pythonn.
 RUN uv venv /opt/venv
@@ -23,10 +22,9 @@ RUN uv sync --locked --no-dev --no-editable
 
 ################################################################################
 # Runtime stage
-# When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.11-slim
+# hadolint ignore=DL3007
+FROM docker.io/chainguard/wolfi-base:latest
 
-ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -39,13 +37,9 @@ ENV BUILDTIME="${BUILDTIME}"
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-COPY --from=builder /opt/venv /opt/venv
 
-# nonroot is the standard user in distroless images and hardened distros
-RUN groupadd --gid 65532 nonroot && \
-    useradd --uid 65532 --gid 65532 --home-dir /home/nonroot --shell /bin/bash nonroot && \
-    mkdir -p /home/nonroot && \
-    chown -R nonroot:nonroot /home/nonroot
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/uv/python /opt/uv/python
 
 WORKDIR /home/nonroot
 USER nonroot

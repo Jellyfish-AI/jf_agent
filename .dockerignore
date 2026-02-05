@@ -1,9 +1,11 @@
 .dockerignore
+.DS_Store
+.env
+.envrc
 .git
 .gitignore
-tests
-.envrc
-output
-.DS_Store
 .jekyll-cache
 docs
+jf_agent_output
+output
+tests
