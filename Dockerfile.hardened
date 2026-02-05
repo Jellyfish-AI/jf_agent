@@ -1,5 +1,6 @@
 # Build stage
-FROM docker.io/chainguard/python:latest-dev as builder
+# hadolint ignore=DL3007
+FROM docker.io/chainguard/python:latest-dev AS builder
 
 # hadolint ignore=DL3002
 USER root
@@ -21,6 +22,7 @@ RUN uv sync --locked --no-dev --no-editable
 
 ################################################################################
 # Runtime stage
+# hadolint ignore=DL3007
 FROM docker.io/chainguard/wolfi-base:latest
 
 ENV LANG=C.UTF-8
