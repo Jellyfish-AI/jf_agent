@@ -1,6 +1,6 @@
 # Build stage
 # When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.12 AS builder
+FROM python:3.12.11 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -11,7 +11,6 @@ WORKDIR /python
 COPY pyproject.toml uv.lock README.md ./
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
 
 # uv will install python based on pyproject.toml. It won't use chainguards pythonn.
 RUN uv venv /opt/venv
@@ -25,7 +24,7 @@ RUN uv sync --locked --no-dev --no-editable
 ################################################################################
 # Runtime stage
 # When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.12-slim
+FROM python:3.12.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -41,7 +40,6 @@ ENV BUILDTIME="${BUILDTIME}"
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /opt/uv/python /opt/uv/python
 
 # nonroot is the standard user in distroless images and hardened distros
 RUN groupadd --gid 65532 nonroot && \

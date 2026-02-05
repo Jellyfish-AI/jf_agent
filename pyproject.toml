@@ -24,11 +24,14 @@ dependencies = [
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["jf_agent"]
 
 [tool.isort]
 profile = "black"
