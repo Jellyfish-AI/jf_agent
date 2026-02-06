@@ -29,7 +29,7 @@ jira:
   # We recommend setting this to pull back data from one year ago. For example,
   # if the current date is 2026-01-01, set this to 2025-01-01.
   #
-  # Note: Moving this date forward will delete any issues older than the new date.
+  # WARNING: Moving this date forward will delete any issues older than the new date.
   # Once set, be careful when modifying this value to avoid unintended data loss.
   earliest_issue_dt: 2025-01-01
 
