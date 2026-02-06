@@ -26,16 +26,11 @@ jira:
   gdpr_active: False
 
   # The earliest date for pulling issues into Jellyfish (format: YYYY-MM-DD).
-  # We recommend you set this date to pull back data from one year ago, relative 
-  # to when you first set up the agent. For example, if the current date is 2026-01-01, 
-  # and you want to pull back one year of data, set this to 2025-01-01.
-  # 
-  # WARNING: After setting this date, do not move it "forward" in time.
-  # Moving the date forward (from 2025 to 2026, for example) will cause 
-  # the agent to delete data that was previously pulled, and that data 
-  # will not be backfilled in future runs.
+  # We recommend setting this to pull back data from one year ago. For example,
+  # if the current date is 2026-01-01, set this to 2025-01-01.
   #
-  # We recommend that you DO NOT ALTER THIS DATE after your initial setup!
+  # Note: Moving this date forward will delete any issues older than the new date.
+  # Once set, be careful when modifying this value to avoid unintended data loss.
   earliest_issue_dt: 2025-01-01
 
   # The number of concurrent threads the agent will use for downloading issue data.
