@@ -138,7 +138,6 @@ def obtain_config(args) -> ValidatedConfig:
     )
 
     debug_http_requests = args.debug_requests
-
     try:
         with open(config_file_path, 'r') as yaml_file:
             yaml_config = yaml.safe_load(yaml_file)
@@ -431,6 +430,8 @@ def get_ingest_config(
         if isinstance(jf_issue_ids_for_redownload, list):
             jf_issue_ids_for_redownload = set(jf_issue_ids_for_redownload)
 
+        skip_pulling_users = jf_options.get('skip_pulling_users', False)
+        logger.debug(f'Skipping Pulling Users Set to: {skip_pulling_users}')
         jira_config: JiraDownloadConfig = JiraDownloadConfig(
             company_slug=company_slug,
             #
@@ -440,6 +441,9 @@ def get_ingest_config(
             password=creds.jira_password if creds.jira_password else "",
             bypass_ssl_verification=config.skip_ssl_verification,
             personal_access_token=creds.jira_bearer_token if creds.jira_bearer_token else "",
+            #
+            # Users Info
+            skip_downloading_users=skip_pulling_users,
             #
             # Server Info
             gdpr_active=config.jira_gdpr_active,
