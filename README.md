@@ -39,7 +39,7 @@ Here's how to fix it:
 ## Development
 Initial set-up
 ```bash
-uv sync --group dev
-uv run pre-commit install
+pdm install --dev
+pdm run pre-commit install
 ```
 

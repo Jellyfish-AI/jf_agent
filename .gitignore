@@ -138,7 +138,6 @@ dmypy.json
 
 # jf_agent output dir (by convention)
 output
-jf_agent_output
 
 .bash_history
 

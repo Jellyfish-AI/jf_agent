@@ -1,35 +1,19 @@
-# Build stage
-# When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.11 AS builder
+FROM python:3.12.11 AS py-deps
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN pip install -U pip setuptools wheel
+RUN pip install pdm
 
-# hadolint ignore=DL3002
-USER root
 
 WORKDIR /python
-COPY pyproject.toml uv.lock README.md ./
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+COPY pyproject.toml pdm.lock README.md ./
 
-# uv will install python based on pyproject.toml. It won't use chainguards pythonn.
-RUN uv venv /opt/venv
-# hadolint ignore=DL3059
-RUN uv sync --locked --no-dev --no-install-project --no-editable
+# Some little PEP582 magic
+RUN mkdir __pypackages__ && pdm sync --prod --no-editable -v
 
-# keep these layers separate from the sync above so we can change code without rebuilding the dependencies
-COPY jf_agent ./jf_agent
-RUN uv sync --locked --no-dev --no-editable
-
-################################################################################
-# Runtime stage
-# When upgrading Python versions, update '.python-version' to match
+# When upgrading Python versions, please update '.python-version' to match
 FROM python:3.12.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
 
 ARG SHA=develop
 ENV SHA="${SHA}"
@@ -37,17 +21,19 @@ ENV SHA="${SHA}"
 ARG BUILDTIME=unknown
 ENV BUILDTIME="${BUILDTIME}"
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-COPY --from=builder /opt/venv /opt/venv
+ENV PYTHONPATH="${PYTHONPATH}":/python/pkgs
+COPY --from=py-deps /python/__pypackages__/3.12/lib /python/pkgs
+COPY --from=py-deps /python/__pypackages__/3.12/bin/* /bin/
 
-# nonroot is the standard user in distroless images and hardened distros
-RUN groupadd --gid 65532 nonroot && \
-    useradd --uid 65532 --gid 65532 --home-dir /home/nonroot --shell /bin/bash nonroot && \
-    mkdir -p /home/nonroot && \
-    chown -R nonroot:nonroot /home/nonroot
+RUN apt-get update && apt-get -y upgrade && apt-get -y install curl jq && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /home/jf_agent && \
+    useradd --home-dir /home/jf_agent --shell /bin/bash --user-group jf_agent && \
+    chown -R jf_agent:jf_agent /home/jf_agent
 
-WORKDIR /home/nonroot
-USER nonroot
+COPY --chown=jf_agent:jf_agent . /home/jf_agent
 
-ENTRYPOINT ["python", "-m", "jf_agent.rollback_on_fail"]
+WORKDIR /home/jf_agent
+
+USER jf_agent
+
+ENTRYPOINT ["./rollback_on_fail.sh"]
