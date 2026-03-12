@@ -41,13 +41,19 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 COPY --from=builder /opt/venv /opt/venv
 
-# nonroot is the standard user in distroless images and hardened distros
-RUN groupadd --gid 65532 nonroot && \
-    useradd --uid 65532 --gid 65532 --home-dir /home/nonroot --shell /bin/bash nonroot && \
-    mkdir -p /home/nonroot && \
-    chown -R nonroot:nonroot /home/nonroot
+# We name the user "jf_agent" (not "nonroot") so that /home/jf_agent is a real
+# directory, matching the legacy documentation that tells customers to bind-mount
+# to /home/jf_agent/config.yml and /home/jf_agent/output. Using a real directory
+# (rather than a symlink) ensures `pwd` and `docker exec` show the expected path.
+# The hardened image (Dockerfile.hardened) cannot rename Chainguard's built-in
+# nonroot user, so it uses a symlink instead — see that file for details.
+# UID/GID 65532 follows the distroless/hardened-image convention for nonroot.
+RUN groupadd --gid 65532 jf_agent && \
+    useradd --uid 65532 --gid 65532 --home-dir /home/jf_agent --shell /bin/bash jf_agent && \
+    mkdir -p /home/jf_agent && \
+    chown -R jf_agent:jf_agent /home/jf_agent
 
-WORKDIR /home/nonroot
-USER nonroot
+WORKDIR /home/jf_agent
+USER jf_agent
 
 ENTRYPOINT ["python", "-m", "jf_agent.rollback_on_fail"]

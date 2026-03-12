@@ -41,7 +41,17 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/uv/python /opt/uv/python
 
-WORKDIR /home/nonroot
+# Legacy documentation tells customers to bind-mount to /home/jf_agent/config.yml
+# and /home/jf_agent/output. Chainguard's wolfi-base ships with a built-in
+# nonroot user (UID 65532) whose home is /home/nonroot — we cannot rename it.
+# A symlink bridges the gap: Docker (runc) resolves symlinks in mount targets,
+# so --mount target=/home/jf_agent/... resolves to /home/nonroot/... correctly.
+# Note: `pwd` inside the container will show /home/nonroot (the resolved path),
+# not /home/jf_agent. The standard image (Dockerfile) avoids this by naming the
+# user "jf_agent" directly — see that file for details.
+RUN ln -s /home/nonroot /home/jf_agent
+
+WORKDIR /home/jf_agent
 USER nonroot
 
 ENTRYPOINT ["python", "-m", "jf_agent.rollback_on_fail"]
