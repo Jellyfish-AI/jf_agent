@@ -8,9 +8,12 @@ from jf_ingest.config import AzureDevopsAuthConfig as JFIngestAzureDevopsAuthCon
 
 from jf_agent.config_file_reader import (
     GitConfig,
+    ValidatedConfig,
     _get_git_config_from_yaml,
     _get_jf_ingest_git_auth_config,
+    obtain_config,
 )
+from jf_agent.exception import BadConfigException
 
 
 class TestGitConfigGeneration(TestCase):

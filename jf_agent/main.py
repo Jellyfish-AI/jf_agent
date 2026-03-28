@@ -607,7 +607,9 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
     return JellyfishEndpointInfo(jira_info, git_instance_info, jf_options)
 
 
-def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: int, skip_ssl_verification: bool = False) -> dict:
+def _get_additional_jira_issue_metadata(
+    base_url: str, api_token: str, cursor: int, skip_ssl_verification: bool = False
+) -> dict:
     headers = {'Jellyfish-API-Token': api_token}
     endpoint = f'{base_url}/endpoints/agent/jira-issue-metadata'
 
@@ -733,9 +735,9 @@ def generate_manifests(config, creds, jellyfish_endpoint_info):
 
 # far more straightforward than real bin packing because we have a set number of bins to start
 def _pack_bins(num_bins: int, packing_items: list[ProjectMetadata]) -> list:
-    bins = [[] for i in range(num_bins)]
+    bins = [[] for _ in range(num_bins)]
     bin_size = [
-        0 for i in range(num_bins)
+        0 for _ in range(num_bins)
     ]  # size is based on number of *repos* in a bin, not projects
 
     for item in packing_items:
