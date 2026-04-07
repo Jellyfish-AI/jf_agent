@@ -21,7 +21,7 @@ jobs:
     - name: Install pre-reqs
       run: pip install --user uv
     - name: Generate requirements.txt 
-      run: uv export > requirements.txt
+      run: uv export --locked --no-editable --no-emit-local > requirements.txt
     - name: Install
       run: pip install -r requirements.txt
     - name: Endor Labs Scan Pull Request
