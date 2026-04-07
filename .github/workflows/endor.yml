@@ -12,15 +12,23 @@ jobs:
       id-token: write # Used for keyless authentication with Endor Labs
       issues: write # Required to automatically comment on PRs for new policy violations
       pull-requests: write # Required to automatically comment on PRs for new policy violations
+    env:
+      ENDOR_SCAN_ENABLE_UV_PACKAGE_MANAGER: false
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
     - name: Install pre-reqs
       run: pip install --user uv
+    - name: Generate requirements.txt 
+      run: uv export --locked --no-editable --no-emit-local > requirements.txt
+    - name: Remove uv files which confuse Endor
+      run: rm uv.lock && rm pyproject.toml
+    - name: Install
+      run: pip install -r requirements.txt
     - name: Endor Labs Scan Pull Request
       if: github.event_name == 'pull_request'
-      uses: endorlabs/github-action@v1.1.7
+      uses: endorlabs/github-action@v1.1.12 # Endor uses immutable releases so hash pinning not required
       with:
         namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
@@ -31,7 +39,7 @@ jobs:
         additional_args: "--exit-on-policy-warning"
     - name: Endor Labs Scan Push to main
       if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-      uses: endorlabs/github-action@v1.1.7
+      uses: endorlabs/github-action@v1.1.12 # Endor uses immutable releases so hash pinning not required
       with:
         namespace: "jellyfish" # Replace with your Endor Labs tenant namespace
         scan_dependencies: true
