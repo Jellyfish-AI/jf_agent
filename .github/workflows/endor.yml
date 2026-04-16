@@ -12,8 +12,6 @@ jobs:
       id-token: write # Used for keyless authentication with Endor Labs
       issues: write # Required to automatically comment on PRs for new policy violations
       pull-requests: write # Required to automatically comment on PRs for new policy violations
-    env:
-      ENDOR_SCAN_ENABLE_UV_PACKAGE_MANAGER: false
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
