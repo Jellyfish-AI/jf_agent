@@ -1,6 +1,6 @@
 # Build stage
 # When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.11 AS builder
+FROM python:3.13.11 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -24,7 +24,7 @@ RUN uv sync --locked --no-dev --no-editable
 ################################################################################
 # Runtime stage
 # When upgrading Python versions, update '.python-version' to match
-FROM python:3.12.11-slim
+FROM python:3.13.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
