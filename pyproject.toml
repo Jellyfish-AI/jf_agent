@@ -8,7 +8,7 @@ authors = [
 dependencies = [
     "urllib3>=2.6.3",
     "pyyaml>=4.21b",
-    "jira<4,>=3.1.1",
+    "jira==3.10.5",
     "tqdm>=4.66.2",
     "stashy",
     "dateparser",
@@ -20,9 +20,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "structlog>=24.4.0",
     "colorama>=0.4.6",
-    "jf-ingest==0.0.279",
+    "jf-ingest==0.0.280",
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.13,<3.14"
 readme = "README.md"
 license = "MIT"
 
@@ -88,6 +88,7 @@ exclude = '''
 name = "pypi"
 url = "https://pypi.org/simple"
 default = true
+
 
 [dependency-groups]
 dev = [
