@@ -5,7 +5,7 @@ from itertools import chain
 
 from jf_ingest import diagnostics, logging_helper
 from jira import JIRA
-from jira.resources import GreenHopperResource
+from jira.resources import AgileResource
 
 from jf_agent.jf_jira.jira_download import download_fields, download_missing_repos_found_by_jira
 
@@ -17,7 +17,7 @@ def _get_raw_jira_connection(config, creds, max_retries=3):
         'server': config.jira_url,
         'max_retries': max_retries,
         'options': {
-            'agile_rest_path': GreenHopperResource.AGILE_BASE_REST_PATH,
+            'agile_rest_path': AgileResource.AGILE_BASE_REST_PATH,
             'verify': not config.skip_ssl_verification,
             "headers": {
                 "Accept": "application/json;q=1.0, */*;q=0.9",
