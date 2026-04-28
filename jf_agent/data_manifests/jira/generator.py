@@ -1,12 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
-from jf_agent.data_manifests.jira.adapter import JiraCloudManifestAdapter
-
-from jf_agent.data_manifests.jira.manifest import JiraDataManifest, JiraProjectManifest
-from jf_agent.data_manifests.manifest import ManifestSource
 from jira import JIRAError
 
+from jf_agent.data_manifests.jira.adapter import JiraCloudManifestAdapter
+from jf_agent.data_manifests.jira.manifest import JiraDataManifest, JiraProjectManifest
+from jf_agent.data_manifests.manifest import ManifestSource
 
 logger = logging.getLogger(__name__)
 

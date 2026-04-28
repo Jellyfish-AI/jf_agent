@@ -1,14 +1,14 @@
-from collections import deque
-from datetime import datetime, timedelta
 import logging
 import time
+from collections import deque
+from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
+from jf_ingest import logging_helper
 from requests.utils import default_user_agent
 
 from jf_agent.ratelimit import RateLimiter, RateLimitRealmConfig
-from jf_ingest import logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,9 @@ class BitbucketCloudClient:
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 404 and ignore404:
                         # URLs are potentially sensitive data, so print instead of log!
-                        print(f'Caught a 404 for {url} - ignoring',)
+                        print(
+                            f'Caught a 404 for {url} - ignoring',
+                        )
                         return
                     raise
 

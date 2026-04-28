@@ -1,32 +1,30 @@
-from jf_agent.git.utils import get_branches_for_standardized_repo
+import logging
+from typing import List
+
 import gitlab
-from tqdm import tqdm
 import requests
 from dateutil import parser
-from typing import List
 from gitlab.v4.objects.projects import GroupProject
-import logging
+from jf_ingest import diagnostics, logging_helper
+from tqdm import tqdm
+
+from jf_agent.config_file_reader import GitConfig
 from jf_agent.git import (
     GitAdapter,
-    StandardizedUser,
-    StandardizedProject,
     StandardizedBranch,
-    StandardizedRepository,
     StandardizedCommit,
+    StandardizedProject,
     StandardizedPullRequest,
     StandardizedPullRequestComment,
     StandardizedPullRequestReview,
+    StandardizedRepository,
     StandardizedShortRepository,
+    StandardizedUser,
     pull_since_date_for_repo,
 )
-from jf_agent.git.gitlab_client import (
-    GitLabClient,
-    MissingSourceProjectException,
-)
-from jf_agent.git.utils import log_and_print_request_error
+from jf_agent.git.gitlab_client import GitLabClient, MissingSourceProjectException
+from jf_agent.git.utils import get_branches_for_standardized_repo, log_and_print_request_error
 from jf_agent.name_redactor import NameRedactor, sanitize_text
-from jf_agent.config_file_reader import GitConfig
-from jf_ingest import diagnostics, logging_helper
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,10 @@ class GitLabAdapter(GitAdapter):
                 continue
 
             projects.append(
-                _standardize_project(group, self.config.git_redact_names_and_urls,)  # are group_ids
+                _standardize_project(
+                    group,
+                    self.config.git_redact_names_and_urls,
+                )  # are group_ids
             )
         logger.info('✓')
 
@@ -86,7 +87,8 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_repos(
-        self, standardized_projects: List[StandardizedProject],
+        self,
+        standardized_projects: List[StandardizedProject],
     ) -> List[StandardizedRepository]:
         logger.info('downloading gitlab repos...')
 
@@ -210,7 +212,9 @@ class GitLabAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_pull_requests(
-        self, standardized_repos: List[StandardizedRepository], server_git_instance_info,
+        self,
+        standardized_repos: List[StandardizedRepository],
+        server_git_instance_info,
     ) -> List[StandardizedPullRequest]:
         logger.info('downloading gitlab prs...')
 
@@ -336,18 +340,22 @@ def _standardize_project(api_group, redact_names_and_urls: bool) -> Standardized
     return StandardizedProject(
         id=api_group.id,
         login=api_group.id,
-        name=api_group.name
-        if not redact_names_and_urls
-        else _project_redactor.redact_name(api_group.name),
+        name=(
+            api_group.name
+            if not redact_names_and_urls
+            else _project_redactor.redact_name(api_group.name)
+        ),
         url=None,
     )
 
 
 def _standardize_branch(api_branch, redact_names_and_urls: bool) -> StandardizedBranch:
     return StandardizedBranch(
-        name=api_branch.name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(api_branch.name),
+        name=(
+            api_branch.name
+            if not redact_names_and_urls
+            else _branch_redactor.redact_name(api_branch.name)
+        ),
         sha=api_branch.commit['id'],
     )
 
@@ -378,9 +386,11 @@ def _standardize_repo(
 def _standardize_short_form_repo(api_repo, redact_names_and_urls):
     return StandardizedShortRepository(
         id=api_repo.id,
-        name=api_repo.name
-        if not redact_names_and_urls
-        else _repo_redactor.redact_name(api_repo.name),
+        name=(
+            api_repo.name
+            if not redact_names_and_urls
+            else _repo_redactor.redact_name(api_repo.name)
+        ),
         url=api_repo.web_url if not redact_names_and_urls else None,
     )
 
@@ -410,9 +420,9 @@ def _standardize_commit(
         message=sanitize_text(api_commit.message, strip_text_content),
         is_merge=len(api_commit.parent_ids) > 1,
         repo=standardized_repo.short(),  # use short form of repo
-        branch_name=branch_name
-        if not redact_names_and_urls
-        else _branch_redactor.redact_name(branch_name),
+        branch_name=(
+            branch_name if not redact_names_and_urls else _branch_redactor.redact_name(branch_name)
+        ),
     )
 
 

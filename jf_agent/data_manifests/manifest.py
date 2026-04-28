@@ -1,16 +1,14 @@
 import gzip
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-import json
 from typing import Optional, TypeVar
 
 import requests
-
 from jf_ingest import logging_helper
-
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +100,9 @@ class Manifest(ABC):
         with open(file_name, 'w') as f:
             f.write(self.to_json_str())
 
-    def upload_to_s3(self, jellyfish_api_base: str, jellyfish_api_token: str, skip_ssl_verification: bool = False) -> None:
+    def upload_to_s3(
+        self, jellyfish_api_base: str, jellyfish_api_token: str, skip_ssl_verification: bool = False
+    ) -> None:
         headers = {'Jellyfish-API-Token': jellyfish_api_token, 'content-encoding': 'gzip'}
 
         logger.info(f'Attempting to upload {self.get_unique_key()} manifest to s3...')
