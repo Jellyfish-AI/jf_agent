@@ -1,13 +1,12 @@
+import json
 import os
 from datetime import datetime, timedelta
+from unittest import TestCase
 
 import requests_mock
-import json
-from unittest import TestCase
 
 from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
 from jf_agent.session import retry_session
-
 
 URI = 'https://bitbucket.testco.com'
 TEST_INPUT_FILE_PATH = 'test_data/bitbucket_cloud/'

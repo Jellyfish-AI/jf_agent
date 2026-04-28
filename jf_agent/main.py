@@ -607,7 +607,9 @@ def obtain_jellyfish_endpoint_info(config, creds, skip_jf_ingest_issue_metadata:
     return JellyfishEndpointInfo(jira_info, git_instance_info, jf_options)
 
 
-def _get_additional_jira_issue_metadata(base_url: str, api_token: str, cursor: int, skip_ssl_verification: bool = False) -> dict:
+def _get_additional_jira_issue_metadata(
+    base_url: str, api_token: str, cursor: int, skip_ssl_verification: bool = False
+) -> dict:
     headers = {'Jellyfish-API-Token': api_token}
     endpoint = f'{base_url}/endpoints/agent/jira-issue-metadata'
 

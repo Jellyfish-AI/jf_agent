@@ -1,13 +1,14 @@
 import json
 import logging
-from datetime import datetime
 import time
-from requests import Session
-import requests
-from requests.utils import default_user_agent
+from datetime import datetime
 from typing import Generator
-from jf_agent.git.github_gql_utils import datetime_to_gql_str_format, github_gql_format_to_datetime
 
+import requests
+from requests import Session
+from requests.utils import default_user_agent
+
+from jf_agent.git.github_gql_utils import datetime_to_gql_str_format, github_gql_format_to_datetime
 from jf_agent.session import retry_session
 
 logger = logging.getLogger(__name__)
@@ -147,7 +148,7 @@ class GithubGqlClient:
                 if attempt_number > max_attempts:
                     raise
 
-                sleep_time = attempt_number ** 2
+                sleep_time = attempt_number**2
                 # Overwrite sleep time if github gives us a specific wait time
                 if e.response.headers.get('retry-after') and attempt_number == 1:
                     retry_after = int(e.response.headers.get('retry-after'))
@@ -186,7 +187,9 @@ class GithubGqlClient:
                 # past. In that case, wait for 5 mins just in case.
                 if sleep_time <= 0:
                     sleep_time = 300
-                logger.warning(f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',)
+                logger.warning(
+                    f'GQL Rate Limit hit. Sleeping for {sleep_time} seconds',
+                )
                 time.sleep(sleep_time)
             finally:
                 attempt_number += 1

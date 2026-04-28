@@ -4,11 +4,11 @@ from typing import Any, TypeVar
 
 from jf_agent.data_manifests.manifest import Manifest, ManifestSource
 
-
 IGitDataManifest = TypeVar('IGitDataManifest', bound='GitDataManifest')
 IGitRepoManifest = TypeVar('IGitRepoManifest', bound='GitRepoManifest')
 IGitUserManifest = TypeVar('IGitUserManifest', bound='GitUserManifest')
 IGitPullRequestManifest = TypeVar('IGitPullRequestManifest', bound='GitPullRequestManifest')
+
 
 # This is the parent class for all GitManifest type classes. It inherits
 # from manifests, but ensures that all 'GitManifests' have an instance

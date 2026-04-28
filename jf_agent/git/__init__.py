@@ -373,9 +373,9 @@ def load_and_dump_git(
             else:
                 from jf_agent.git.gitlab_adapter import GitLabAdapter
 
-                GitLabAdapter(config, outdir, compress_output_files, git_connection).load_and_dump_git(
-                    endpoint_git_instance_info
-                )
+                GitLabAdapter(
+                    config, outdir, compress_output_files, git_connection
+                ).load_and_dump_git(endpoint_git_instance_info)
         elif config.git_provider == ADO_PROVIDER:
             for jf_ingest_git_config in jf_ingest_config.git_configs:
                 if jf_ingest_git_config.instance_slug == instance_slug:
