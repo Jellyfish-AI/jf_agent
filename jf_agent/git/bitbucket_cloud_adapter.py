@@ -265,9 +265,10 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_branches(self, project, api_repo) -> List[StandardizedBranch]:
+        repo_slug = api_repo['full_name'].split('/')[-1]
         return [
             _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
-            for api_branch in self.client.get_branches(project.id, api_repo['uuid'])
+            for api_branch in self.client.get_branches(project.id, repo_slug)
         ]
 
 
@@ -281,6 +282,7 @@ def _standardize_repo(
     standardized_project: StandardizedProject,
     redact_names_and_urls: bool,
 ) -> StandardizedRepository:
+    repo_slug = api_repo['full_name'].split('/')[-1]
     repo_name = (
         api_repo['name']
         if not redact_names_and_urls
@@ -289,7 +291,7 @@ def _standardize_repo(
     url = api_repo['links']['self']['href'] if not redact_names_and_urls else None
 
     return StandardizedRepository(
-        id=api_repo['uuid'],
+        id=repo_slug,
         name=repo_name,
         full_name=api_repo['full_name'],
         url=url,
@@ -305,8 +307,9 @@ def _standardize_repo(
 
 
 def _standardize_short_form_repo(api_repo, redact_names_and_urls):
+    repo_slug = api_repo['full_name'].split('/')[-1]
     return StandardizedShortRepository(
-        id=api_repo['uuid'],
+        id=repo_slug,
         name=(
             api_repo['name']
             if not redact_names_and_urls
@@ -480,7 +483,7 @@ def _standardize_pr(
         and api_pr['merge_commit'].get('hash')
     ):
         api_merge_commit = client.get_commit(
-            repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
+            repo.project.id, repo.id, api_pr['merge_commit']['hash']
         )
         merge_commit = _standardize_commit(
             api_merge_commit,
