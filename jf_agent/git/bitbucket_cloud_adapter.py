@@ -385,12 +385,12 @@ def _standardize_user(api_user):
 def _standardize_pr(
     client, repo, api_pr, strip_text_content: bool, redact_names_and_urls: bool,
 ):
-    slug = _repo_slug(repo)
+    repo_slug = _repo_slug(repo)
 
     # Process the PR's diff to get additions, deletions, changed_files
     additions, deletions, changed_files = None, None, None
     try:
-        diff_str = client.pr_diff(repo.project.id, slug, api_pr['id'])
+        diff_str = client.pr_diff(repo.project.id, repo_slug, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             logging_helper.log_standard_error(
@@ -426,7 +426,7 @@ def _standardize_pr(
             body=sanitize_text(c['content']['raw'], strip_text_content),
             created_at=parser.parse(c['created_on']),
         )
-        for c in client.pr_comments(repo.project.id, slug, api_pr['id'])
+        for c in client.pr_comments(repo.project.id, repo_slug, api_pr['id'])
     ]
 
     # Crawl activity for approvals, merge and closed dates
@@ -435,7 +435,7 @@ def _standardize_pr(
     merged_by = None
     closed_date = None
     try:
-        activity = list(client.pr_activity(repo.project.id, slug, api_pr['id']))
+        activity = list(client.pr_activity(repo.project.id, repo_slug, api_pr['id']))
         approvals = [
             StandardizedPullRequestReview(
                 user=_standardize_user(approval['user']),
@@ -477,7 +477,7 @@ def _standardize_pr(
             strip_text_content,
             redact_names_and_urls,
         )
-        for c in client.pr_commits(repo.project.id, slug, api_pr['id'])
+        for c in client.pr_commits(repo.project.id, repo_slug, api_pr['id'])
     ]
     merge_commit = None
     if (
@@ -487,7 +487,7 @@ def _standardize_pr(
         and api_pr['merge_commit'].get('hash')
     ):
         api_merge_commit = client.get_commit(
-            repo.project.id, slug, api_pr['merge_commit']['hash']
+            repo.project.id, repo_slug, api_pr['merge_commit']['hash']
         )
         merge_commit = _standardize_commit(
             api_merge_commit,
