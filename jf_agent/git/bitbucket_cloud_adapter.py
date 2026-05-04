@@ -171,7 +171,7 @@ class BitbucketCloudAdapter(GitAdapter):
                 for branch in get_branches_for_standardized_repo(repo, included_branches):
                     for j, commit in enumerate(
                         tqdm(
-                            self.client.get_commits(repo.project.id, repo.id, branch),
+                            self.client.get_commits(repo.project.id, _repo_slug(repo), branch),
                             desc=f'downloading commits for {repo.name} on branch {branch}',
                             unit='commits',
                         ),
@@ -210,7 +210,7 @@ class BitbucketCloudAdapter(GitAdapter):
                         server_git_instance_info, repo.project.login, repo.id, 'prs'
                     )
 
-                    api_prs = self.client.get_pullrequests(repo.project.id, repo.id)
+                    api_prs = self.client.get_pullrequests(repo.project.id, _repo_slug(repo))
 
                     if not api_prs:
                         logger.info(f'no prs found for repo {repo.id}. Skipping... ')
@@ -273,10 +273,15 @@ class BitbucketCloudAdapter(GitAdapter):
     @diagnostics.capture_timing()
     @logging_helper.log_entry_exit(logger)
     def get_branches(self, project, api_repo) -> List[StandardizedBranch]:
+        repo_slug = api_repo['full_name'].split('/')[-1]
         return [
             _standardize_branch(api_branch, self.config.git_redact_names_and_urls)
-            for api_branch in self.client.get_branches(project.id, api_repo['uuid'])
+            for api_branch in self.client.get_branches(project.id, repo_slug)
         ]
+
+
+def _repo_slug(repo: StandardizedRepository) -> str:
+    return repo.full_name.split('/')[-1]
 
 
 def _standardize_project(project_name, redact_names_and_urls):
@@ -401,10 +406,12 @@ def _standardize_pr(
     strip_text_content: bool,
     redact_names_and_urls: bool,
 ):
+    repo_slug = _repo_slug(repo)
+
     # Process the PR's diff to get additions, deletions, changed_files
     additions, deletions, changed_files = None, None, None
     try:
-        diff_str = client.pr_diff(repo.project.id, repo.id, api_pr['id'])
+        diff_str = client.pr_diff(repo.project.id, repo_slug, api_pr['id'])
         additions, deletions, changed_files = _calculate_diff_counts(diff_str)
         if additions is None:
             logging_helper.log_standard_error(
@@ -446,7 +453,7 @@ def _standardize_pr(
             body=sanitize_text(c['content']['raw'], strip_text_content),
             created_at=parser.parse(c['created_on']),
         )
-        for c in client.pr_comments(repo.project.id, repo.id, api_pr['id'])
+        for c in client.pr_comments(repo.project.id, repo_slug, api_pr['id'])
     ]
 
     # Crawl activity for approvals, merge and closed dates
@@ -455,7 +462,7 @@ def _standardize_pr(
     merged_by = None
     closed_date = None
     try:
-        activity = list(client.pr_activity(repo.project.id, repo.id, api_pr['id']))
+        activity = list(client.pr_activity(repo.project.id, repo_slug, api_pr['id']))
         approvals = [
             StandardizedPullRequestReview(
                 user=_standardize_user(approval['user']),
@@ -498,7 +505,7 @@ def _standardize_pr(
             strip_text_content,
             redact_names_and_urls,
         )
-        for c in client.pr_commits(repo.project.id, repo.id, api_pr['id'])
+        for c in client.pr_commits(repo.project.id, repo_slug, api_pr['id'])
     ]
     merge_commit = None
     if (
@@ -508,7 +515,7 @@ def _standardize_pr(
         and api_pr['merge_commit'].get('hash')
     ):
         api_merge_commit = client.get_commit(
-            repo.project.id, api_pr['source']['repository']['uuid'], api_pr['merge_commit']['hash']
+            repo.project.id, repo_slug, api_pr['merge_commit']['hash']
         )
         merge_commit = _standardize_commit(
             api_merge_commit,

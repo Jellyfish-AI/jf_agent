@@ -87,7 +87,7 @@ class TestBitbucketCloudAdapter(TestCase):
         resulting_repo = resulting_repos[0]
         input_repo = test_repos[0]
         self.assertEqual(
-            resulting_repo.id, input_repo['uuid'], "Resulting repo id does not match input"
+            resulting_repo.id, input_repo['uuid'], "Resulting repo id should be the UUID"
         )
         self.assertEqual(
             resulting_repo.name, input_repo['name'], "Resulting repo name does not match input"
@@ -281,6 +281,73 @@ class TestBitbucketCloudAdapter(TestCase):
         )
         self.assertFalse(resulting_pr.is_closed)
         self.assertFalse(resulting_pr.is_merged)
+
+    def test_get_prs_merge_commit_uses_destination_repo(self):
+        # Arrange: a MERGED PR where source repo uuid differs from destination repo slug.
+        # This verifies the fix for the bug where get_commit was called with the source
+        # repo uuid instead of the destination repo id.
+        test_commits = _get_test_data('test_commits.json')
+        dest_slug = 'destination_repo_slug'
+        source_uuid = '{aaaaaaaa-0000-0000-0000-bbbbbbbbbbbb}'
+
+        merged_pr = {
+            'id': 99,
+            'title': 'Merged PR',
+            'description': '',
+            'state': 'MERGED',
+            'merge_commit': {'hash': 'abc123merge'},
+            'created_on': '2020-01-01T00:00:00+00:00',
+            'updated_on': '2020-01-02T00:00:00+00:00',
+            'author': {
+                'display_name': 'test_user',
+                'uuid': '{1cd06601-cd0e-4fce-be03-e9ac226978b7}',
+                'links': {'html': {'href': 'https://bitbucket.org/test_user/'}},
+            },
+            'source': {
+                'branch': {'name': 'feature'},
+                'repository': {
+                    'full_name': 'some-fork/destination_repo_slug',
+                    'name': 'fork_repo',
+                    'type': 'repository',
+                    'uuid': source_uuid,
+                    'links': {'self': {'href': 'https://api.bitbucket.org/2.0/repositories/some-fork/fork'}},
+                },
+            },
+            'destination': {
+                'branch': {'name': 'master'},
+                'repository': {
+                    'full_name': f'test_project/{dest_slug}',
+                    'name': dest_slug,
+                    'type': 'repository',
+                    'uuid': '{cccccccc-0000-0000-0000-dddddddddddd}',
+                    'links': {'self': {'href': f'https://api.bitbucket.org/2.0/repositories/test_project/{dest_slug}'}},
+                },
+            },
+            'links': {'html': {'href': 'https://bitbucket.org/test_project/pull-requests/99'}},
+        }
+
+        mock_standardized_repo = MagicMock()
+        mock_standardized_repo.id = '{cccccccc-0000-0000-0000-dddddddddddd}'
+        mock_standardized_repo.full_name = f'test_project/{dest_slug}'
+        mock_standardized_repo.project.id = 'test_project'
+        mock_standardized_repos = [mock_standardized_repo]
+
+        self.mock_client.get_pullrequests.return_value = [merged_pr]
+        self.mock_client.pr_diff.return_value = ""
+        self.mock_client.pr_comments.return_value = []
+        self.mock_client.pr_activity.return_value = []
+        self.mock_client.pr_commits.return_value = test_commits
+        self.mock_client.get_commit.return_value = test_commits[0]
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Call the adapter method
+        list(self.adapter.get_pull_requests(mock_standardized_repos, test_git_instance_info))
+
+        # Assert: get_commit must be called with the destination repo slug, not the source uuid
+        self.mock_client.get_commit.assert_called_once_with(
+            'test_project', dest_slug, 'abc123merge'
+        )
 
 
 def _get_test_data(file_name):
