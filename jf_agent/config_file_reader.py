@@ -75,6 +75,7 @@ ValidatedConfig = namedtuple(
         'jira_exclude_project_categories',
         'jira_required_email_domains',
         'jira_is_email_required',
+        'jira_user_group_names',
         'jira_issue_jql',
         'jira_download_worklogs',
         'jira_download_sprints',
@@ -168,6 +169,7 @@ def obtain_config(args) -> ValidatedConfig:
     jira_gdpr_active = jira_config.get('gdpr_active', False)
     jira_required_email_domains = set(jira_config.get('required_email_domains', []))
     jira_is_email_required = jira_config.get('is_email_required', False)
+    jira_user_group_names = list(jira_config.get('user_group_names', []))
     jira_include_projects = set(jira_config.get('include_projects', []))
     jira_exclude_projects = set(jira_config.get('exclude_projects', []))
     jira_include_project_categories = set(jira_config.get('include_project_categories', []))
@@ -284,6 +286,7 @@ def obtain_config(args) -> ValidatedConfig:
         jira_exclude_project_categories,
         jira_required_email_domains,
         jira_is_email_required,
+        jira_user_group_names,
         jira_issue_jql,
         jira_download_worklogs,
         jira_download_sprints,
@@ -455,6 +458,7 @@ def get_ingest_config(
             # User Info
             required_email_domains=config.jira_required_email_domains,
             is_email_required=config.jira_is_email_required,
+            jira_user_group_names=config.jira_user_group_names,
             #
             # Projects Info
             include_projects=config.jira_include_projects,
