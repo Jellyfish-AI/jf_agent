@@ -127,18 +127,10 @@ jira:
   #   - jellyfish.co
 
   # it's possible for a user to have no email.  if we need to restrict users
-  # by email domain, should null-email users be included?  uncomment this
+  # by email domain, should null-email users be included?  uncomment this 
   # if they shouldn't:
   #
   # is_email_required: True
-
-  # If provided, only pull users who are members of these Jira groups instead
-  # of using the default bulk user search. If omitted, all discoverable users
-  # are pulled.
-  #
-  # user_group_names:
-  #   - jira-software-users
-  #   - engineering-team
 
   # This is a special run mode that allows you to skip saving your JIRA data
   # locally, and instead continuously submit it via S3. This run mode is good
