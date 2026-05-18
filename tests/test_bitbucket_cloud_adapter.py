@@ -358,7 +358,7 @@ class TestBitbucketCloudAdapter(TestCase):
             'test_project', dest_slug, 'abc123merge'
         )
 
-    def test_get_prs_merge_commit_404_does_not_skip_pr(self):
+    def test_get_prs_merge_commit_404_does_not_skip_pr(self) -> None:
         # Regression test for OJ-54730: when Bitbucket Cloud has garbage-collected a PR's
         # merge commit, get_commit raises HTTPError(404). The PR must still be returned,
         # just with merge_commit left unset.
@@ -370,7 +370,7 @@ class TestBitbucketCloudAdapter(TestCase):
             'title': 'Merged PR with stale merge commit',
             'description': '',
             'state': 'MERGED',
-            'merge_commit': {'hash': '9a9601098ec2'},  # pragma: allowlist secret
+            'merge_commit': {'hash': 'stalemergehash'},
             'created_on': '2020-01-01T00:00:00+00:00',
             'updated_on': '2020-01-02T00:00:00+00:00',
             'author': {
