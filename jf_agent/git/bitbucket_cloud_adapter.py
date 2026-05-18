@@ -514,16 +514,20 @@ def _standardize_pr(
         and api_pr['merge_commit']
         and api_pr['merge_commit'].get('hash')
     ):
-        api_merge_commit = client.get_commit(
-            repo.project.id, repo_slug, api_pr['merge_commit']['hash']
-        )
-        merge_commit = _standardize_commit(
-            api_merge_commit,
-            repo,
-            api_pr['destination']['branch']['name'],
-            strip_text_content,
-            redact_names_and_urls,
-        )
+        merge_commit_hash = api_pr['merge_commit']['hash']
+        try:
+            api_merge_commit = client.get_commit(repo.project.id, repo_slug, merge_commit_hash)
+            merge_commit = _standardize_commit(
+                api_merge_commit,
+                repo,
+                api_pr['destination']['branch']['name'],
+                strip_text_content,
+                redact_names_and_urls,
+            )
+        except requests.exceptions.HTTPError as e:
+            logger.info(
+                f'For merge commit {merge_commit_hash} received a {e.response.status_code} while retrieving PR commits'
+            )
 
     # Repo links
     base_repo = _standardize_short_form_repo(
