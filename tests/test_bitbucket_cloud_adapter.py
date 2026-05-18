@@ -1,9 +1,10 @@
 import json
 import unittest
-
-from dateutil import parser
 from unittest import TestCase
 from unittest.mock import MagicMock
+
+import requests
+from dateutil import parser
 
 from jf_agent.git import StandardizedShortRepository
 from jf_agent.git.bitbucket_cloud_adapter import BitbucketCloudAdapter
@@ -310,7 +311,11 @@ class TestBitbucketCloudAdapter(TestCase):
                     'name': 'fork_repo',
                     'type': 'repository',
                     'uuid': source_uuid,
-                    'links': {'self': {'href': 'https://api.bitbucket.org/2.0/repositories/some-fork/fork'}},
+                    'links': {
+                        'self': {
+                            'href': 'https://api.bitbucket.org/2.0/repositories/some-fork/fork'
+                        }
+                    },
                 },
             },
             'destination': {
@@ -320,7 +325,11 @@ class TestBitbucketCloudAdapter(TestCase):
                     'name': dest_slug,
                     'type': 'repository',
                     'uuid': '{cccccccc-0000-0000-0000-dddddddddddd}',
-                    'links': {'self': {'href': f'https://api.bitbucket.org/2.0/repositories/test_project/{dest_slug}'}},
+                    'links': {
+                        'self': {
+                            'href': f'https://api.bitbucket.org/2.0/repositories/test_project/{dest_slug}'
+                        }
+                    },
                 },
             },
             'links': {'html': {'href': 'https://bitbucket.org/test_project/pull-requests/99'}},
@@ -347,6 +356,93 @@ class TestBitbucketCloudAdapter(TestCase):
         # Assert: get_commit must be called with the destination repo slug, not the source uuid
         self.mock_client.get_commit.assert_called_once_with(
             'test_project', dest_slug, 'abc123merge'
+        )
+
+    def test_get_prs_merge_commit_404_does_not_skip_pr(self):
+        # Regression test for OJ-54730: when Bitbucket Cloud has garbage-collected a PR's
+        # merge commit, get_commit raises HTTPError(404). The PR must still be returned,
+        # just with merge_commit left unset.
+        test_commits = _get_test_data('test_commits.json')
+        dest_slug = 'destination_repo_slug'
+
+        merged_pr = {
+            'id': 2394,
+            'title': 'Merged PR with stale merge commit',
+            'description': '',
+            'state': 'MERGED',
+            'merge_commit': {'hash': '9a9601098ec2'},  # pragma: allowlist secret
+            'created_on': '2020-01-01T00:00:00+00:00',
+            'updated_on': '2020-01-02T00:00:00+00:00',
+            'author': {
+                'display_name': 'test_user',
+                'uuid': '{1cd06601-cd0e-4fce-be03-e9ac226978b7}',
+                'links': {'html': {'href': 'https://bitbucket.org/test_user/'}},
+            },
+            'source': {
+                'branch': {'name': 'feature'},
+                'repository': {
+                    'full_name': f'test_project/{dest_slug}',
+                    'name': dest_slug,
+                    'type': 'repository',
+                    'uuid': '{cccccccc-0000-0000-0000-dddddddddddd}',
+                    'links': {
+                        'self': {
+                            'href': f'https://api.bitbucket.org/2.0/repositories/test_project/{dest_slug}'
+                        }
+                    },
+                },
+            },
+            'destination': {
+                'branch': {'name': 'master'},
+                'repository': {
+                    'full_name': f'test_project/{dest_slug}',
+                    'name': dest_slug,
+                    'type': 'repository',
+                    'uuid': '{cccccccc-0000-0000-0000-dddddddddddd}',
+                    'links': {
+                        'self': {
+                            'href': f'https://api.bitbucket.org/2.0/repositories/test_project/{dest_slug}'
+                        }
+                    },
+                },
+            },
+            'links': {'html': {'href': 'https://bitbucket.org/test_project/pull-requests/2394'}},
+        }
+
+        mock_standardized_repo = MagicMock()
+        mock_standardized_repo.id = '{cccccccc-0000-0000-0000-dddddddddddd}'
+        mock_standardized_repo.full_name = f'test_project/{dest_slug}'
+        mock_standardized_repo.project.id = 'test_project'
+        mock_standardized_repos = [mock_standardized_repo]
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        http_error = requests.exceptions.HTTPError(
+            '404 Client Error: Not Found', response=mock_response
+        )
+
+        self.mock_client.get_pullrequests.return_value = [merged_pr]
+        self.mock_client.pr_diff.return_value = ""
+        self.mock_client.pr_comments.return_value = []
+        self.mock_client.pr_activity.return_value = []
+        self.mock_client.pr_commits.return_value = test_commits
+        self.mock_client.get_commit.side_effect = http_error
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        resulting_prs = list(
+            self.adapter.get_pull_requests(mock_standardized_repos, test_git_instance_info)
+        )
+
+        self.assertEqual(
+            len(resulting_prs), 1, "PR must still be ingested despite 404 on merge commit"
+        )
+        resulting_pr = resulting_prs[0]
+        self.assertEqual(resulting_pr.id, 2394)
+        self.assertTrue(resulting_pr.is_merged)
+        self.assertIsNone(
+            resulting_pr.merge_commit,
+            "merge_commit should be None when Bitbucket returns 404 for the merge commit hash",
         )
 
 
