@@ -559,8 +559,7 @@ def get_ingest_config(
 
         pull_from = _make_datetimes_timezone_aware(endpoint_git_instance_info['pull_from'])
 
-        # Older Jellyfish servers don't send this field; fall back to the jf_ingest
-        # GitConfig dataclass default by leaving it unset on the kwargs below.
+        # Check if non-default backpopulation window should be used.
         extra_kwargs = {}
         if 'backpopulation_window_days' in endpoint_git_instance_info:
             extra_kwargs['backpopulation_window_days'] = endpoint_git_instance_info[
