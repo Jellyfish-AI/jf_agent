@@ -558,6 +558,15 @@ def get_ingest_config(
                 skip_pulling_users = ADO_DEFAULT_API_URL not in base_url
 
         pull_from = _make_datetimes_timezone_aware(endpoint_git_instance_info['pull_from'])
+
+        # Older Jellyfish servers don't send this field; fall back to the jf_ingest
+        # GitConfig dataclass default by leaving it unset on the kwargs below.
+        extra_kwargs = {}
+        if 'backpopulation_window_days' in endpoint_git_instance_info:
+            extra_kwargs['backpopulation_window_days'] = endpoint_git_instance_info[
+                'backpopulation_window_days'
+            ]
+
         git_configs.append(
             JFIngestGitConfig(
                 company_slug=company_slug,
@@ -580,6 +589,7 @@ def get_ingest_config(
                 git_strip_text_content=agent_git_config.git_strip_text_content,
                 check_ghc_mannequin_user_prs=agent_git_config.github_check_mannequin_users,
                 skip_pulling_users=skip_pulling_users,
+                **extra_kwargs,
             )
         )
 
