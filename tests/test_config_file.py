@@ -44,7 +44,7 @@ def _build_ingest_config_inputs(endpoint_git_instance_info: dict):
     config.skip_ssl_verification = False
     config.run_mode_includes_send = False
     config.jira_skip_saving_data_locally = False
-    config.outdir = '/tmp/agent-output'
+    config.outdir = 'agent-output-test'
     config.jellyfish_api_base = 'https://api.jellyfish.co'
 
     creds = MagicMock()
