@@ -1,8 +1,9 @@
 import json
 import unittest
-
 from unittest import TestCase
 from unittest.mock import MagicMock
+
+import stashy.errors
 
 from jf_agent.git import bitbucket_server
 
@@ -323,6 +324,109 @@ class TestBitbucketServer(TestCase):
             input_pr['fromRef']['displayId'],
             "resulting PR body does not match input",
         )
+
+    def test_get_repos_skips_deleted_repo(self):
+        # Arrange
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_deleted_repo = MagicMock()
+        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.get.return_value = test_repos[0]
+        mock_live_repo.branches.return_value = test_branches
+        mock_live_repo.default_branch = MagicMock()
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos.list.return_value = [test_repos[0], test_repos[0]]
+        mock_project.repos.__getitem__.side_effect = [mock_deleted_repo, mock_live_repo]
+
+        # Act — should not raise despite first repo being deleted
+        result_repos = list(bitbucket_server.get_repos(mock_client, test_projects, {}, {}, False))
+
+        # Assert — deleted repo skipped, live repo still returned
+        self.assertEqual(len(result_repos), 1)
+        self.assertEqual(result_repos[0][0], mock_live_repo)
+
+    def test_get_branch_commits_skips_deleted_repo(self):
+        # Arrange
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_deleted_repo = MagicMock()
+        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.get.return_value = test_repos[0]
+        mock_live_repo.default_branch = test_branches[0]
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo}
+        mock_live_repo.commits.return_value = test_commits
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act — should not raise despite the first repo being deleted
+        result_commits = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                [mock_deleted_repo, mock_live_repo],
+                {},
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Assert — deleted repo produced nothing, live repo's commits still returned
+        self.assertEqual(len(result_commits), len(test_commits))
+
+    def test_get_pull_requests_skips_deleted_repo(self):
+        # Arrange
+        test_prs = _get_test_data('test_prs.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_deleted_repo = MagicMock()
+        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.get.return_value = test_repos[0]
+        mock_live_repo.pull_requests.all.return_value = test_prs
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo}
+        mock_live_repo.commits.return_value = test_commits
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act — should not raise despite the first repo being deleted
+        result_prs = list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [mock_deleted_repo, mock_live_repo],
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Assert — deleted repo produced nothing, live repo's PRs still returned
+        self.assertEqual(len(result_prs), len(test_prs))
 
 
 def _get_test_data(file_name):

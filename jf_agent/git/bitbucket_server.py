@@ -221,7 +221,11 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
         for repo in project.repos.list():
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
-                yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
+                try:
+                    yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
+                except stashy.errors.NotFoundException as e:
+                    logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
+                    continue
 
     logger.info('✓')
 
@@ -257,7 +261,11 @@ def get_commits_for_included_branches(
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for branch commits', i, 1):
-            repo = api_repo.get()
+            try:
+                repo = api_repo.get()
+            except stashy.errors.NotFoundException as e:
+                logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
+                continue
             if verbose:
                 logger.info(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
@@ -270,7 +278,7 @@ def get_commits_for_included_branches(
             # We are working with the BBS api object rather than a StandardizedRepository here,
             # so we can not use get_branches_for_standardized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
             branches_to_process = [_get_default_branch_name(api_repo)]
-            additional_branch_patterns = included_branches.get(api_repo.get()['name'])
+            additional_branch_patterns = included_branches.get(repo['name'])
 
             if additional_branch_patterns:
                 repo_branches = [b['displayId'] for b in api_repo.branches()]
@@ -333,7 +341,11 @@ def get_pull_requests(
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for pull requests', i, 1):
-            repo = api_repo.get()
+            try:
+                repo = api_repo.get()
+            except stashy.errors.NotFoundException as e:
+                logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
+                continue
             if verbose:
                 logger.info(f"Beginning download of PRs for repo {repo}")
             api_project = client.projects[repo['project']['key']]
@@ -369,7 +381,7 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except RetryError:
                     logger.warning(
-                        f"Could not retrieve diff data for PR {pr['id']} in repo {api_repo.get()['name']}"
+                        f"Could not retrieve diff data for PR {pr['id']} in repo {repo['name']}"
                     )
                     additions, deletions, changed_files = None, None, None
                 except ChunkedEncodingError as e:
