@@ -41,5 +41,6 @@ Initial set-up
 ```bash
 uv sync --group dev
 uv run pre-commit install
+
 ```
 
