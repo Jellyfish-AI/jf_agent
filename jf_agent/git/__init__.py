@@ -421,7 +421,9 @@ def load_and_dump_git(
     }
 
 
-def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: str):
+def pull_since_date_for_repo(
+    instance_info, org_login, repo_id, commits_or_prs: str, commit_lookback_days: int = 31
+):
     assert commits_or_prs in ('commits', 'prs')
 
     instance_pull_from_dt = pytz.utc.localize(datetime.fromisoformat(instance_info['pull_from']))
@@ -438,8 +440,8 @@ def pull_since_date_for_repo(instance_info, org_login, repo_id, commits_or_prs: 
             return instance_pull_from_dt
         else:
             if commits_or_prs == 'commits':
-                # We don't need to backpopulate the repo -- pull commits for last month
-                return pytz.utc.localize(datetime.utcnow() - timedelta(days=31))
+                # We don't need to backpopulate the repo -- pull recent commits
+                return pytz.utc.localize(datetime.utcnow() - timedelta(days=commit_lookback_days))
             else:
                 # We don't need to backpopulate the repo -- only need to pull PRs that have been updated
                 # more recently than PR with the latest update_date on the already-sent PRs

@@ -149,7 +149,11 @@ class GithubGqlAdapter(GitAdapter):
                         # Get our internal 'pull_from' value
                         pull_since_for_commits = (
                             pull_since_date_for_repo(
-                                self.server_git_instance_info, nrm_project.login, repo_id, 'commits'
+                                self.server_git_instance_info,
+                                nrm_project.login,
+                                repo_id,
+                                'commits',
+                                self.config.git_commit_lookback_days,
                             )
                             or datetime.min
                         )
@@ -209,7 +213,11 @@ class GithubGqlAdapter(GitAdapter):
             with logging_helper.log_loop_iters('repo for branch commits', i, 1):
                 pull_since = (
                     pull_since_date_for_repo(
-                        server_git_instance_info, nrm_repo.project.login, nrm_repo.id, 'commits'
+                        server_git_instance_info,
+                        nrm_repo.project.login,
+                        nrm_repo.id,
+                        'commits',
+                        self.config.git_commit_lookback_days,
                     )
                     or datetime.min
                 )

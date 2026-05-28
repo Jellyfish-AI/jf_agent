@@ -101,6 +101,7 @@ def load_and_dump(
                 config.git_strip_text_content,
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
+                config.git_commit_lookback_days,
             ),
             item_id_dict_key='hash',
         )
@@ -281,11 +282,16 @@ def get_commits_for_included_branches(
     strip_text_content,
     server_git_instance_info,
     redact_names_and_urls,
+    commit_lookback_days=31,
 ):
     for i, repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for branch commits', i, 1):
             pull_since = pull_since_date_for_repo(
-                server_git_instance_info, repo['organization']['login'], repo['id'], 'commits'
+                server_git_instance_info,
+                repo['organization']['login'],
+                repo['id'],
+                'commits',
+                commit_lookback_days,
             )
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly

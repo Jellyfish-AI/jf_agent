@@ -82,6 +82,7 @@ def load_and_dump(
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
                 config.git_verbose,
+                config.git_commit_lookback_days,
             ),
             item_id_dict_key='hash',
         )
@@ -258,6 +259,7 @@ def get_commits_for_included_branches(
     server_git_instance_info,
     redact_names_and_urls,
     verbose,
+    commit_lookback_days=31,
 ):
     for i, api_repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for branch commits', i, 1):
@@ -270,7 +272,11 @@ def get_commits_for_included_branches(
                 logger.info(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
             pull_since = pull_since_date_for_repo(
-                server_git_instance_info, repo['project']['key'], repo['id'], 'commits'
+                server_git_instance_info,
+                repo['project']['key'],
+                repo['id'],
+                'commits',
+                commit_lookback_days,
             )
 
             # Determine branches to pull commits from for this repo. If no branches are explicitly

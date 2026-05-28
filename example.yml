@@ -208,6 +208,12 @@ git:
   #     - master
   #     - develop
 
+  # The number of days to look back when pulling commit data. Commits older than
+  # this many days will not be pulled. If omitted, defaults to 31.
+  # Reducing this value can significantly speed up agent runs for repositories
+  # with large amounts of commit history.
+  commit_lookback_days: 31
+
   # Strip out long-form text content (commit messages, PR text, etc).
   strip_text_content: False
 

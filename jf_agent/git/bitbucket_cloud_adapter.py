@@ -165,7 +165,11 @@ class BitbucketCloudAdapter(GitAdapter):
         for i, repo in enumerate(standardized_repos, start=1):
             with logging_helper.log_loop_iters('repo for branch commits', i, 1):
                 pull_since = pull_since_date_for_repo(
-                    server_git_instance_info, repo.project.login, repo.id, 'commits'
+                    server_git_instance_info,
+                    repo.project.login,
+                    repo.id,
+                    'commits',
+                    self.config.git_commit_lookback_days,
                 )
 
                 for branch in get_branches_for_standardized_repo(repo, included_branches):

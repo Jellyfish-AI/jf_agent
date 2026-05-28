@@ -74,7 +74,26 @@ class TestGitConfigGeneration(TestCase):
         assert git_config.git_provider == 'ado'
         assert git_config.git_url == 'https://ado.com'
         assert git_config.git_verbose is True
+        assert git_config.git_commit_lookback_days == 31
         assert git_config.ado_api_version is None  # Default value
+
+    def test_get_git_config_from_yaml_commit_lookback_days_override(self):
+        github_yaml_content = """
+        git:
+            provider: github
+            url: https://api.github.com
+            include_projects:
+              - example-org
+            commit_lookback_days: 7
+        """
+
+        yaml_config = yaml.safe_load(github_yaml_content)
+
+        git_configs: list[GitConfig] = _get_git_config_from_yaml(yaml_config)
+
+        self.assertEqual(len(git_configs), 1)
+        git_config = git_configs[0]
+        assert git_config.git_commit_lookback_days == 7
 
     def test_get_git_config_from_yaml_ado_version_override(self):
         ado_yaml_content = """
@@ -105,6 +124,7 @@ class TestGitConfigGeneration(TestCase):
               url: https://ado.com
               verbose: true
               ado_api_version: '6.0'
+              commit_lookback_days: 14
             - provider: ado
               creds_envvar_prefix: ORG2
               instance_slug: ado-instance-2
@@ -125,6 +145,7 @@ class TestGitConfigGeneration(TestCase):
         assert config_1.git_url == 'https://ado.com'
         assert config_1.git_verbose is True
         assert config_1.ado_api_version == '6.0'
+        assert config_1.git_commit_lookback_days == 14
 
         config_2 = git_configs[1]
         assert config_2.git_instance_slug == 'ado-instance-2'
@@ -132,6 +153,7 @@ class TestGitConfigGeneration(TestCase):
         assert config_2.git_url == 'https://ado.com'
         assert config_2.git_verbose is True
         assert config_2.ado_api_version is None  # Default value
+        assert config_2.git_commit_lookback_days == 31
 
     def test_get_jf_ingest_git_auth_config(self):
         ado_yaml_content = """
