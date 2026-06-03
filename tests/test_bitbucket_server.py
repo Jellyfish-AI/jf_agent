@@ -428,6 +428,100 @@ class TestBitbucketServer(TestCase):
         # Assert — deleted repo produced nothing, live repo's PRs still returned
         self.assertEqual(len(result_prs), len(test_prs))
 
+    def test_get_branch_commits_deduplicates_across_branches(self):
+        """
+        When git_include_branches causes multiple branches to be ingested,
+        commits reachable from more than one branch should only be yielded once.
+
+        This prevents inflated commit counts in downstream analytics when branches
+        share ancestry (e.g. a feature branch that hasn't diverged from main yet).
+        """
+        # Create two branches that return the same commits (shared ancestry)
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_api_repo = MagicMock()
+        mock_api_repos = [mock_api_repo]
+
+        mock_api_repo.get.return_value = test_repos[0]
+        mock_client.projects = {'test_project_key': mock_project}
+
+        mock_api_repo.default_branch = test_branches[0]
+        mock_api_repo.branches.return_value = test_branches
+        mock_project.repos = {'test_repo_name': mock_api_repo}
+
+        # Both branches return the same commits (simulating shared ancestry)
+        mock_api_repo.commits.return_value = test_commits
+
+        test_git_instance_info = {'pull_from': '2000-07-23', 'repos_dict_v2': {}}
+
+        # Include a pattern that matches the second branch
+        result_commits = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                mock_api_repos,
+                {'test_repo_name': ['test_display_id*']},
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Each commit should appear only once despite being on multiple branches
+        result_hashes = [c['hash'] for c in result_commits]
+        self.assertEqual(len(result_hashes), len(set(result_hashes)))
+        self.assertEqual(len(result_commits), len(test_commits))
+
+    def test_get_branch_commits_dedup_preserves_first_branch(self):
+        """
+        Deduplicated commits retain the branch attribution of whichever branch
+        was processed first (the default branch).
+
+        The default branch is always processed before any git_include_branches
+        matches, so shared commits are attributed to the default branch rather
+        than an arbitrary feature branch.
+        """
+        # Verify that when a commit appears on multiple branches,
+        # it is attributed to whichever branch yielded it first
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_api_repo = MagicMock()
+        mock_api_repos = [mock_api_repo]
+
+        mock_api_repo.get.return_value = test_repos[0]
+        mock_client.projects = {'test_project_key': mock_project}
+
+        mock_api_repo.default_branch = test_branches[0]
+        mock_api_repo.branches.return_value = test_branches
+        mock_project.repos = {'test_repo_name': mock_api_repo}
+        mock_api_repo.commits.return_value = test_commits
+
+        test_git_instance_info = {'pull_from': '2000-07-23', 'repos_dict_v2': {}}
+
+        result_commits = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                mock_api_repos,
+                {'test_repo_name': ['test_display_id*']},
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Commits should be attributed to the default branch (processed first)
+        for commit in result_commits:
+            self.assertEqual(commit['branch_name'], test_branches[0]['displayId'])
+
 
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:

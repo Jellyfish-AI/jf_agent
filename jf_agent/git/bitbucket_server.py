@@ -292,6 +292,7 @@ def get_commits_for_included_branches(
                     get_matching_branches(additional_branch_patterns, repo_branches)
                 )
 
+            seen_hashes = set()
             for branch in branches_to_process:
                 try:
                     if verbose:
@@ -305,6 +306,8 @@ def get_commits_for_included_branches(
                         start=1,
                     ):
                         with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
+                            if commit['id'] in seen_hashes:
+                                continue
                             if verbose:
                                 tqdm.write(
                                     f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
@@ -317,6 +320,7 @@ def get_commits_for_included_branches(
                             if pull_since and standardized_commit['commit_date'] < pull_since:
                                 break
 
+                            seen_hashes.add(commit['id'])
                             yield standardized_commit
 
                 except stashy.errors.NotFoundException as e:
