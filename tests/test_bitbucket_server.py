@@ -456,7 +456,7 @@ class TestBitbucketServer(TestCase):
         # Both branches return the same commits (simulating shared ancestry)
         mock_api_repo.commits.return_value = test_commits
 
-        test_git_instance_info = {'pull_from': '2000-07-23', 'repos_dict_v2': {}}
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
         # Include a pattern that matches the second branch
         result_commits = list(
@@ -504,7 +504,7 @@ class TestBitbucketServer(TestCase):
         mock_project.repos = {'test_repo_name': mock_api_repo}
         mock_api_repo.commits.return_value = test_commits
 
-        test_git_instance_info = {'pull_from': '2000-07-23', 'repos_dict_v2': {}}
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
         result_commits = list(
             bitbucket_server.get_commits_for_included_branches(
