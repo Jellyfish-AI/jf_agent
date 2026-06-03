@@ -312,15 +312,15 @@ def get_commits_for_included_branches(
                                 tqdm.write(
                                     f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
                                 )
+                            seen_hashes.add(commit['id'])
                             standardized_commit = _standardize_commit(
                                 commit, repo, branch, strip_text_content, redact_names_and_urls
                             )
                             # commits are ordered newest to oldest
-                            # if this is too old, we're done with this repo
+                            # if this is too old, we're done with this branch
                             if pull_since and standardized_commit['commit_date'] < pull_since:
                                 break
 
-                            seen_hashes.add(commit['id'])
                             yield standardized_commit
 
                 except stashy.errors.NotFoundException as e:
