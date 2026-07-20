@@ -31,7 +31,7 @@ jira:
   #
   # WARNING: Moving this date forward will delete any issues older than the new date.
   # Once set, be careful when modifying this value to avoid unintended data loss.
-  earliest_issue_dt: 2025-01-01
+  earliest_issue_dt: 2026-01-01
 
   # The number of concurrent threads the agent will use for downloading issue data.
   # It's unusual, but some Jira instances can be overwhelmed by more than one or
