@@ -262,7 +262,7 @@ requires-dist = [
     { name = "click", specifier = "~=8.3.3" },
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "dateparser" },
-    { name = "jf-ingest", specifier = "==0.0.290" },
+    { name = "jf-ingest", specifier = "==0.0.295" },
     { name = "jira", specifier = "==3.10.5" },
     { name = "jsonstreams" },
     { name = "psutil" },
@@ -287,7 +287,7 @@ dev = [
 
 [[package]]
 name = "jf-ingest"
-version = "0.0.290"
+version = "0.0.295"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filemagic" },
@@ -304,9 +304,9 @@ dependencies = [
     { name = "requests-mock" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/62/8e73aabbf8d19c6731e39de2e4e8cda9a8a01ff48e4216d2a14adba4dff6/jf_ingest-0.0.290.tar.gz", hash = "sha256:7f615ba389899179d829acdee8b892d645ac93084f050ac396043fe8044efcc2", size = 336834, upload-time = "2026-05-19T15:16:14.871Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/e5/abb50ee485352af7d3393b2fc7a097b1a688cc1dca900640da5e19ffd316/jf_ingest-0.0.295.tar.gz", hash = "sha256:d2aa7c8cb1fe7d5a4cbf03586c7c5cacdc146478dbd4c0fb6777cf294a30e47d", size = 340474, upload-time = "2026-07-20T22:06:19.103Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/31/1141c1b028227b66c00f3639de399c3b02acc49e6acc5600a1b7d26ebb2b/jf_ingest-0.0.290-py3-none-any.whl", hash = "sha256:42316ea6d7de6c78fe5523960b2efdca8a020d95ad9bcecb1f9f4b7c88c86875", size = 215396, upload-time = "2026-05-19T15:16:13.218Z" },
+    { url = "https://files.pythonhosted.org/packages/55/97/e798b0a22467c13fa873e759616a80cc3d56140c0f860f136468c685e366/jf_ingest-0.0.295-py3-none-any.whl", hash = "sha256:30e0e8ce341d63247a57d410ed9e9c9d78e160b186c8c87ee3416b93faab4ea2", size = 218018, upload-time = "2026-07-20T22:06:17.679Z" },
 ]
 
 [[package]]
