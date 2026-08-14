@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 
 import pytz
@@ -419,14 +420,29 @@ def get_pull_requests(
                 merged_by = None
 
                 activites = []
-                try:
-                    activites = sorted(
-                        [a for a in api_pr.activities()], key=lambda x: x['createdDate']
-                    )
-                except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
-                    logger.info(
-                        f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
-                    )
+                for attempt in range(3):
+                    try:
+                        activites = sorted(
+                            [a for a in api_pr.activities()], key=lambda x: x['createdDate']
+                        )
+                        break
+                    except ChunkedEncodingError as e:
+                        if attempt < 2:
+                            logger.warning(
+                                f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
+                                f'retrying (attempt {attempt + 1}/3)...'
+                            )
+                            time.sleep(2 ** attempt)
+                        else:
+                            logger.info(
+                                f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]} '
+                                f'after 3 attempts. Assuming no comments, approvals, etc, and continuing...\n{e}',
+                            )
+                    except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
+                        logger.info(
+                            f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                        )
+                        break
 
                 for activity in activites:
                     if activity['action'] == 'COMMENTED':
@@ -461,27 +477,42 @@ def get_pull_requests(
                     else None
                 )
 
-                try:
-                    commits = [
-                        _standardize_commit(
-                            c,
-                            repo,
-                            pr['toRef']['displayId'],
-                            strip_text_content,
-                            redact_names_and_urls,
+                commits = []
+                for attempt in range(3):
+                    try:
+                        commits = [
+                            _standardize_commit(
+                                c,
+                                repo,
+                                pr['toRef']['displayId'],
+                                strip_text_content,
+                                redact_names_and_urls,
+                            )
+                            for c in tqdm(
+                                api_pr.commits(),
+                                f'downloading commits for PR {pr["id"]}',
+                                leave=False,
+                                unit='commits',
+                            )
+                        ]
+                        break
+                    except ChunkedEncodingError as e:
+                        if attempt < 2:
+                            logger.warning(
+                                f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
+                                f'retrying (attempt {attempt + 1}/3)...'
+                            )
+                            time.sleep(2 ** attempt)
+                        else:
+                            logger.warning(
+                                f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]} '
+                                f'after 3 attempts: {e}'
+                            )
+                    except stashy.errors.NotFoundException as e:
+                        logger.warning(
+                            f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}: {e}'
                         )
-                        for c in tqdm(
-                            api_pr.commits(),
-                            f'downloading commits for PR {pr["id"]}',
-                            leave=False,
-                            unit='commits',
-                        )
-                    ]
-                except stashy.errors.NotFoundException:
-                    logger.warning(
-                        f'WARN: For PR {pr["id"]}, caught stashy.errors.NotFoundException when attempting to fetch a commit'
-                    )
-                    commits = []
+                        break
 
                 standardized_pr = {
                     'id': pr['id'],
