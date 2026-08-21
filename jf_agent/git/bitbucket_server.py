@@ -183,18 +183,31 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
         )
     except stashy.errors.NotFoundException:
         default_branch_name = ''
+    except (RetryError, ChunkedEncodingError) as e:
+        logger.warning(
+            f'Failed to fetch default branch for repo {repo["name"]}, defaulting to blank: {e}'
+        )
+        default_branch_name = ''
 
-    branches = [
-        {
-            'name': (
-                b['displayId']
-                if not redact_names_and_urls
-                else _branch_redactor.redact_name(b['displayId'])
-            ),
-            'sha': b['latestCommit'],
-        }
-        for b in api_repo.branches()
-    ]
+    try:
+        branches = [
+            {
+                'name': (
+                    b['displayId']
+                    if not redact_names_and_urls
+                    else _branch_redactor.redact_name(b['displayId'])
+                ),
+                'sha': b['latestCommit'],
+            }
+            for b in api_repo.branches()
+        ]
+    except stashy.errors.NotFoundException:
+        branches = []
+    except (RetryError, ChunkedEncodingError) as e:
+        logger.warning(
+            f'Failed to fetch branches for repo {repo["name"]}, defaulting to blank: {e}'
+        )
+        branches = []
 
     return {
         'id': repo['id'],
@@ -432,7 +445,7 @@ def get_pull_requests(
                                 f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
                                 f'retrying (attempt {attempt + 1}/3)...'
                             )
-                            time.sleep(2 ** attempt)
+                            time.sleep(2**attempt)
                         else:
                             logger.info(
                                 f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]} '
@@ -502,7 +515,7 @@ def get_pull_requests(
                                 f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
                                 f'retrying (attempt {attempt + 1}/3)...'
                             )
-                            time.sleep(2 ** attempt)
+                            time.sleep(2**attempt)
                         else:
                             logger.warning(
                                 f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]} '
