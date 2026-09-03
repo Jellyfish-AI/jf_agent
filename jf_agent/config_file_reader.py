@@ -571,6 +571,26 @@ def get_ingest_config(
                 'backpopulation_window_days'
             ]
 
+        # Branch selection configured in Jellyfish wins per repo; repos the server says
+        # nothing about keep whatever the local config file asked for. Without this, a
+        # branch configured in Jellyfish silently has no effect on an agent pull, so
+        # commits made directly to a non-default branch are never collected.
+        included_branches_by_repo = dict(agent_git_config.git_include_branches)
+        included_branches_by_repo.update(
+            endpoint_git_instance_info.get('included_branches_by_repo') or {}
+        )
+        if 'pull_commits_for_all_branches' in endpoint_git_instance_info:
+            extra_kwargs['pull_all_commits_and_branches'] = endpoint_git_instance_info[
+                'pull_commits_for_all_branches'
+            ]
+        # This is the field that decides whether jf_ingest lists a repo's branches at all.
+        # included_branches_by_repo can only narrow the list discovery returns, never add
+        # to it, so without this a branch named in Jellyfish is never reached.
+        if 'repo_id_to_pull_all_commits_and_branches' in endpoint_git_instance_info:
+            extra_kwargs['repo_id_to_pull_all_commits_and_branches'] = endpoint_git_instance_info[
+                'repo_id_to_pull_all_commits_and_branches'
+            ]
+
         git_configs.append(
             JFIngestGitConfig(
                 company_slug=company_slug,
@@ -588,7 +608,7 @@ def get_ingest_config(
                 excluded_organizations=agent_git_config.git_exclude_projects,
                 included_repos=[str(incl_repo) for incl_repo in agent_git_config.git_include_repos],
                 excluded_repos=[str(excl_repo) for excl_repo in agent_git_config.git_exclude_repos],
-                included_branches_by_repo=agent_git_config.git_include_branches,
+                included_branches_by_repo=included_branches_by_repo,
                 git_redact_names_and_urls=agent_git_config.git_redact_names_and_urls,
                 git_strip_text_content=agent_git_config.git_strip_text_content,
                 check_ghc_mannequin_user_prs=agent_git_config.github_check_mannequin_users,
