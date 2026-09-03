@@ -327,3 +327,98 @@ class TestBackpopulationWindowDaysPassthrough(TestCase):
         self.assertEqual(mock_jf_ingest_git_config.call_count, 1)
         kwargs = mock_jf_ingest_git_config.call_args.kwargs
         self.assertNotIn('backpopulation_window_days', kwargs)
+
+
+class TestServerDeliveredBranchConfig(TestCase):
+    """
+    Branch selection sent by the server endpoint must reach JFIngestGitConfig. Server
+    values win per repo; repos the server says nothing about keep the local config.
+    """
+
+    def _run(self, endpoint_git_instance_info, local_include_branches=None):
+        config, creds, endpoint_git_instances_info = _build_ingest_config_inputs(
+            endpoint_git_instance_info=endpoint_git_instance_info
+        )
+        if local_include_branches is not None:
+            config.git_configs[0].git_include_branches = local_include_branches
+
+        with (
+            patch('jf_agent.config_file_reader.IngestionConfig'),
+            patch('jf_agent.config_file_reader.JFIngestGitConfig') as mock_git_config,
+            patch(
+                'jf_agent.config_file_reader._get_jf_ingest_git_auth_config',
+                return_value=MagicMock(),
+            ),
+            patch(
+                'jf_agent.config_file_reader.get_company_info',
+                return_value={'company_slug': 'test-co'},
+            ),
+        ):
+            get_ingest_config(
+                config=config,
+                creds=creds,
+                endpoint_jira_info={},
+                endpoint_git_instances_info=endpoint_git_instances_info,
+                jf_options={},
+            )
+        self.assertEqual(mock_git_config.call_count, 1)
+        return mock_git_config.call_args.kwargs
+
+    def test_server_branches_win_per_repo_and_local_is_preserved(self):
+        kwargs = self._run(
+            endpoint_git_instance_info={
+                'slug': 'ado-instance-1',
+                'key': 'ado-key',
+                'repos_dict_v2': {},
+                'pull_from': '2024-01-01T00:00:00',
+                'included_branches_by_repo': {'repo_one': ['release_a', 'release_b']},
+            },
+            local_include_branches={
+                'repo_one': ['stale_branch'],
+                'other_repo': ['keep_me'],
+            },
+        )
+        self.assertEqual(
+            kwargs.get('included_branches_by_repo'),
+            {'repo_one': ['release_a', 'release_b'], 'other_repo': ['keep_me']},
+        )
+
+    def test_pull_all_commits_and_branches_forwarded_when_present(self):
+        kwargs = self._run(
+            endpoint_git_instance_info={
+                'slug': 'ado-instance-1',
+                'key': 'ado-key',
+                'repos_dict_v2': {},
+                'pull_from': '2024-01-01T00:00:00',
+                'pull_commits_for_all_branches': True,
+            }
+        )
+        self.assertTrue(kwargs.get('pull_all_commits_and_branches'))
+
+    def test_per_repo_branch_discovery_forwarded_when_present(self):
+        kwargs = self._run(
+            endpoint_git_instance_info={
+                'slug': 'ado-instance-1',
+                'key': 'ado-key',
+                'repos_dict_v2': {},
+                'pull_from': '2024-01-01T00:00:00',
+                'repo_id_to_pull_all_commits_and_branches': {'123': True},
+            }
+        )
+        self.assertEqual(
+            kwargs.get('repo_id_to_pull_all_commits_and_branches'), {'123': True}
+        )
+
+    def test_older_server_payload_leaves_local_config_untouched(self):
+        kwargs = self._run(
+            endpoint_git_instance_info={
+                'slug': 'ado-instance-1',
+                'key': 'ado-key',
+                'repos_dict_v2': {},
+                'pull_from': '2024-01-01T00:00:00',
+            },
+            local_include_branches={'other_repo': ['keep_me']},
+        )
+        self.assertEqual(kwargs.get('included_branches_by_repo'), {'other_repo': ['keep_me']})
+        self.assertNotIn('pull_all_commits_and_branches', kwargs)
+        self.assertNotIn('repo_id_to_pull_all_commits_and_branches', kwargs)
