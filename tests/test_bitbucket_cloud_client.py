@@ -1,11 +1,15 @@
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from unittest import TestCase
 
 import requests_mock
 
-from jf_agent.git.bitbucket_cloud_client import BitbucketCloudClient
+from jf_agent.git.bitbucket_cloud_client import (
+    MAX_REPO_QUERY_URL_LENGTH,
+    BitbucketCloudClient,
+)
 from jf_agent.session import retry_session
 
 URI = 'https://bitbucket.testco.com'
@@ -107,3 +111,90 @@ class TestBitbucketCloudClient(TestCase):
 
             self.assertEqual([r['name'] for r in repos], ['a', 'b', 'c'])
             self.assertEqual(m.call_count, 2)
+
+
+class TestBitbucketCloudRepoAllowlistQuery(TestCase):
+    """Cover the BBQL `q` filter that narrows the repo listing to the allowlist."""
+
+    REPOS_URL = f'{URI}/2.0/repositories/test-ws'
+    UNFILTERED_URL = f'{REPOS_URL}?role=MEMBER&pagelen=100'
+
+    def setUp(self):
+        self.client = get_connection()
+
+    @staticmethod
+    def _queries(mocker):
+        return [m.qs.get('q', [None])[0] for m in mocker.request_history]
+
+    def test_allowlist_is_queried_as_a_contains_match(self):
+        """An exact match is case sensitive, so it would drop a repo the local filter keeps."""
+        with requests_mock.Mocker() as m:
+            m.register_uri(
+                'GET',
+                f'{self.UNFILTERED_URL}&q=(name~"repo-a" OR name~"repo-b")',
+                complete_qs=True,
+                json={'values': [{'uuid': '{1}', 'name': 'repo-a'}]},
+            )
+
+            repos = list(self.client.get_all_repos('test-ws', ['repo-a', 'repo-b']))
+
+        self.assertEqual([r['name'] for r in repos], ['repo-a'])
+        self.assertNotIn('name=', self._queries(m)[0])
+
+    def test_every_allowlist_entry_lands_in_a_query(self):
+        """An entry that no query carries is a repo the agent never lists and silently loses."""
+        allowlist = [f'repo-{i}-{"n" * (i % 400)}' for i in range(250)]
+        with requests_mock.Mocker() as m:
+            m.register_uri('GET', self.REPOS_URL, json={'values': []})
+
+            list(self.client.get_all_repos('test-ws', allowlist))
+
+        queried = set()
+        for request in m.request_history:
+            self.assertLessEqual(len(request.url), MAX_REPO_QUERY_URL_LENGTH)
+            queried.update(re.findall(r'name~"([^"]*)"', request.qs['q'][0]))
+
+        self.assertGreater(len(m.request_history), 1)
+        self.assertEqual(queried, set(allowlist))
+
+    def test_repo_matched_by_two_batches_is_yielded_once(self):
+        with requests_mock.Mocker() as m:
+            m.register_uri(
+                'GET',
+                self.REPOS_URL,
+                json={'values': [{'uuid': '{dupe}', 'name': 'shared'}]},
+            )
+
+            repos = list(self.client.get_all_repos('test-ws', ['shared'] * 150))
+
+        self.assertEqual([r['uuid'] for r in repos], ['{dupe}'])
+
+    def test_uuid_in_the_allowlist_lists_unfiltered(self):
+        """BBQL cannot match a uuid case insensitively, so a query would drop the repo."""
+        with requests_mock.Mocker() as m:
+            m.register_uri('GET', self.UNFILTERED_URL, complete_qs=True, json={'values': []})
+
+            list(
+                self.client.get_all_repos(
+                    'test-ws', ['repo-a', '{12345678-1234-1234-1234-123456789ABC}']
+                )
+            )
+
+        self.assertEqual(self._queries(m), [None])
+
+    def test_rejected_query_falls_back_to_the_unfiltered_listing(self):
+        """A workspace that refuses the query must still ingest every repo."""
+        with requests_mock.Mocker() as m:
+            m.register_uri('GET', self.REPOS_URL, status_code=400)
+            m.register_uri(
+                'GET',
+                self.UNFILTERED_URL,
+                complete_qs=True,
+                json={'values': [{'uuid': '{1}', 'name': 'repo-a'}]},
+            )
+
+            repos = list(self.client.get_all_repos('test-ws', ['repo-a']))
+
+        self.assertEqual([r['name'] for r in repos], ['repo-a'])
+        self.assertIsNotNone(self._queries(m)[0])
+        self.assertIsNone(self._queries(m)[-1])

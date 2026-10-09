@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -16,6 +17,21 @@ from jf_agent.git.utils import get_matching_branches
 from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 logger = logging.getLogger(__name__)
+
+# stashy's Repos.all() sends no params, so Bitbucket Server falls back to a page
+# size of 25. Ask for a full page instead: a 16,000 repo instance then costs ~16
+# requests to enumerate rather than ~640.
+REPO_PAGE_SIZE = 1000
+
+# A run point-reads each allowlist entry in each project, so the cost is
+# len(include_repos) * len(projects). Above this many reads the paged listing
+# costs fewer requests, so it wins.
+MAX_POINT_READS = 100
+
+# A point read addresses a repo by slug. Bitbucket Server derives a slug from
+# the repo name by lowercasing it and replacing each other character, so only an
+# entry that is already slug-shaped is certain to address the repo it names.
+_SLUG_SAFE_PATTERN = re.compile(r'^[a-z0-9._-]+$')
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -221,6 +237,30 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     }
 
 
+def _get_project_repos(project, project_key, include_repos, use_point_reads):
+    """Yield the raw repo dicts of one Bitbucket Server project.
+
+    With use_point_reads, each allowlist entry is fetched by name rather than
+    paging the whole project, because that then costs fewer requests. A repo
+    the project does not hold answers 404 and is skipped, as is one the agent
+    cannot read: one bad entry must not end the run.
+    """
+    if use_point_reads:
+        for repo_name in include_repos:
+            try:
+                yield project.repos[repo_name].get()
+            except stashy.errors.NotFoundException:
+                # Most entries belong to some other project, so a miss is routine.
+                logger.debug(f'Repo "{repo_name}" is not in project {project_key}, skipping')
+            except (stashy.errors.AuthenticationException, stashy.errors.GenericException) as e:
+                logger.warning(
+                    f'Could not fetch repo "{repo_name}" in project {project_key}, skipping: {e}'
+                )
+        return
+
+    yield from project.repos.paginate('', params={'limit': REPO_PAGE_SIZE})
+
+
 @logging_helper.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     logger.info(f'downloading bitbucket repositories... [!n]')
@@ -231,9 +271,19 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     if exclude_repos:
         filters.append(lambda r: r['name'].lower() not in set([r.lower() for r in exclude_repos]))
 
+    api_projects = list(api_projects)
+    # An entry that is not slug-shaped may address no repo and would drop it
+    # silently, so the whole run pages the listing instead.
+    use_point_reads = (
+        bool(include_repos)
+        and len(include_repos) * len(api_projects) <= MAX_POINT_READS
+        and all(_SLUG_SAFE_PATTERN.match(entry) for entry in include_repos)
+    )
+
     for api_project in api_projects:
-        project = client.projects[api_project['key']]
-        for repo in project.repos.list():
+        project_key = api_project['key']
+        project = client.projects[project_key]
+        for repo in _get_project_repos(project, project_key, include_repos, use_point_reads):
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
                 try:
