@@ -77,7 +77,7 @@ class BitbucketCloudAdapter(GitAdapter):
         for p in standardized_projects:
             for i, api_repo in enumerate(
                 tqdm(
-                    self.client.get_all_repos(p.id),
+                    self.client.get_all_repos(p.id, self.config.git_include_repos),
                     desc=f'downloading repos for {p.name}',
                     unit='repos',
                 )
