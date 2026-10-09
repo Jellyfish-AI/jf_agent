@@ -17,6 +17,15 @@ from jf_agent.name_redactor import NameRedactor, sanitize_text
 
 logger = logging.getLogger(__name__)
 
+# stashy's Repos.all() sends no params, so Bitbucket Server falls back to a page
+# size of 25. Ask for a full page instead: a 16,000 repo instance then costs ~16
+# requests to enumerate rather than ~640.
+REPO_PAGE_SIZE = 1000
+
+# Above this many allowlist entries, one point read per entry costs more
+# requests than paging the project, so the paged listing wins.
+MAX_REPOS_FOR_POINT_READS = 100
+
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
 _repo_redactor = NameRedactor()
@@ -221,6 +230,25 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     }
 
 
+def _get_project_repos(project, include_repos):
+    """Yield the raw repo dicts of one Bitbucket Server project.
+
+    A short allowlist is read one repo at a time, because a point read per entry
+    costs fewer requests than paging the whole project. Bitbucket Server answers
+    404 for a repo the project does not hold, and that repo is skipped. A longer
+    allowlist, or none at all, falls back to the paged listing.
+    """
+    if include_repos and len(include_repos) <= MAX_REPOS_FOR_POINT_READS:
+        for repo_name in include_repos:
+            try:
+                yield project.repos[repo_name].get()
+            except stashy.errors.NotFoundException:
+                continue
+        return
+
+    yield from project.repos.paginate('', params={'limit': REPO_PAGE_SIZE})
+
+
 @logging_helper.log_entry_exit(logger)
 def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_and_urls):
     logger.info(f'downloading bitbucket repositories... [!n]')
@@ -233,7 +261,7 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
 
     for api_project in api_projects:
         project = client.projects[api_project['key']]
-        for repo in project.repos.list():
+        for repo in _get_project_repos(project, include_repos):
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
                 try:
