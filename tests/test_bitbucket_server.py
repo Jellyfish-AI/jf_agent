@@ -429,6 +429,89 @@ class TestBitbucketServer(TestCase):
         self.assertEqual(len(result_prs), len(test_prs))
 
 
+class TestBitbucketServerRepoListing(TestCase):
+    """Cover how get_repos enumerates repos: paged listing versus per-repo point reads."""
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_repo = _get_test_data('test_repos.json')[0]
+        self.test_branches = _get_test_data('test_branches.json')
+
+        self.mock_project = MagicMock()
+        self.mock_client = MagicMock()
+        self.mock_client.projects = {'test_project_key': self.mock_project}
+
+    def _mock_repo(self, get_error=None):
+        mock_repo = MagicMock()
+        if get_error:
+            mock_repo.get.side_effect = get_error
+        else:
+            mock_repo.get.return_value = self.test_repo
+        mock_repo.branches.return_value = self.test_branches
+        return mock_repo
+
+    def _repos_by_name(self, repos_by_name):
+        self.mock_project.repos.__getitem__.side_effect = lambda name: repos_by_name[name]
+
+    def _run(self, include_repos):
+        return list(
+            bitbucket_server.get_repos(
+                self.mock_client, self.test_projects, include_repos, {}, False
+            )
+        )
+
+    def test_listing_asks_for_a_full_page(self):
+        """Bitbucket Server defaults to 25 repos per page, which is ~640 requests for 16k repos."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        self._run(include_repos={})
+
+        self.mock_project.repos.paginate.assert_called_once_with(
+            '', params={'limit': bitbucket_server.REPO_PAGE_SIZE}
+        )
+
+    def test_allowlist_too_large_for_point_reads_pages_the_listing(self):
+        """Point reads cost one request per entry per project, so a big allowlist pages instead."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        self._run(include_repos=[f'repo-{i}' for i in range(bitbucket_server.MAX_POINT_READS + 1)])
+
+        self.mock_project.repos.paginate.assert_called_once()
+
+    def test_allowlist_entry_that_is_not_a_slug_pages_the_listing(self):
+        """A point read addresses a slug, so a name that is not one would find no repo."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        repos = self._run(include_repos=['test_repo_name', 'Name With Spaces'])
+
+        self.mock_project.repos.paginate.assert_called_once()
+        self.assertEqual([r[1]['name'] for r in repos], ['test_repo_name'])
+
+    def test_point_read_skips_a_repo_it_cannot_fetch(self):
+        """Allowlist entries span projects, so a failed read is routine and must not end the run."""
+        for error in (
+            stashy.errors.NotFoundException(MagicMock()),
+            stashy.errors.AuthenticationException(MagicMock()),
+            stashy.errors.GenericException(MagicMock()),
+        ):
+            with self.subTest(error=type(error).__name__):
+                self.mock_project.reset_mock()
+                self._repos_by_name(
+                    {
+                        'other-repo': self._mock_repo(get_error=error),
+                        'test_repo_name': self._mock_repo(),
+                    }
+                )
+
+                repos = self._run(include_repos=['other-repo', 'test_repo_name'])
+
+                self.mock_project.repos.paginate.assert_not_called()
+                self.assertEqual([r[1]['name'] for r in repos], ['test_repo_name'])
+
+
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())

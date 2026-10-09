@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -26,6 +27,11 @@ REPO_PAGE_SIZE = 1000
 # len(include_repos) * len(projects). Above this many reads the paged listing
 # costs fewer requests, so it wins.
 MAX_POINT_READS = 100
+
+# A point read addresses a repo by slug. Bitbucket Server derives a slug from
+# the repo name by lowercasing it and replacing each other character, so only an
+# entry that is already slug-shaped is certain to address the repo it names.
+_SLUG_SAFE_PATTERN = re.compile(r'^[a-z0-9._-]+$')
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -266,8 +272,12 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
         filters.append(lambda r: r['name'].lower() not in set([r.lower() for r in exclude_repos]))
 
     api_projects = list(api_projects)
-    use_point_reads = bool(include_repos) and (
-        len(include_repos) * len(api_projects) <= MAX_POINT_READS
+    # An entry that is not slug-shaped may address no repo and would drop it
+    # silently, so the whole run pages the listing instead.
+    use_point_reads = (
+        bool(include_repos)
+        and len(include_repos) * len(api_projects) <= MAX_POINT_READS
+        and all(_SLUG_SAFE_PATTERN.match(entry) for entry in include_repos)
     )
 
     for api_project in api_projects:
