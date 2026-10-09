@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 # requests to enumerate rather than ~640.
 REPO_PAGE_SIZE = 1000
 
-# Above this many allowlist entries, one point read per entry costs more
-# requests than paging the project, so the paged listing wins.
-MAX_REPOS_FOR_POINT_READS = 100
+# A run point-reads each allowlist entry in each project, so the cost is
+# len(include_repos) * len(projects). Above this many reads the paged listing
+# costs fewer requests, so it wins.
+MAX_POINT_READS = 100
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -230,20 +231,25 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     }
 
 
-def _get_project_repos(project, include_repos):
+def _get_project_repos(project, project_key, include_repos, use_point_reads):
     """Yield the raw repo dicts of one Bitbucket Server project.
 
-    A short allowlist is read one repo at a time, because a point read per entry
-    costs fewer requests than paging the whole project. Bitbucket Server answers
-    404 for a repo the project does not hold, and that repo is skipped. A longer
-    allowlist, or none at all, falls back to the paged listing.
+    With use_point_reads, each allowlist entry is fetched by name rather than
+    paging the whole project, because that then costs fewer requests. A repo
+    the project does not hold answers 404 and is skipped, as is one the agent
+    cannot read: one bad entry must not end the run.
     """
-    if include_repos and len(include_repos) <= MAX_REPOS_FOR_POINT_READS:
+    if use_point_reads:
         for repo_name in include_repos:
             try:
                 yield project.repos[repo_name].get()
             except stashy.errors.NotFoundException:
-                continue
+                # Most entries belong to some other project, so a miss is routine.
+                logger.debug(f'Repo "{repo_name}" is not in project {project_key}, skipping')
+            except (stashy.errors.AuthenticationException, stashy.errors.GenericException) as e:
+                logger.warning(
+                    f'Could not fetch repo "{repo_name}" in project {project_key}, skipping: {e}'
+                )
         return
 
     yield from project.repos.paginate('', params={'limit': REPO_PAGE_SIZE})
@@ -259,9 +265,15 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
     if exclude_repos:
         filters.append(lambda r: r['name'].lower() not in set([r.lower() for r in exclude_repos]))
 
+    api_projects = list(api_projects)
+    use_point_reads = bool(include_repos) and (
+        len(include_repos) * len(api_projects) <= MAX_POINT_READS
+    )
+
     for api_project in api_projects:
-        project = client.projects[api_project['key']]
-        for repo in _get_project_repos(project, include_repos):
+        project_key = api_project['key']
+        project = client.projects[project_key]
+        for repo in _get_project_repos(project, project_key, include_repos, use_point_reads):
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
                 try:

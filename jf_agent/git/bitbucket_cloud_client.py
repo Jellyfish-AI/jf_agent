@@ -35,45 +35,55 @@ def _escape_bbql_string(value: str) -> str:
     return value.replace('\\', '\\\\').replace('"', '\\"')
 
 
-def _repo_query_clause(entry: str) -> str:
-    """Return the BBQL clause that matches one git_include_repos entry.
-
-    An entry is either a repo UUID or a repo name, because the local filter
-    accepts both. A UUID gets an exact match. A name gets the `~` (contains)
-    operator rather than `=`, which is exact and case sensitive: the local
-    filter matches case insensitively, so an exact server-side match would drop
-    repos whose casing differs from the config, with no error. A contains match
-    returns a superset, and the local filter trims it.
-    """
-    if _UUID_PATTERN.match(entry):
-        uuid = entry if entry.startswith('{') else f'{{{entry}}}'
-        return f'uuid="{_escape_bbql_string(uuid)}"'
-    return f'name~"{_escape_bbql_string(entry)}"'
-
-
 def _repo_query_url(base_url: str, clauses: List[str]) -> str:
     query = '(' + ' OR '.join(clauses) + ')'
     return f'{base_url}&q=' + quote(query, safe='')
 
 
 def _build_repo_query_urls(base_url: str, include_repos: Iterable[str]) -> List[str]:
-    """Split an allowlist into the listing URLs that cover it.
+    """Return the listing URLs that cover an allowlist, or [] to list unfiltered.
+
+    Each name becomes a `~` (contains) clause rather than `=`, which is exact
+    and case sensitive: the local filter matches case insensitively, so an
+    exact server-side match would drop repos whose casing differs from the
+    config, with no error. A contains match returns a superset instead, and the
+    local filter trims it.
 
     A batch closes when it reaches REPO_QUERY_BATCH_SIZE entries or when one
-    more clause would push the URL past MAX_REPO_QUERY_URL_LENGTH. A single
-    clause that exceeds the length cap on its own still gets its own URL,
-    because dropping it would lose the repo.
+    more clause would push the URL past MAX_REPO_QUERY_URL_LENGTH.
+
+    The result is empty when no query can match the allowlist as safely as the
+    local filter does. The caller then lists unfiltered, which is slow but
+    returns every repo. Over-matching costs requests; under-matching loses
+    customer data.
     """
+    if any(_UUID_PATTERN.match(entry) for entry in include_repos):
+        # BBQL has no case-insensitive match for a uuid, and the uuid field is
+        # not reliably queryable on this endpoint.
+        logger.info(
+            'Listing bitbucket repos unfiltered: git_include_repos holds a repo uuid, '
+            'which cannot be queried as safely as the local filter matches it'
+        )
+        return []
+
     urls = []
     batch: List[str] = []
     for entry in include_repos:
-        candidate = batch + [_repo_query_clause(entry)]
+        clause = f'name~"{_escape_bbql_string(entry)}"'
+        if len(_repo_query_url(base_url, [clause])) > MAX_REPO_QUERY_URL_LENGTH:
+            logger.info(
+                'Listing bitbucket repos unfiltered: an entry in git_include_repos is too '
+                f'long to query ({len(entry)} characters)'
+            )
+            return []
+
+        candidate = batch + [clause]
         if batch and (
             len(candidate) > REPO_QUERY_BATCH_SIZE
             or len(_repo_query_url(base_url, candidate)) > MAX_REPO_QUERY_URL_LENGTH
         ):
             urls.append(_repo_query_url(base_url, batch))
-            batch = candidate[-1:]
+            batch = [clause]
         else:
             batch = candidate
 
@@ -103,31 +113,41 @@ class BitbucketCloudClient:
         With an allowlist, the listing runs once per batch of allowlist entries
         under a BBQL `q` filter, so the server returns only candidate repos.
         That filter matches a superset of the allowlist, and the caller's own
-        filter stays the authority on what is in scope. With no allowlist, one
-        unfiltered listing runs.
+        filter stays the authority on what is in scope. With no allowlist, or
+        when no safe query covers the allowlist, one unfiltered listing runs.
         """
         # pagelen=100 is the API max (default is 10). Listing counts against the bbcloud_repos
         # rate limit, so bigger pages matter for large workspaces. The `next` URL Bitbucket
         # returns keeps pagelen and q, so they apply to every page.
         base_url = f'{self.server_base_uri}/2.0/repositories/{owner}?role=MEMBER&pagelen=100'
 
-        if not include_repos:
+        urls = _build_repo_query_urls(base_url, include_repos) if include_repos else []
+        if not urls:
             yield from self.get_all_pages(base_url, rate_limit_realm='bbcloud_repos')
             return
 
-        urls = _build_repo_query_urls(base_url, include_repos)
         logger.info(f'Listing bitbucket repos for {owner} in {len(urls)} filtered request(s)')
 
         # A contains match can return the same repo for more than one batch.
         seen_uuids = set()
-        for url in urls:
-            for repo in self.get_all_pages(url, rate_limit_realm='bbcloud_repos'):
-                uuid = repo.get('uuid')
-                if uuid is not None:
-                    if uuid in seen_uuids:
-                        continue
-                    seen_uuids.add(uuid)
-                yield repo
+        try:
+            for url in urls:
+                for repo in self.get_all_pages(url, rate_limit_realm='bbcloud_repos'):
+                    uuid = repo.get('uuid')
+                    if uuid is not None:
+                        if uuid in seen_uuids:
+                            continue
+                        seen_uuids.add(uuid)
+                    yield repo
+        except requests.exceptions.HTTPError as e:
+            # A workspace that rejects the query must still ingest. A listing the
+            # agent may not read at all fails again here and raises.
+            logger.warning(
+                f'Filtered bitbucket repo listing failed ({e}); listing {owner} unfiltered'
+            )
+            for repo in self.get_all_pages(base_url, rate_limit_realm='bbcloud_repos'):
+                if repo.get('uuid') not in seen_uuids:
+                    yield repo
 
     def get_forks(self, owner, repository_uuid):
         url = f'{self.server_base_uri}/2.0/repositories/{owner}/{repository_uuid}/forks'
