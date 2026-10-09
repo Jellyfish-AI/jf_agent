@@ -91,7 +91,7 @@ class TestBitbucketServer(TestCase):
         mock_repo_list = [mock_repo]
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos.list.return_value = mock_repo_list
+        mock_project.repos.paginate.return_value = mock_repo_list
         mock_project.repos.__getitem__.return_value = mock_repo
 
         mock_repo.get.return_value = test_repos[0]
@@ -344,7 +344,7 @@ class TestBitbucketServer(TestCase):
         mock_live_repo.default_branch = MagicMock()
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos.list.return_value = [test_repos[0], test_repos[0]]
+        mock_project.repos.paginate.return_value = [test_repos[0], test_repos[0]]
         mock_project.repos.__getitem__.side_effect = [mock_deleted_repo, mock_live_repo]
 
         # Act — should not raise despite first repo being deleted
