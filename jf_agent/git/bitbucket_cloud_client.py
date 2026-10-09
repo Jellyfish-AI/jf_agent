@@ -1,8 +1,10 @@
 import logging
+import re
 import time
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Iterable, List, Optional
+from urllib.parse import quote
 
 import requests
 from jf_ingest import logging_helper
@@ -11,6 +13,73 @@ from requests.utils import default_user_agent
 from jf_agent.ratelimit import RateLimiter, RateLimitRealmConfig
 
 logger = logging.getLogger(__name__)
+
+# One BBQL query carries at most this many allowlist entries. Each entry becomes
+# an OR clause, so a bigger batch means fewer listing requests against the
+# bbcloud_repos rate limit.
+REPO_QUERY_BATCH_SIZE = 100
+
+# Bitbucket does not publish a URL limit, so stay well under the ~8k that
+# proxies and web servers commonly enforce. Long repo names can exhaust this
+# before the batch size does, and the stricter of the two wins.
+MAX_REPO_QUERY_URL_LENGTH = 6000
+
+# A Bitbucket Cloud repo UUID, with or without the braces the API returns.
+_UUID_PATTERN = re.compile(
+    r'^\{?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}?$'
+)
+
+
+def _escape_bbql_string(value: str) -> str:
+    """Escape a value for use inside a double-quoted BBQL string literal."""
+    return value.replace('\\', '\\\\').replace('"', '\\"')
+
+
+def _repo_query_clause(entry: str) -> str:
+    """Return the BBQL clause that matches one git_include_repos entry.
+
+    An entry is either a repo UUID or a repo name, because the local filter
+    accepts both. A UUID gets an exact match. A name gets the `~` (contains)
+    operator rather than `=`, which is exact and case sensitive: the local
+    filter matches case insensitively, so an exact server-side match would drop
+    repos whose casing differs from the config, with no error. A contains match
+    returns a superset, and the local filter trims it.
+    """
+    if _UUID_PATTERN.match(entry):
+        uuid = entry if entry.startswith('{') else f'{{{entry}}}'
+        return f'uuid="{_escape_bbql_string(uuid)}"'
+    return f'name~"{_escape_bbql_string(entry)}"'
+
+
+def _repo_query_url(base_url: str, clauses: List[str]) -> str:
+    query = '(' + ' OR '.join(clauses) + ')'
+    return f'{base_url}&q=' + quote(query, safe='')
+
+
+def _build_repo_query_urls(base_url: str, include_repos: Iterable[str]) -> List[str]:
+    """Split an allowlist into the listing URLs that cover it.
+
+    A batch closes when it reaches REPO_QUERY_BATCH_SIZE entries or when one
+    more clause would push the URL past MAX_REPO_QUERY_URL_LENGTH. A single
+    clause that exceeds the length cap on its own still gets its own URL,
+    because dropping it would lose the repo.
+    """
+    urls = []
+    batch: List[str] = []
+    for entry in include_repos:
+        candidate = batch + [_repo_query_clause(entry)]
+        if batch and (
+            len(candidate) > REPO_QUERY_BATCH_SIZE
+            or len(_repo_query_url(base_url, candidate)) > MAX_REPO_QUERY_URL_LENGTH
+        ):
+            urls.append(_repo_query_url(base_url, batch))
+            batch = candidate[-1:]
+        else:
+            batch = candidate
+
+    if batch:
+        urls.append(_repo_query_url(base_url, batch))
+    return urls
 
 
 class BitbucketCloudClient:
@@ -28,12 +97,37 @@ class BitbucketCloudClient:
             {'Accept': 'application/json', 'User-Agent': f'jellyfish/1.0 ({default_user_agent()})'}
         )
 
-    def get_all_repos(self, owner):
+    def get_all_repos(self, owner, include_repos: Optional[Iterable[str]] = None):
+        """Yield the repos in the owner's workspace, deduplicated by uuid.
+
+        With an allowlist, the listing runs once per batch of allowlist entries
+        under a BBQL `q` filter, so the server returns only candidate repos.
+        That filter matches a superset of the allowlist, and the caller's own
+        filter stays the authority on what is in scope. With no allowlist, one
+        unfiltered listing runs.
+        """
         # pagelen=100 is the API max (default is 10). Listing counts against the bbcloud_repos
         # rate limit, so bigger pages matter for large workspaces. The `next` URL Bitbucket
-        # returns keeps pagelen, so it applies to every page.
-        url = f'{self.server_base_uri}/2.0/repositories/{owner}?role=MEMBER&pagelen=100'
-        return self.get_all_pages(url, rate_limit_realm='bbcloud_repos')
+        # returns keeps pagelen and q, so they apply to every page.
+        base_url = f'{self.server_base_uri}/2.0/repositories/{owner}?role=MEMBER&pagelen=100'
+
+        if not include_repos:
+            yield from self.get_all_pages(base_url, rate_limit_realm='bbcloud_repos')
+            return
+
+        urls = _build_repo_query_urls(base_url, include_repos)
+        logger.info(f'Listing bitbucket repos for {owner} in {len(urls)} filtered request(s)')
+
+        # A contains match can return the same repo for more than one batch.
+        seen_uuids = set()
+        for url in urls:
+            for repo in self.get_all_pages(url, rate_limit_realm='bbcloud_repos'):
+                uuid = repo.get('uuid')
+                if uuid is not None:
+                    if uuid in seen_uuids:
+                        continue
+                    seen_uuids.add(uuid)
+                yield repo
 
     def get_forks(self, owner, repository_uuid):
         url = f'{self.server_base_uri}/2.0/repositories/{owner}/{repository_uuid}/forks'
