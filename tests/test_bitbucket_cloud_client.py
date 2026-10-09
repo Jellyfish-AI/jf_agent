@@ -90,3 +90,20 @@ class TestBitbucketCloudClient(TestCase):
             self.assertGreaterEqual(
                 len(json_response[0]), 19
             )  # number of elements in test repo json (2023-05-26)
+
+    def test_get_all_repos_requests_max_page_size_and_follows_next(self):
+        first_page = f'{URI}/2.0/repositories/test-ws?role=MEMBER&pagelen=100'
+        second_page = f'{URI}/2.0/repositories/test-ws?role=MEMBER&pagelen=100&page=2'
+        with requests_mock.Mocker() as m:
+            m.register_uri(
+                'GET',
+                first_page,
+                complete_qs=True,
+                json={'values': [{'name': 'a'}, {'name': 'b'}], 'next': second_page},
+            )
+            m.register_uri('GET', second_page, complete_qs=True, json={'values': [{'name': 'c'}]})
+
+            repos = list(self.bitbucket_connection.get_all_repos('test-ws'))
+
+            self.assertEqual([r['name'] for r in repos], ['a', 'b', 'c'])
+            self.assertEqual(m.call_count, 2)

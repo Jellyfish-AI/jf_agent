@@ -29,7 +29,10 @@ class BitbucketCloudClient:
         )
 
     def get_all_repos(self, owner):
-        url = f'{self.server_base_uri}/2.0/repositories/{owner}?role=MEMBER'
+        # pagelen=100 is the API max (default is 10). Listing counts against the bbcloud_repos
+        # rate limit, so bigger pages matter for large workspaces. The `next` URL Bitbucket
+        # returns keeps pagelen, so it applies to every page.
+        url = f'{self.server_base_uri}/2.0/repositories/{owner}?role=MEMBER&pagelen=100'
         return self.get_all_pages(url, rate_limit_realm='bbcloud_repos')
 
     def get_forks(self, owner, repository_uuid):
