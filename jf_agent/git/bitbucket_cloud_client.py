@@ -57,6 +57,7 @@ def _build_repo_query_urls(base_url: str, include_repos: Iterable[str]) -> List[
     returns every repo. Over-matching costs requests; under-matching loses
     customer data.
     """
+    include_repos = list(include_repos)  # Read twice below, so never a generator.
     if any(_UUID_PATTERN.match(entry) for entry in include_repos):
         # BBQL has no case-insensitive match for a uuid, and the uuid field is
         # not reliably queryable on this endpoint.
