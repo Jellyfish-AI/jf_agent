@@ -4,6 +4,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 import stashy.errors
+from requests.exceptions import RetryError
 
 from jf_agent.git import bitbucket_server
 
@@ -427,6 +428,52 @@ class TestBitbucketServer(TestCase):
 
         # Assert — deleted repo produced nothing, live repo's PRs still returned
         self.assertEqual(len(result_prs), len(test_prs))
+
+    def test_get_pull_requests_continues_when_pr_commits_exhaust_retries(self):
+        # Arrange
+        test_prs = _get_test_data('test_prs.json')
+        test_prs.append({**test_prs[0], 'id': test_prs[0]['id'] + 1})
+        test_repos = _get_test_data('test_repos.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_api_repo = MagicMock()
+
+        mock_api_repo.get.return_value = test_repos[0]
+        mock_api_repo.pull_requests.all.return_value = test_prs
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_api_repo}
+
+        # The first PR's commits endpoint keeps returning 500s until the session's
+        # retries are exhausted; every other PR's commits succeed.
+        failing_pr_id = test_prs[0]['id']
+        api_prs = {}
+        for pr in test_prs:
+            api_pr = MagicMock()
+            if pr['id'] == failing_pr_id:
+                api_pr.commits.side_effect = RetryError('too many 500 error responses')
+            else:
+                api_pr.commits.return_value = test_commits
+            api_prs[pr['id']] = api_pr
+        mock_api_repo.pull_requests.__getitem__.side_effect = lambda pr_id: api_prs[pr_id]
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act — should not raise despite the commits fetch failing
+        result_prs = list(
+            bitbucket_server.get_pull_requests(
+                mock_client, [mock_api_repo], False, test_git_instance_info, False, False
+            )
+        )
+
+        # Assert — the failing PR is still emitted without commits, and the rest keep theirs
+        self.assertEqual(len(result_prs), len(test_prs))
+        results_by_id = {pr['id']: pr for pr in result_prs}
+        self.assertEqual(results_by_id[failing_pr_id]['commits'], [])
+        for pr_id, result_pr in results_by_id.items():
+            if pr_id != failing_pr_id:
+                self.assertEqual(len(result_pr['commits']), len(test_commits))
 
 
 def _get_test_data(file_name):
