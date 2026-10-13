@@ -429,7 +429,16 @@ class TestBitbucketServer(TestCase):
         # Assert — deleted repo produced nothing, live repo's PRs still returned
         self.assertEqual(len(result_prs), len(test_prs))
 
-    def test_get_pull_requests_continues_when_pr_commits_exhaust_retries(self):
+    def test_get_pull_requests_continues_when_pr_commits_fail(self):
+        commit_errors = {
+            'retries exhausted': RetryError('too many 500 error responses'),
+            'authentication': stashy.errors.AuthenticationException(MagicMock(status_code=401)),
+        }
+        for error_name, commit_error in commit_errors.items():
+            with self.subTest(error=error_name):
+                self._assert_pr_emitted_without_commits_on_error(commit_error)
+
+    def _assert_pr_emitted_without_commits_on_error(self, commit_error):
         # Arrange
         test_prs = _get_test_data('test_prs.json')
         test_prs.append({**test_prs[0], 'id': test_prs[0]['id'] + 1})
@@ -445,14 +454,13 @@ class TestBitbucketServer(TestCase):
         mock_client.projects = {'test_project_key': mock_project}
         mock_project.repos = {'test_repo_name': mock_api_repo}
 
-        # The first PR's commits endpoint keeps returning 500s until the session's
-        # retries are exhausted; every other PR's commits succeed.
+        # The first PR's commits endpoint fails; every other PR's commits succeed.
         failing_pr_id = test_prs[0]['id']
         api_prs = {}
         for pr in test_prs:
             api_pr = MagicMock()
             if pr['id'] == failing_pr_id:
-                api_pr.commits.side_effect = RetryError('too many 500 error responses')
+                api_pr.commits.side_effect = commit_error
             else:
                 api_pr.commits.return_value = test_commits
             api_prs[pr['id']] = api_pr
