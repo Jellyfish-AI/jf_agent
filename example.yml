@@ -232,6 +232,15 @@ git:
   # Cloud).
   verbose: False
 
+  # Skip the per-pull-request diff and commit API calls (Bitbucket Server only).
+  # This removes roughly half of the requests a run makes, which makes a large
+  # backfill much faster. It is meant for backfills only: turn it off once the
+  # backfill finishes, then run again to fill in the skipped data.
+  # While it is on, pull requests are loaded without `additions`, `deletions`,
+  # `changed_files` and `commits`. Comments, approvals and merge data are not
+  # affected.
+  defer_pr_enrichment: False
+
   # This field sets the API Version needed when working with ADO. This is different from
   # the server version, like 2022.1. 2022.1, for example, maps to server version 7.1
   # If this is left omitted than the default ado_api_version of '7.0' will be used.
