@@ -95,7 +95,7 @@ class TestBitbucketServer(TestCase):
         mock_project.repos.__getitem__.return_value = mock_repo
 
         mock_repo.get.return_value = test_repos[0]
-        mock_repo.branches.return_value = test_branches
+        mock_repo.paginate.return_value = test_branches
         mock_repo.default_branch = mock_branch
 
         default_branch_name = 'default_branch_name'
@@ -340,7 +340,7 @@ class TestBitbucketServer(TestCase):
 
         mock_live_repo = MagicMock()
         mock_live_repo.get.return_value = test_repos[0]
-        mock_live_repo.branches.return_value = test_branches
+        mock_live_repo.paginate.return_value = test_branches
         mock_live_repo.default_branch = MagicMock()
 
         mock_client.projects = {'test_project_key': mock_project}
@@ -502,7 +502,7 @@ class TestBitbucketServerRepoListing(TestCase):
             mock_repo.get.side_effect = get_error
         else:
             mock_repo.get.return_value = self.test_repo
-        mock_repo.branches.return_value = self.test_branches
+        mock_repo.paginate.return_value = self.test_branches
         return mock_repo
 
     def _repos_by_name(self, repos_by_name):
@@ -570,6 +570,81 @@ class TestBitbucketServerRepoListing(TestCase):
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
+
+
+class _RecordingRepo:
+    """A Bitbucket Server repo that records how it was read.
+
+    MagicMock cannot see a plain attribute read, and the request count is the
+    thing under test here, so these two reads are counted explicitly.
+    """
+
+    def __init__(self, repo, branches):
+        self._repo = repo
+        self._branches = branches
+        self.default_branch_reads = 0
+        self.paginate_calls = []
+        self.unpaginated_branches_calls = 0
+
+    def get(self):
+        return self._repo
+
+    @property
+    def default_branch(self):
+        self.default_branch_reads += 1
+        return {'displayId': 'main'}
+
+    def branches(self, *args, **kwargs):
+        # stashy's own helper, which sends no limit. Present so that falling
+        # back to it fails the assertion below rather than an AttributeError.
+        self.unpaginated_branches_calls += 1
+        return self._branches
+
+    def paginate(self, resource_url, params=None):
+        self.paginate_calls.append((resource_url, params))
+        return self._branches
+
+
+class TestBitbucketServerRepoRequestCount(TestCase):
+    """Each extra read here is paid once per repo, so a 16,000 repo instance
+    pays for it 16,000 times."""
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_repos = _get_test_data('test_repos.json')
+        self.test_branches = _get_test_data('test_branches.json')
+        self.api_repo = _RecordingRepo(self.test_repos[0], self.test_branches)
+
+    def _standardize(self):
+        return bitbucket_server._standardize_repo(self.test_projects[0], self.api_repo, False)
+
+    def test_default_branch_is_read_once(self):
+        # default_branch is an uncached property, so a second read is a second
+        # request for an answer already held.
+        self._standardize()
+
+        self.assertEqual(self.api_repo.default_branch_reads, 1)
+
+    def test_branches_are_requested_a_full_page_at_a_time(self):
+        # stashy's branches() sends no limit, so Bitbucket Server pages at 25.
+        self._standardize()
+
+        self.assertEqual(
+            self.api_repo.paginate_calls,
+            [('/branches', {'limit': bitbucket_server.BRANCH_PAGE_SIZE})],
+        )
+
+    def test_the_standardized_repo_is_unchanged(self):
+        # The reads above are fewer, but what they produce must not change.
+        result = self._standardize()
+
+        self.assertEqual(result['id'], self.test_repos[0]['id'])
+        self.assertEqual(result['name'], self.test_repos[0]['name'])
+        self.assertEqual(result['default_branch_name'], 'main')
+        self.assertEqual(
+            [b['name'] for b in result['branches']],
+            [b['displayId'] for b in self.test_branches],
+        )
 
 
 if __name__ == "__main__":

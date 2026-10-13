@@ -28,6 +28,9 @@ REPO_PAGE_SIZE = 1000
 # costs fewer requests, so it wins.
 MAX_POINT_READS = 100
 
+# stashy's branches() sends no limit either, so branch listing also pages at 25.
+BRANCH_PAGE_SIZE = 1000
+
 # A point read addresses a repo by slug. Bitbucket Server derives a slug from
 # the repo name by lowercasing it and replacing each other character, so only an
 # entry that is already slug-shaped is certain to address the repo it names.
@@ -187,6 +190,9 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
 
 
 def _standardize_repo(api_project, api_repo, redact_names_and_urls):
+    # This also serves as a liveness check: a repo deleted between the listing
+    # and here answers 404, and get_repos skips it. The 404s raised below are
+    # swallowed, so dropping this read would write a blank repo record instead.
     repo = api_repo.get()
 
     name = (
@@ -194,9 +200,10 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
     )
     url = repo['links']['self'][0]['href'] if not redact_names_and_urls else None
     try:
-        default_branch_name = (
-            api_repo.default_branch['displayId'] if api_repo.default_branch else ''
-        )
+        # default_branch is an uncached property, so each access issues its own
+        # request. Read it once rather than twice.
+        default_branch = api_repo.default_branch
+        default_branch_name = default_branch['displayId'] if default_branch else ''
     except stashy.errors.NotFoundException:
         default_branch_name = ''
     except (RetryError, ChunkedEncodingError) as e:
@@ -215,7 +222,7 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
                 ),
                 'sha': b['latestCommit'],
             }
-            for b in api_repo.branches()
+            for b in api_repo.paginate('/branches', params={'limit': BRANCH_PAGE_SIZE})
         ]
     except stashy.errors.NotFoundException:
         branches = []
