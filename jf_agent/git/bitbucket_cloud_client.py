@@ -140,9 +140,11 @@ class BitbucketCloudClient:
                             continue
                         seen_uuids.add(uuid)
                     yield repo
-        except requests.exceptions.HTTPError as e:
-            # A workspace that rejects the query must still ingest. A listing the
-            # agent may not read at all fails again here and raises.
+        except requests.exceptions.RequestException as e:
+            # A workspace that rejects the query must still ingest. HTTPError alone
+            # is not enough: the retrying session turns a 5xx into a RetryError,
+            # which is a sibling of HTTPError, not a subclass. A listing the agent
+            # may not read at all fails again here and raises.
             logger.warning(
                 f'Filtered bitbucket repo listing failed ({e}); listing {owner} unfiltered'
             )

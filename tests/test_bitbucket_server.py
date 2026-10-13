@@ -804,6 +804,105 @@ class _RecordingRepo:
         return self._branches
 
 
+class TestBitbucketServerOnePrDoesNotCostTheRepo(TestCase):
+    """A failure fetching one PR's subresources must cost only that PR.
+
+    #476 closed this for the commits fetch. The diff and activities fetches had
+    the same gap: a 401 matched none of their handlers, reached the repo-level
+    guard, and skipped every PR left in the repo.
+    """
+
+    def setUp(self):
+        self.test_prs = _get_test_data('test_prs.json')
+        self.test_prs.append({**self.test_prs[0], 'id': self.test_prs[0]['id'] + 1})
+        self.test_repos = _get_test_data('test_repos.json')
+        self.git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+    def _run_with_failing(self, attr, exc):
+        """Make `attr` raise `exc` on the FIRST PR only, and run the PR phase."""
+        failing_id = self.test_prs[0]['id']
+        api_prs = {}
+        for pr in self.test_prs:
+            api_pr = MagicMock()
+            if pr['id'] == failing_id:
+                getattr(api_pr, attr).side_effect = exc
+            api_prs[pr['id']] = api_pr
+
+        mock_api_repo = MagicMock()
+        mock_api_repo.pull_requests.all.return_value = self.test_prs
+        mock_api_repo.pull_requests.__getitem__.side_effect = lambda pr_id: api_prs[pr_id]
+
+        mock_client = MagicMock()
+        mock_client.projects = {'test_project_key': MagicMock()}
+        mock_client.projects['test_project_key'].repos = {'test_repo_name': mock_api_repo}
+
+        return list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [bitbucket_server.ApiRepo(mock_api_repo, self.test_repos[0])],
+                False,
+                self.git_instance_info,
+                False,
+                False,
+            )
+        )
+
+    def test_a_401_on_the_diff_fetch_costs_only_that_pr(self):
+        result = self._run_with_failing('diff', stashy.errors.AuthenticationException(MagicMock()))
+
+        # Both PRs survive -- the one that failed is still emitted, without its
+        # diff fields, and the one queued behind it is not lost.
+        self.assertEqual(len(result), len(self.test_prs))
+        self.assertIsNone(result[0]['additions'])
+        self.assertIsNone(result[0]['deletions'])
+        self.assertIsNone(result[0]['changed_files'])
+
+    def test_a_401_on_the_activities_fetch_costs_only_that_pr(self):
+        result = self._run_with_failing(
+            'activities', stashy.errors.AuthenticationException(MagicMock())
+        )
+
+        self.assertEqual(len(result), len(self.test_prs))
+        self.assertEqual(result[0]['comments'], [])
+        self.assertEqual(result[0]['approvals'], [])
+
+
+class TestBitbucketServerPointReadDoesNotAbortDiscovery(TestCase):
+    def test_a_transport_error_on_a_point_read_skips_only_that_entry(self):
+        # get_repos guards the yield, not the iterator, so anything escaping
+        # _get_project_repos ends discovery for every project still queued.
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+
+        good = MagicMock()
+        good.get.return_value = test_repos[0]
+        good.paginate.return_value = test_branches
+        good.default_branch = MagicMock()
+
+        bad = MagicMock()
+        bad.get.side_effect = RetryError('too many retries')
+
+        mock_project = MagicMock()
+        mock_project.repos.__getitem__.side_effect = lambda name: {
+            'bad_repo': bad,
+            'test_repo_name': good,
+        }[name]
+
+        mock_client = MagicMock()
+        mock_client.projects = {'test_project_key': mock_project}
+
+        # Both entries are slug-shaped and the list is small, so this takes the
+        # point-read path.
+        result = list(
+            bitbucket_server.get_repos(
+                mock_client, test_projects, ['bad_repo', 'test_repo_name'], {}, False
+            )
+        )
+
+        self.assertEqual([r[1]['name'] for r in result], ['test_repo_name'])
+
+
 class TestBitbucketServerExcludedReposAreNotFetched(TestCase):
     """An excluded repo must cost zero per-repo requests.
 

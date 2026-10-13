@@ -291,7 +291,9 @@ def _get_project_repos(project, project_key, include_repos, use_point_reads):
             except stashy.errors.NotFoundException:
                 # Most entries belong to some other project, so a miss is routine.
                 logger.debug(f'Repo "{repo_name}" is not in project {project_key}, skipping')
-            except (stashy.errors.AuthenticationException, stashy.errors.GenericException) as e:
+            except _REPO_LEVEL_API_ERRORS as e:
+                # get_repos only guards the yield, so anything escaping here ends
+                # repo discovery for every project still queued.
                 logger.warning(
                     f'Could not fetch repo "{repo_name}" in project {project_key}, skipping: {e}'
                 )
@@ -547,6 +549,14 @@ def _pull_requests_for_repo(
                 f'Error retrieving diff data for PR {pr["id"]} in repo {repo["name"]}.  Skipping that PR...',
             )
             additions, deletions, changed_files = None, None, None
+        except _REPO_LEVEL_API_ERRORS as e:
+            # Notably a 401, which matches none of the handlers above. Unhandled it
+            # reaches the repo-level guard and costs every PR left in this repo.
+            logger.warning(
+                f'WARN: {type(e).__name__} retrieving diff data for PR {pr["id"]} in repo '
+                f'{repo["name"]}, continuing without it: {e}'
+            )
+            additions, deletions, changed_files = None, None, None
         else:
             additions, deletions, changed_files = 0, 0, 0
 
@@ -584,6 +594,14 @@ def _pull_requests_for_repo(
             except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
                 logger.info(
                     f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                )
+                break
+            except _REPO_LEVEL_API_ERRORS as e:
+                # Same gap as the diff fetch above: a 401 here would skip the rest
+                # of the repo rather than just this PR's comments and approvals.
+                logger.warning(
+                    f'WARN: {type(e).__name__} retrieving activity data for PR {pr["id"]} in '
+                    f'repo {repo["name"]}, assuming no comments or approvals: {e}'
                 )
                 break
 
