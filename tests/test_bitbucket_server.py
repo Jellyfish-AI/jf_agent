@@ -325,6 +325,57 @@ class TestBitbucketServer(TestCase):
             "resulting PR body does not match input",
         )
 
+    def test_deferred_enrichment_makes_no_diff_or_commits_request(self):
+        # Arrange
+        mock_client, mock_api_repos, mock_api_pr = _mock_repo_with_prs()
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act
+        result_prs = list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                mock_api_repos,
+                False,
+                test_git_instance_info,
+                False,
+                False,
+                defer_pr_enrichment=True,
+            )
+        )
+
+        # Assert — PRs must still come through, or the call assertions below prove nothing
+        self.assertTrue(result_prs, "deferred enrichment should still yield PRs")
+        mock_api_pr.diff.assert_not_called()
+        mock_api_pr.commits.assert_not_called()
+        # Activities carry merge_date, merged_by, comments and approvals, so they are
+        # never deferred.
+        self.assertEqual(mock_api_pr.activities.call_count, len(result_prs))
+        # An enriched PR carries counts of 0, so the sizes must read as unknown rather
+        # than reach Jellyfish as a PR that changed nothing.
+        result_pr = result_prs[0]
+        self.assertIsNone(result_pr['additions'], "deferred PR should carry no addition count")
+        self.assertIsNone(result_pr['deletions'], "deferred PR should carry no deletion count")
+        self.assertIsNone(
+            result_pr['changed_files'], "deferred PR should carry no changed file count"
+        )
+
+    def test_default_run_fetches_pr_diffs_and_commits(self):
+        # Arrange
+        mock_client, mock_api_repos, mock_api_pr = _mock_repo_with_prs()
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act — no deferral argument, so this is what an existing customer runs
+        result_prs = list(
+            bitbucket_server.get_pull_requests(
+                mock_client, mock_api_repos, False, test_git_instance_info, False, False
+            )
+        )
+
+        # Assert
+        self.assertTrue(result_prs, "default run should yield PRs")
+        self.assertEqual(mock_api_pr.diff.call_count, len(result_prs))
+        self.assertEqual(mock_api_pr.commits.call_count, len(result_prs))
+
     def test_get_repos_skips_deleted_repo(self):
         # Arrange
         test_projects = _get_test_data('test_projects.json')
@@ -432,6 +483,28 @@ class TestBitbucketServer(TestCase):
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
+
+
+def _mock_repo_with_prs():
+    """Build the mocks get_pull_requests needs, plus the api_pr it enriches each PR through."""
+    test_prs = _get_test_data('test_prs.json')
+    test_repos = _get_test_data('test_repos.json')
+
+    mock_client = MagicMock()
+    mock_project = MagicMock()
+    mock_api_repo = MagicMock()
+
+    mock_api_repo.get.return_value = test_repos[0]
+    mock_api_repo.pull_requests.all.return_value = test_prs
+
+    mock_client.projects = {'test_project_key': mock_project}
+    mock_project.repos = {'test_repo_name': mock_api_repo}
+
+    # A MagicMock returns the same child for every subscript, so this is the api_pr
+    # that get_pull_requests reaches for each PR in the list.
+    mock_api_pr = mock_api_repo.pull_requests[test_prs[0]['id']]
+
+    return mock_client, [mock_api_repo], mock_api_pr
 
 
 if __name__ == "__main__":
