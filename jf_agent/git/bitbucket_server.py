@@ -105,6 +105,7 @@ def load_and_dump(
                 endpoint_git_instance_info,
                 config.git_redact_names_and_urls,
                 config.git_verbose,
+                config.git_defer_pr_enrichment,
             ),
             item_id_dict_key='id',
         )
@@ -357,8 +358,29 @@ def _standardize_pr_repo(repo, redact_names_and_urls):
 
 
 def get_pull_requests(
-    client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
+    client,
+    api_repos,
+    strip_text_content,
+    server_git_instance_info,
+    redact_names_and_urls,
+    verbose,
+    defer_pr_enrichment=False,
 ):
+    """Yield standardized pull requests for each repo.
+
+    With `defer_pr_enrichment` set, the per-PR diff and commits requests are not
+    made, so `additions`, `deletions` and `changed_files` are None and `commits`
+    is empty. Activities are still fetched, so comments, approvals and merge data
+    remain complete.
+    """
+    # A later run does not revisit these PRs, so leaving the flag on quietly costs
+    # the customer the skipped fields for good.
+    if defer_pr_enrichment:
+        logger.warning(
+            'defer_pr_enrichment is on: pull request diffs and commits will not be fetched. '
+            'Turn it off once the backfill is done.'
+        )
+
     for i, api_repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for pull requests', i, 1):
             try:
@@ -393,39 +415,43 @@ def get_pull_requests(
 
                 api_pr = api_repo.pull_requests[pr['id']]
 
-                try:
-                    pr_diffs = api_pr.diff().diffs
-                except TypeError:
-                    additions, deletions, changed_files = None, None, None
-                except stashy.errors.NotFoundException:
-                    additions, deletions, changed_files = None, None, None
-                except RetryError:
-                    logger.warning(
-                        f"Could not retrieve diff data for PR {pr['id']} in repo {repo['name']}"
-                    )
-                    additions, deletions, changed_files = None, None, None
-                except ChunkedEncodingError as e:
-                    logger.warning(
-                        f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}, error: {e}. Skipping.'
-                    )
-                    skipped_prs += 1
-                    continue
-                except stashy.errors.GenericException:
-                    logger.info(
-                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
-                    )
+                # Deferring skips the per-PR diff request; the size fields stay unknown.
+                if defer_pr_enrichment:
                     additions, deletions, changed_files = None, None, None
                 else:
-                    additions, deletions, changed_files = 0, 0, 0
+                    try:
+                        pr_diffs = api_pr.diff().diffs
+                    except TypeError:
+                        additions, deletions, changed_files = None, None, None
+                    except stashy.errors.NotFoundException:
+                        additions, deletions, changed_files = None, None, None
+                    except RetryError:
+                        logger.warning(
+                            f"Could not retrieve diff data for PR {pr['id']} in repo {repo['name']}"
+                        )
+                        additions, deletions, changed_files = None, None, None
+                    except ChunkedEncodingError as e:
+                        logger.warning(
+                            f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}, error: {e}. Skipping.'
+                        )
+                        skipped_prs += 1
+                        continue
+                    except stashy.errors.GenericException:
+                        logger.info(
+                            f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
+                        )
+                        additions, deletions, changed_files = None, None, None
+                    else:
+                        additions, deletions, changed_files = 0, 0, 0
 
-                    for pr_diff in pr_diffs:
-                        changed_files += 1
-                        for hunk in pr_diff.hunks:
-                            for segment in hunk['segments']:
-                                if segment['type'] == 'ADDED':
-                                    additions += len(segment['lines'])
-                                if segment['type'] == 'REMOVED':
-                                    deletions += len(segment['lines'])
+                        for pr_diff in pr_diffs:
+                            changed_files += 1
+                            for hunk in pr_diff.hunks:
+                                for segment in hunk['segments']:
+                                    if segment['type'] == 'ADDED':
+                                        additions += len(segment['lines'])
+                                    if segment['type'] == 'REMOVED':
+                                        deletions += len(segment['lines'])
 
                 comments = []
                 approvals = []
@@ -491,41 +517,43 @@ def get_pull_requests(
                 )
 
                 commits = []
-                for attempt in range(3):
-                    try:
-                        commits = [
-                            _standardize_commit(
-                                c,
-                                repo,
-                                pr['toRef']['displayId'],
-                                strip_text_content,
-                                redact_names_and_urls,
-                            )
-                            for c in tqdm(
-                                api_pr.commits(),
-                                f'downloading commits for PR {pr["id"]}',
-                                leave=False,
-                                unit='commits',
-                            )
-                        ]
-                        break
-                    except ChunkedEncodingError as e:
-                        if attempt < 2:
+                # Deferring skips the per-PR commits request; commits stay empty.
+                if not defer_pr_enrichment:
+                    for attempt in range(3):
+                        try:
+                            commits = [
+                                _standardize_commit(
+                                    c,
+                                    repo,
+                                    pr['toRef']['displayId'],
+                                    strip_text_content,
+                                    redact_names_and_urls,
+                                )
+                                for c in tqdm(
+                                    api_pr.commits(),
+                                    f'downloading commits for PR {pr["id"]}',
+                                    leave=False,
+                                    unit='commits',
+                                )
+                            ]
+                            break
+                        except ChunkedEncodingError as e:
+                            if attempt < 2:
+                                logger.warning(
+                                    f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
+                                    f'retrying (attempt {attempt + 1}/3)...'
+                                )
+                                time.sleep(2**attempt)
+                            else:
+                                logger.warning(
+                                    f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]} '
+                                    f'after 3 attempts: {e}'
+                                )
+                        except stashy.errors.NotFoundException as e:
                             logger.warning(
-                                f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
-                                f'retrying (attempt {attempt + 1}/3)...'
+                                f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}: {e}'
                             )
-                            time.sleep(2**attempt)
-                        else:
-                            logger.warning(
-                                f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]} '
-                                f'after 3 attempts: {e}'
-                            )
-                    except stashy.errors.NotFoundException as e:
-                        logger.warning(
-                            f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}: {e}'
-                        )
-                        break
+                            break
 
                 standardized_pr = {
                     'id': pr['id'],

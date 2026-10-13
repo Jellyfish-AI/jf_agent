@@ -49,6 +49,8 @@ class GitConfig:
     git_exclude_bbcloud_projects: List
     git_commit_lookback_days: int = 31
     github_check_mannequin_users: bool = False
+    # Bitbucket Server only
+    git_defer_pr_enrichment: bool = False
     # For ADO only
     ado_api_version: Optional[str] = None
 
@@ -723,6 +725,7 @@ def _get_git_config(git_config, git_provider_override=None, multiple=False) -> G
         gitlab_per_page_override=git_config.get('gitlab_per_page_override', None),
         git_verbose=git_config.get('verbose', False),
         git_commit_lookback_days=git_config.get('commit_lookback_days', 31),
+        git_defer_pr_enrichment=git_config.get('defer_pr_enrichment', False),
         creds_envvar_prefix=creds_envvar_prefix,
         gitlab_keep_base_url=git_config.get('keep_base_url', False),
         # ADO only
