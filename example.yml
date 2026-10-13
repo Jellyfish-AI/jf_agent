@@ -232,13 +232,17 @@ git:
   # Cloud).
   verbose: False
 
-  # Skip the per-pull-request diff and commit API calls (Bitbucket Server only).
-  # This removes roughly half of the requests a run makes, which makes a large
-  # backfill much faster. It is meant for backfills only: turn it off once the
-  # backfill finishes, then run again to fill in the skipped data.
-  # While it is on, pull requests are loaded without `additions`, `deletions`,
-  # `changed_files` and `commits`. Comments, approvals and merge data are not
-  # affected.
+  # Skip the per-pull-request diff and commit API calls (Bitbucket Server only;
+  # every other provider ignores this setting). This removes roughly half of the
+  # requests a run makes, which makes a large backfill much faster.
+  # Pull requests loaded while this is on arrive without `additions`, `deletions`,
+  # `changed_files` and `commits`. Comments, approvals and merge data are
+  # unaffected.
+  # Turning it off later does not refill what was skipped. Once a repo is
+  # backpopulated the agent only pulls pull requests updated since the last run,
+  # so the skipped pull requests are never visited again. Ask Jellyfish to reset
+  # the repo's backpopulation state if you need that data later.
+  # Only turn this on for a backfill, and agree it with Jellyfish first.
   defer_pr_enrichment: False
 
   # This field sets the API Version needed when working with ADO. This is different from

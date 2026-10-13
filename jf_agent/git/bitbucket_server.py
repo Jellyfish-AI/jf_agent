@@ -373,6 +373,14 @@ def get_pull_requests(
     is empty. Activities are still fetched, so comments, approvals and merge data
     remain complete.
     """
+    # A later run does not revisit these PRs, so leaving the flag on quietly costs
+    # the customer the skipped fields for good.
+    if defer_pr_enrichment:
+        logger.warning(
+            'defer_pr_enrichment is on: pull request diffs and commits will not be fetched. '
+            'Turn it off once the backfill is done.'
+        )
+
     for i, api_repo in enumerate(api_repos, start=1):
         with logging_helper.log_loop_iters('repo for pull requests', i, 1):
             try:
