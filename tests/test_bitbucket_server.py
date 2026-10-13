@@ -804,6 +804,75 @@ class _RecordingRepo:
         return self._branches
 
 
+class TestBitbucketServerExcludedReposAreNotFetched(TestCase):
+    """An excluded repo must cost zero per-repo requests.
+
+    The filter runs before _standardize_repo, so a repo that fails it is never
+    asked for its default branch or its branches. These pin that ordering.
+    """
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_branches = _get_test_data('test_branches.json')
+        base = _get_test_data('test_repos.json')[0]
+        self.wanted = {**base, 'name': 'wanted_repo'}
+        self.unwanted = {**base, 'name': 'unwanted_repo', 'id': 999}
+
+    def _run(self, include_repos=None, exclude_repos=None):
+        wanted_api = _RecordingRepo(self.wanted, self.test_branches)
+        unwanted_api = _RecordingRepo(self.unwanted, self.test_branches)
+        by_name = {'wanted_repo': wanted_api, 'unwanted_repo': unwanted_api}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_client.projects = {'test_project_key': mock_project}
+        # Both repos come back from the listing; only one should be fetched.
+        mock_project.repos.paginate.return_value = [self.wanted, self.unwanted]
+        mock_project.repos.__getitem__.side_effect = lambda name: by_name[name]
+
+        result = list(
+            bitbucket_server.get_repos(
+                mock_client,
+                self.test_projects,
+                include_repos or {},
+                exclude_repos or {},
+                False,
+            )
+        )
+        return result, wanted_api, unwanted_api
+
+    def test_a_repo_outside_include_repos_is_never_fetched(self):
+        # 'Wanted_Repo' is not slug-shaped, so the run pages the listing rather
+        # than point-reading. That is the path where the filter has to do the
+        # work: both repos come back and only one may be fetched.
+        result, wanted_api, unwanted_api = self._run(include_repos=['Wanted_Repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+        self.assertEqual(unwanted_api.get_calls, 0)
+        # and the included one really was fetched, so the assertions above mean
+        # something
+        self.assertEqual(wanted_api.default_branch_reads, 1)
+
+    def test_a_small_allowlist_never_even_lists_the_other_repos(self):
+        # With a slug-shaped allowlist small enough to point-read, an excluded
+        # repo is not just unfetched, it is never listed.
+        result, wanted_api, unwanted_api = self._run(include_repos=['wanted_repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+
+    def test_a_repo_in_exclude_repos_is_never_fetched(self):
+        result, _, unwanted_api = self._run(exclude_repos=['unwanted_repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+        self.assertEqual(unwanted_api.get_calls, 0)
+
+
 class TestBitbucketServerRepoRequestCount(TestCase):
     """Each extra read here is paid once per repo, so a 16,000 repo instance
     pays for it 16,000 times."""
