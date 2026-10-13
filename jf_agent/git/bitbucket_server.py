@@ -358,7 +358,10 @@ def get_commits_for_included_branches(
             additional_branch_patterns = included_branches.get(repo['name'])
 
             if additional_branch_patterns:
-                repo_branches = [b['displayId'] for b in api_repo.branches()]
+                repo_branches = [
+                    b['displayId']
+                    for b in api_repo.paginate('/branches', params={'limit': BRANCH_PAGE_SIZE})
+                ]
                 branches_to_process.extend(
                     get_matching_branches(additional_branch_patterns, repo_branches)
                 )
@@ -647,6 +650,9 @@ def get_pull_requests(
 
 def _get_default_branch_name(api_repo):
     try:
-        return api_repo.default_branch['displayId'] if api_repo.default_branch else ''
+        # default_branch is an uncached property, so each access issues its own
+        # request. Read it once rather than twice.
+        default_branch = api_repo.default_branch
+        return default_branch['displayId'] if default_branch else ''
     except stashy.errors.NotFoundException:
         return ''

@@ -634,6 +634,13 @@ class TestBitbucketServerRepoRequestCount(TestCase):
             [('/branches', {'limit': bitbucket_server.BRANCH_PAGE_SIZE})],
         )
 
+    def test_the_commits_phase_also_reads_default_branch_once(self):
+        # _get_default_branch_name is called once per repo by the commits phase
+        # and carried the same double read, so the saving here is the same size.
+        bitbucket_server._get_default_branch_name(self.api_repo)
+
+        self.assertEqual(self.api_repo.default_branch_reads, 1)
+
     def test_the_standardized_repo_is_unchanged(self):
         # The reads above are fewer, but what they produce must not change.
         result = self._standardize()
