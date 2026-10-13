@@ -2,6 +2,7 @@ import logging
 import re
 import time
 from datetime import datetime
+from typing import Any, NamedTuple
 
 import pytz
 import stashy
@@ -35,6 +36,18 @@ BRANCH_PAGE_SIZE = 1000
 # the repo name by lowercasing it and replacing each other character, so only an
 # entry that is already slug-shaped is certain to address the repo it names.
 _SLUG_SAFE_PATTERN = re.compile(r'^[a-z0-9._-]+$')
+
+
+class ApiRepo(NamedTuple):
+    """A Bitbucket Server repo as the phases need it.
+
+    `resource` makes requests, `data` is the object the listing already
+    returned. Carrying both means no phase has to refetch a repo it has.
+    """
+
+    resource: Any
+    data: dict
+
 
 _branch_redactor = NameRedactor(preserve_names=['master', 'develop'])
 _project_redactor = NameRedactor()
@@ -189,16 +202,15 @@ def get_projects(client, include_projects, exclude_projects, redact_names_and_ur
     return projects
 
 
-def _standardize_repo(api_project, api_repo, redact_names_and_urls):
-    # This also serves as a liveness check: a repo deleted between the listing
-    # and here answers 404, and get_repos skips it. The 404s raised below are
-    # swallowed, so dropping this read would write a blank repo record instead.
-    repo = api_repo.get()
+def _standardize_repo(api_project, api_repo, redact_names_and_urls, repo):
+    # `repo` is the object the listing already returned. Refetching it here cost
+    # one request per repo and told us only what we were already holding.
 
     name = (
         repo['name'] if not redact_names_and_urls else _project_redactor.redact_name(repo['name'])
     )
     url = repo['links']['self'][0]['href'] if not redact_names_and_urls else None
+    default_branch_missing = False
     try:
         # default_branch is an uncached property, so each access issues its own
         # request. Read it once rather than twice.
@@ -206,6 +218,7 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
         default_branch_name = default_branch['displayId'] if default_branch else ''
     except stashy.errors.NotFoundException:
         default_branch_name = ''
+        default_branch_missing = True
     except (RetryError, ChunkedEncodingError) as e:
         logger.warning(
             f'Failed to fetch default branch for repo {repo["name"]}, defaulting to blank: {e}'
@@ -226,6 +239,12 @@ def _standardize_repo(api_project, api_repo, redact_names_and_urls):
         ]
     except stashy.errors.NotFoundException:
         branches = []
+        if default_branch_missing:
+            # Both branch endpoints answered 404, so the repo is gone rather
+            # than merely empty -- an empty but live repo answers 200 with no
+            # values here. get_repos skips it, as it did back when the refetch
+            # above was the thing that noticed.
+            raise
     except (RetryError, ChunkedEncodingError) as e:
         logger.warning(
             f'Failed to fetch branches for repo {repo["name"]}, defaulting to blank: {e}'
@@ -294,7 +313,10 @@ def get_repos(client, api_projects, include_repos, exclude_repos, redact_names_a
             if all(filt(repo) for filt in filters):
                 api_repo = project.repos[repo['name']]
                 try:
-                    yield api_repo, _standardize_repo(api_project, api_repo, redact_names_and_urls)
+                    yield (
+                        ApiRepo(api_repo, repo),
+                        _standardize_repo(api_project, api_repo, redact_names_and_urls, repo),
+                    )
                 except stashy.errors.NotFoundException as e:
                     logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
                     continue
@@ -332,13 +354,9 @@ def get_commits_for_included_branches(
     verbose,
     commit_lookback_days=31,
 ):
-    for i, api_repo in enumerate(api_repos, start=1):
+    for i, entry in enumerate(api_repos, start=1):
+        api_repo, repo = entry.resource, entry.data
         with logging_helper.log_loop_iters('repo for branch commits', i, 1):
-            try:
-                repo = api_repo.get()
-            except stashy.errors.NotFoundException as e:
-                logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
-                continue
             if verbose:
                 logger.info(f"Beginning download of commits for repo {repo}")
             api_project = client.projects[repo['project']['key']]
@@ -416,16 +434,27 @@ def _standardize_pr_repo(repo, redact_names_and_urls):
     return normal_repo
 
 
+def _pull_requests_or_skip(api_repo, repo):
+    """Yield a repo's pull requests, or nothing if the repo has gone away.
+
+    pull_requests.all() pages lazily, so a repo deleted mid-run raises on its
+    first page rather than when it is called. Unhandled that would end the whole
+    PR download, so it is caught here and costs only the repo it happened to.
+    """
+    try:
+        yield from api_repo.pull_requests.all(state='ALL', order='NEWEST')
+    except stashy.errors.NotFoundException as e:
+        logger.warning(
+            f'WARN: Got NotFoundException listing PRs for repo {repo["name"]}, skipping: {e}'
+        )
+
+
 def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
 ):
-    for i, api_repo in enumerate(api_repos, start=1):
+    for i, entry in enumerate(api_repos, start=1):
+        repo = entry.data
         with logging_helper.log_loop_iters('repo for pull requests', i, 1):
-            try:
-                repo = api_repo.get()
-            except stashy.errors.NotFoundException as e:
-                logger.warning(f'WARN: Got NotFoundException fetching repo, skipping: {e}')
-                continue
             if verbose:
                 logger.info(f"Beginning download of PRs for repo {repo}")
             api_project = client.projects[repo['project']['key']]
@@ -439,7 +468,7 @@ def get_pull_requests(
             skipped_prs = 0
 
             for pr in tqdm(
-                api_repo.pull_requests.all(state='ALL', order='NEWEST'),
+                _pull_requests_or_skip(api_repo, repo),
                 desc=f'downloading PRs for {repo["name"]}',
                 unit='prs',
             ):
@@ -466,13 +495,13 @@ def get_pull_requests(
                     additions, deletions, changed_files = None, None, None
                 except ChunkedEncodingError as e:
                     logger.warning(
-                        f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}, error: {e}. Skipping.'
+                        f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {repo["name"]}, error: {e}. Skipping.'
                     )
                     skipped_prs += 1
                     continue
                 except stashy.errors.GenericException:
                     logger.info(
-                        f'Error retrieving diff data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Skipping that PR...',
+                        f'Error retrieving diff data for PR {pr["id"]} in repo {repo["name"]}.  Skipping that PR...',
                     )
                     additions, deletions, changed_files = None, None, None
                 else:
@@ -502,18 +531,18 @@ def get_pull_requests(
                     except ChunkedEncodingError as e:
                         if attempt < 2:
                             logger.warning(
-                                f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
+                                f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {repo["name"]}, '
                                 f'retrying (attempt {attempt + 1}/3)...'
                             )
                             time.sleep(2**attempt)
                         else:
                             logger.info(
-                                f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]} '
+                                f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]} '
                                 f'after 3 attempts. Assuming no comments, approvals, etc, and continuing...\n{e}',
                             )
                     except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
                         logger.info(
-                            f'Error retrieving activity data for PR {pr["id"]} in repo {api_repo.get()["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                            f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
                         )
                         break
 
@@ -572,18 +601,18 @@ def get_pull_requests(
                     except ChunkedEncodingError as e:
                         if attempt < 2:
                             logger.warning(
-                                f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}, '
+                                f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {repo["name"]}, '
                                 f'retrying (attempt {attempt + 1}/3)...'
                             )
                             time.sleep(2**attempt)
                         else:
                             logger.warning(
-                                f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]} '
+                                f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]} '
                                 f'after 3 attempts: {e}'
                             )
                     except stashy.errors.NotFoundException as e:
                         logger.warning(
-                            f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}: {e}'
+                            f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}: {e}'
                         )
                         break
                     except (
