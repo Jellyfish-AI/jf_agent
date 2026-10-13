@@ -526,6 +526,21 @@ def get_pull_requests(
                             f'Error fetching commits for PR {pr["id"]} in repo {api_repo.get()["name"]}: {e}'
                         )
                         break
+                    except (
+                        stashy.errors.GenericException,
+                        stashy.errors.AuthenticationException,
+                        RetryError,
+                        MaxRetryError,
+                    ) as e:
+                        # Very large PRs can make Bitbucket Server return 500s while paging
+                        # commits, and some PRs can return 401s; skip this PR's commits
+                        # rather than failing the whole download. Use repo['name']
+                        # rather than api_repo.get() so logging doesn't hit the server again.
+                        logger.warning(
+                            f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}. '
+                            f'Continuing without commits for this PR...\n{e}'
+                        )
+                        break
 
                 standardized_pr = {
                     'id': pr['id'],
