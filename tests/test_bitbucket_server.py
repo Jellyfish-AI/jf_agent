@@ -1,7 +1,7 @@
 import json
 import unittest
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 import stashy.errors
 from requests.exceptions import RetryError
@@ -88,14 +88,13 @@ class TestBitbucketServer(TestCase):
         mock_project = MagicMock()
         mock_repo = MagicMock()
         mock_branch = MagicMock()
-        mock_repo_list = [mock_repo]
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos.list.return_value = mock_repo_list
+        # The listing returns whole repo objects, which is what the code now uses.
+        mock_project.repos.paginate.return_value = [test_repos[0]]
         mock_project.repos.__getitem__.return_value = mock_repo
 
-        mock_repo.get.return_value = test_repos[0]
-        mock_repo.branches.return_value = test_branches
+        mock_repo.paginate.return_value = test_branches
         mock_repo.default_branch = mock_branch
 
         default_branch_name = 'default_branch_name'
@@ -109,8 +108,16 @@ class TestBitbucketServer(TestCase):
             len(result_repos), len(test_repos), f"repo size should be {len(test_repos)}"
         )
         self.assertEqual(
-            result_repos[0][0], mock_repo, "resulting tuple should have input mock as first element"
+            result_repos[0][0].resource,
+            mock_repo,
+            "resulting tuple should have input mock as first element",
         )
+        self.assertEqual(
+            result_repos[0][0].data,
+            test_repos[0],
+            "the listing's own repo object should be carried forward",
+        )
+        mock_repo.get.assert_not_called()
 
         # get_repos returns a list of (api_object, standardized_project). Use the standardized version for verification.
         result_repo = result_repos[0][1]
@@ -166,9 +173,8 @@ class TestBitbucketServer(TestCase):
         mock_client = MagicMock()
         mock_project = MagicMock()
         mock_api_repo = MagicMock()
-        mock_api_repos = [mock_api_repo]
+        mock_api_repos = [bitbucket_server.ApiRepo(mock_api_repo, test_repos[0])]
 
-        mock_api_repo.get.return_value = test_repos[0]
         mock_client.projects = {'test_project_key': mock_project}
 
         mock_api_repo.default_branch = test_branches[0]
@@ -262,9 +268,8 @@ class TestBitbucketServer(TestCase):
         mock_client = MagicMock()
         mock_project = MagicMock()
         mock_api_repo = MagicMock()
-        mock_api_repos = [mock_api_repo]
+        mock_api_repos = [bitbucket_server.ApiRepo(mock_api_repo, test_repos[0])]
 
-        mock_api_repo.get.return_value = test_repos[0]
         mock_api_repo.pull_requests.all.return_value = test_prs
 
         mock_client.projects = {'test_project_key': mock_project}
@@ -327,7 +332,9 @@ class TestBitbucketServer(TestCase):
         )
 
     def test_get_repos_skips_deleted_repo(self):
-        # Arrange
+        # A repo deleted between the listing and here answers 404 on both branch
+        # endpoints. An empty but live repo answers 404 only on the default
+        # branch, so both together are what tell the two apart.
         test_projects = _get_test_data('test_projects.json')
         test_repos = _get_test_data('test_repos.json')
         test_branches = _get_test_data('test_branches.json')
@@ -335,52 +342,77 @@ class TestBitbucketServer(TestCase):
         mock_client = MagicMock()
         mock_project = MagicMock()
 
-        mock_deleted_repo = MagicMock()
-        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
-
         mock_live_repo = MagicMock()
-        mock_live_repo.get.return_value = test_repos[0]
-        mock_live_repo.branches.return_value = test_branches
+        mock_live_repo.paginate.return_value = test_branches
         mock_live_repo.default_branch = MagicMock()
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos.list.return_value = [test_repos[0], test_repos[0]]
-        mock_project.repos.__getitem__.side_effect = [mock_deleted_repo, mock_live_repo]
+        mock_project.repos.paginate.return_value = [test_repos[0], test_repos[0]]
+        mock_project.repos.__getitem__.side_effect = [_DeletedRepo(), mock_live_repo]
 
-        # Act — should not raise despite first repo being deleted
+        # Act -- should not raise despite first repo being deleted
         result_repos = list(bitbucket_server.get_repos(mock_client, test_projects, {}, {}, False))
 
-        # Assert — deleted repo skipped, live repo still returned
+        # Assert -- deleted repo skipped, live repo still returned
         self.assertEqual(len(result_repos), 1)
-        self.assertEqual(result_repos[0][0], mock_live_repo)
+        self.assertEqual(result_repos[0][0].resource, mock_live_repo)
+
+    def test_get_repos_keeps_an_empty_repo(self):
+        # Only the default branch 404s, so the repo is live but empty and must
+        # still be returned rather than silently dropped.
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos.paginate.return_value = [test_repos[0]]
+        mock_project.repos.__getitem__.return_value = _EmptyRepo()
+
+        result_repos = list(bitbucket_server.get_repos(mock_client, test_projects, {}, {}, False))
+
+        self.assertEqual(len(result_repos), 1)
+        self.assertEqual(result_repos[0][1]['default_branch_name'], '')
+        self.assertEqual(result_repos[0][1]['branches'], [])
 
     def test_get_branch_commits_skips_deleted_repo(self):
-        # Arrange
+        # A repo deleted mid-run now shows up as a 404 from the commits fetch
+        # itself rather than from a refetch of the repo, and must not stop the
+        # run or lose the repos after it.
+        test_projects = _get_test_data('test_projects.json')
         test_repos = _get_test_data('test_repos.json')
         test_branches = _get_test_data('test_branches.json')
         test_commits = _get_test_data('test_commits.json')
+
+        deleted_repo = {**test_repos[0], 'name': 'deleted_repo_name', 'id': 999}
 
         mock_client = MagicMock()
         mock_project = MagicMock()
 
         mock_deleted_repo = MagicMock()
-        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
+        mock_deleted_repo.default_branch = test_branches[0]
+        mock_deleted_repo.commits.side_effect = stashy.errors.NotFoundException(MagicMock())
 
         mock_live_repo = MagicMock()
-        mock_live_repo.get.return_value = test_repos[0]
         mock_live_repo.default_branch = test_branches[0]
+        mock_live_repo.commits.return_value = test_commits
 
         mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos = {'test_repo_name': mock_live_repo}
-        mock_live_repo.commits.return_value = test_commits
+        mock_project.repos = {
+            'test_repo_name': mock_live_repo,
+            'deleted_repo_name': mock_deleted_repo,
+        }
 
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
-        # Act — should not raise despite the first repo being deleted
-        result_commits = list(
+        # Act -- should not raise despite the first repo being deleted
+        result = list(
             bitbucket_server.get_commits_for_included_branches(
                 mock_client,
-                [mock_deleted_repo, mock_live_repo],
+                [
+                    bitbucket_server.ApiRepo(mock_deleted_repo, deleted_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
                 {},
                 False,
                 test_git_instance_info,
@@ -389,36 +421,49 @@ class TestBitbucketServer(TestCase):
             )
         )
 
-        # Assert — deleted repo produced nothing, live repo's commits still returned
-        self.assertEqual(len(result_commits), len(test_commits))
+        # Assert -- the live repo's commits still come through
+        self.assertEqual(len(result), len(test_commits))
 
-    def test_get_pull_requests_skips_deleted_repo(self):
-        # Arrange
-        test_prs = _get_test_data('test_prs.json')
+    def test_get_branch_commits_survives_repo_deleted_while_listing_branches(self):
+        # With included_branches set, the commits phase lists a repo's branches.
+        # A repo deleted by then must cost only itself, not every repo after it.
+        test_projects = _get_test_data('test_projects.json')
         test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
         test_commits = _get_test_data('test_commits.json')
+
+        deleted_repo = {**test_repos[0], 'name': 'deleted_repo_name', 'id': 999}
 
         mock_client = MagicMock()
         mock_project = MagicMock()
 
         mock_deleted_repo = MagicMock()
-        mock_deleted_repo.get.side_effect = stashy.errors.NotFoundException(MagicMock())
+        mock_deleted_repo.default_branch = test_branches[0]
+        mock_deleted_repo.paginate.side_effect = stashy.errors.NotFoundException(MagicMock())
 
         mock_live_repo = MagicMock()
-        mock_live_repo.get.return_value = test_repos[0]
-        mock_live_repo.pull_requests.all.return_value = test_prs
-
-        mock_client.projects = {'test_project_key': mock_project}
-        mock_project.repos = {'test_repo_name': mock_live_repo}
+        mock_live_repo.default_branch = test_branches[0]
+        mock_live_repo.paginate.return_value = test_branches
         mock_live_repo.commits.return_value = test_commits
 
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {
+            'test_repo_name': mock_live_repo,
+            'deleted_repo_name': mock_deleted_repo,
+        }
+
+        included_branches = {'deleted_repo_name': ['*'], 'test_repo_name': ['*']}
         test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
 
-        # Act — should not raise despite the first repo being deleted
-        result_prs = list(
-            bitbucket_server.get_pull_requests(
+        # Act -- must not raise
+        result = list(
+            bitbucket_server.get_commits_for_included_branches(
                 mock_client,
-                [mock_deleted_repo, mock_live_repo],
+                [
+                    bitbucket_server.ApiRepo(mock_deleted_repo, deleted_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                included_branches,
                 False,
                 test_git_instance_info,
                 False,
@@ -426,8 +471,137 @@ class TestBitbucketServer(TestCase):
             )
         )
 
-        # Assert — deleted repo produced nothing, live repo's PRs still returned
-        self.assertEqual(len(result_prs), len(test_prs))
+        # Assert -- the live repo after it still produced commits
+        self.assertTrue(len(result) > 0)
+
+    def test_get_pull_requests_survives_an_auth_error_mid_run(self):
+        # A real DTCC run died here: a 401 partway through ended the PR phase
+        # with 1,015 of 4,209 repos still unfetched, and still reported success.
+        test_repos = _get_test_data('test_repos.json')
+        test_prs = _get_test_data('test_prs.json')
+
+        bad_repo = {**test_repos[0], 'name': 'bad_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_bad_repo = MagicMock()
+        mock_bad_repo.pull_requests.all.side_effect = stashy.errors.AuthenticationException(
+            MagicMock()
+        )
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.pull_requests.all.return_value = test_prs
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo, 'bad_repo_name': mock_bad_repo}
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act -- must not raise, and must not lose the repo queued behind it
+        result = list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_bad_repo, bad_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        self.assertEqual(len(result), len(test_prs))
+
+    def test_get_commits_survives_an_auth_error_mid_run(self):
+        # Same guarantee for the commits phase.
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        bad_repo = {**test_repos[0], 'name': 'bad_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_bad_repo = MagicMock()
+        type(mock_bad_repo).default_branch = PropertyMock(
+            side_effect=stashy.errors.AuthenticationException(MagicMock())
+        )
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.default_branch = test_branches[0]
+        mock_live_repo.commits.return_value = test_commits
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo, 'bad_repo_name': mock_bad_repo}
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        result = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_bad_repo, bad_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                {},
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        self.assertEqual(len(result), len(test_commits))
+
+    def test_get_pull_requests_skips_deleted_repo(self):
+        # pull_requests.all() pages lazily, so a deleted repo raises on its
+        # first page. Unhandled that would end the whole PR download.
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_prs = _get_test_data('test_prs.json')
+
+        deleted_repo = {**test_repos[0], 'name': 'deleted_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_deleted_repo = MagicMock()
+        mock_deleted_repo.pull_requests.all.side_effect = stashy.errors.NotFoundException(
+            MagicMock()
+        )
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.pull_requests.all.return_value = test_prs
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {
+            'test_repo_name': mock_live_repo,
+            'deleted_repo_name': mock_deleted_repo,
+        }
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act -- should not raise despite the first repo being deleted
+        result = list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_deleted_repo, deleted_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Assert -- the live repo's PRs still come through
+        self.assertEqual(len(result), len(test_prs))
 
     def test_get_pull_requests_continues_when_pr_commits_fail(self):
         commit_errors = {
@@ -449,7 +623,8 @@ class TestBitbucketServer(TestCase):
         mock_project = MagicMock()
         mock_api_repo = MagicMock()
 
-        mock_api_repo.get.return_value = test_repos[0]
+        mock_api_repos = [bitbucket_server.ApiRepo(mock_api_repo, test_repos[0])]
+
         mock_api_repo.pull_requests.all.return_value = test_prs
         mock_client.projects = {'test_project_key': mock_project}
         mock_project.repos = {'test_repo_name': mock_api_repo}
@@ -471,7 +646,7 @@ class TestBitbucketServer(TestCase):
         # Act — should not raise despite the commits fetch failing
         result_prs = list(
             bitbucket_server.get_pull_requests(
-                mock_client, [mock_api_repo], False, test_git_instance_info, False, False
+                mock_client, mock_api_repos, False, test_git_instance_info, False, False
             )
         )
 
@@ -484,9 +659,375 @@ class TestBitbucketServer(TestCase):
                 self.assertEqual(len(result_pr['commits']), len(test_commits))
 
 
+class TestBitbucketServerRepoListing(TestCase):
+    """Cover how get_repos enumerates repos: paged listing versus per-repo point reads."""
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_repo = _get_test_data('test_repos.json')[0]
+        self.test_branches = _get_test_data('test_branches.json')
+
+        self.mock_project = MagicMock()
+        self.mock_client = MagicMock()
+        self.mock_client.projects = {'test_project_key': self.mock_project}
+
+    def _mock_repo(self, get_error=None):
+        mock_repo = MagicMock()
+        if get_error:
+            mock_repo.get.side_effect = get_error
+        else:
+            mock_repo.get.return_value = self.test_repo
+        mock_repo.paginate.return_value = self.test_branches
+        return mock_repo
+
+    def _repos_by_name(self, repos_by_name):
+        self.mock_project.repos.__getitem__.side_effect = lambda name: repos_by_name[name]
+
+    def _run(self, include_repos):
+        return list(
+            bitbucket_server.get_repos(
+                self.mock_client, self.test_projects, include_repos, {}, False
+            )
+        )
+
+    def test_listing_asks_for_a_full_page(self):
+        """Bitbucket Server defaults to 25 repos per page, which is ~640 requests for 16k repos."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        self._run(include_repos={})
+
+        self.mock_project.repos.paginate.assert_called_once_with(
+            '', params={'limit': bitbucket_server.REPO_PAGE_SIZE}
+        )
+
+    def test_allowlist_too_large_for_point_reads_pages_the_listing(self):
+        """Point reads cost one request per entry per project, so a big allowlist pages instead."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        self._run(include_repos=[f'repo-{i}' for i in range(bitbucket_server.MAX_POINT_READS + 1)])
+
+        self.mock_project.repos.paginate.assert_called_once()
+
+    def test_allowlist_entry_that_is_not_a_slug_pages_the_listing(self):
+        """A point read addresses a slug, so a name that is not one would find no repo."""
+        self.mock_project.repos.paginate.return_value = [self.test_repo]
+        self.mock_project.repos.__getitem__.return_value = self._mock_repo()
+
+        repos = self._run(include_repos=['test_repo_name', 'Name With Spaces'])
+
+        self.mock_project.repos.paginate.assert_called_once()
+        self.assertEqual([r[1]['name'] for r in repos], ['test_repo_name'])
+
+    def test_point_read_skips_a_repo_it_cannot_fetch(self):
+        """Allowlist entries span projects, so a failed read is routine and must not end the run."""
+        for error in (
+            stashy.errors.NotFoundException(MagicMock()),
+            stashy.errors.AuthenticationException(MagicMock()),
+            stashy.errors.GenericException(MagicMock()),
+        ):
+            with self.subTest(error=type(error).__name__):
+                self.mock_project.reset_mock()
+                self._repos_by_name(
+                    {
+                        'other-repo': self._mock_repo(get_error=error),
+                        'test_repo_name': self._mock_repo(),
+                    }
+                )
+
+                repos = self._run(include_repos=['other-repo', 'test_repo_name'])
+
+                self.mock_project.repos.paginate.assert_not_called()
+                self.assertEqual([r[1]['name'] for r in repos], ['test_repo_name'])
+
+
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
         return json.loads(f.read())
+
+
+class _DeletedRepo:
+    """A repo that has gone away: every branch endpoint answers 404."""
+
+    @property
+    def default_branch(self):
+        raise stashy.errors.NotFoundException(MagicMock())
+
+    def paginate(self, *args, **kwargs):
+        raise stashy.errors.NotFoundException(MagicMock())
+
+
+class _EmptyRepo:
+    """A live repo with no commits: no default branch, but branches lists fine."""
+
+    @property
+    def default_branch(self):
+        raise stashy.errors.NotFoundException(MagicMock())
+
+    def paginate(self, *args, **kwargs):
+        return []
+
+
+class _RecordingRepo:
+    """A Bitbucket Server repo that records how it was read.
+
+    MagicMock cannot see a plain attribute read, and the request count is the
+    thing under test here, so these two reads are counted explicitly.
+    """
+
+    def __init__(self, repo, branches):
+        self._repo = repo
+        self._branches = branches
+        self.default_branch_reads = 0
+        self.paginate_calls = []
+        self.unpaginated_branches_calls = 0
+        self.get_calls = 0
+
+    def get(self):
+        self.get_calls += 1
+        return self._repo
+
+    @property
+    def default_branch(self):
+        self.default_branch_reads += 1
+        return {'displayId': 'main'}
+
+    def branches(self, *args, **kwargs):
+        # stashy's own helper, which sends no limit. Present so that falling
+        # back to it fails the assertion below rather than an AttributeError.
+        self.unpaginated_branches_calls += 1
+        return self._branches
+
+    def paginate(self, resource_url, params=None):
+        self.paginate_calls.append((resource_url, params))
+        return self._branches
+
+
+class TestBitbucketServerOnePrDoesNotCostTheRepo(TestCase):
+    """A failure fetching one PR's subresources must cost only that PR.
+
+    #476 closed this for the commits fetch. The diff and activities fetches had
+    the same gap: a 401 matched none of their handlers, reached the repo-level
+    guard, and skipped every PR left in the repo.
+    """
+
+    def setUp(self):
+        self.test_prs = _get_test_data('test_prs.json')
+        self.test_prs.append({**self.test_prs[0], 'id': self.test_prs[0]['id'] + 1})
+        self.test_repos = _get_test_data('test_repos.json')
+        self.git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+    def _run_with_failing(self, attr, exc):
+        """Make `attr` raise `exc` on the FIRST PR only, and run the PR phase."""
+        failing_id = self.test_prs[0]['id']
+        api_prs = {}
+        for pr in self.test_prs:
+            api_pr = MagicMock()
+            if pr['id'] == failing_id:
+                getattr(api_pr, attr).side_effect = exc
+            api_prs[pr['id']] = api_pr
+
+        mock_api_repo = MagicMock()
+        mock_api_repo.pull_requests.all.return_value = self.test_prs
+        mock_api_repo.pull_requests.__getitem__.side_effect = lambda pr_id: api_prs[pr_id]
+
+        mock_client = MagicMock()
+        mock_client.projects = {'test_project_key': MagicMock()}
+        mock_client.projects['test_project_key'].repos = {'test_repo_name': mock_api_repo}
+
+        return list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [bitbucket_server.ApiRepo(mock_api_repo, self.test_repos[0])],
+                False,
+                self.git_instance_info,
+                False,
+                False,
+            )
+        )
+
+    def test_a_401_on_the_diff_fetch_costs_only_that_pr(self):
+        result = self._run_with_failing('diff', stashy.errors.AuthenticationException(MagicMock()))
+
+        # Both PRs survive -- the one that failed is still emitted, without its
+        # diff fields, and the one queued behind it is not lost.
+        self.assertEqual(len(result), len(self.test_prs))
+        self.assertIsNone(result[0]['additions'])
+        self.assertIsNone(result[0]['deletions'])
+        self.assertIsNone(result[0]['changed_files'])
+
+    def test_a_401_on_the_activities_fetch_costs_only_that_pr(self):
+        result = self._run_with_failing(
+            'activities', stashy.errors.AuthenticationException(MagicMock())
+        )
+
+        self.assertEqual(len(result), len(self.test_prs))
+        self.assertEqual(result[0]['comments'], [])
+        self.assertEqual(result[0]['approvals'], [])
+
+
+class TestBitbucketServerPointReadDoesNotAbortDiscovery(TestCase):
+    def test_a_transport_error_on_a_point_read_skips_only_that_entry(self):
+        # get_repos guards the yield, not the iterator, so anything escaping
+        # _get_project_repos ends discovery for every project still queued.
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+
+        good = MagicMock()
+        good.get.return_value = test_repos[0]
+        good.paginate.return_value = test_branches
+        good.default_branch = MagicMock()
+
+        bad = MagicMock()
+        bad.get.side_effect = RetryError('too many retries')
+
+        mock_project = MagicMock()
+        mock_project.repos.__getitem__.side_effect = lambda name: {
+            'bad_repo': bad,
+            'test_repo_name': good,
+        }[name]
+
+        mock_client = MagicMock()
+        mock_client.projects = {'test_project_key': mock_project}
+
+        # Both entries are slug-shaped and the list is small, so this takes the
+        # point-read path.
+        result = list(
+            bitbucket_server.get_repos(
+                mock_client, test_projects, ['bad_repo', 'test_repo_name'], {}, False
+            )
+        )
+
+        self.assertEqual([r[1]['name'] for r in result], ['test_repo_name'])
+
+
+class TestBitbucketServerExcludedReposAreNotFetched(TestCase):
+    """An excluded repo must cost zero per-repo requests.
+
+    The filter runs before _standardize_repo, so a repo that fails it is never
+    asked for its default branch or its branches. These pin that ordering.
+    """
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_branches = _get_test_data('test_branches.json')
+        base = _get_test_data('test_repos.json')[0]
+        self.wanted = {**base, 'name': 'wanted_repo'}
+        self.unwanted = {**base, 'name': 'unwanted_repo', 'id': 999}
+
+    def _run(self, include_repos=None, exclude_repos=None):
+        wanted_api = _RecordingRepo(self.wanted, self.test_branches)
+        unwanted_api = _RecordingRepo(self.unwanted, self.test_branches)
+        by_name = {'wanted_repo': wanted_api, 'unwanted_repo': unwanted_api}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+        mock_client.projects = {'test_project_key': mock_project}
+        # Both repos come back from the listing; only one should be fetched.
+        mock_project.repos.paginate.return_value = [self.wanted, self.unwanted]
+        mock_project.repos.__getitem__.side_effect = lambda name: by_name[name]
+
+        result = list(
+            bitbucket_server.get_repos(
+                mock_client,
+                self.test_projects,
+                include_repos or {},
+                exclude_repos or {},
+                False,
+            )
+        )
+        return result, wanted_api, unwanted_api
+
+    def test_a_repo_outside_include_repos_is_never_fetched(self):
+        # 'Wanted_Repo' is not slug-shaped, so the run pages the listing rather
+        # than point-reading. That is the path where the filter has to do the
+        # work: both repos come back and only one may be fetched.
+        result, wanted_api, unwanted_api = self._run(include_repos=['Wanted_Repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+        self.assertEqual(unwanted_api.get_calls, 0)
+        # and the included one really was fetched, so the assertions above mean
+        # something
+        self.assertEqual(wanted_api.default_branch_reads, 1)
+
+    def test_a_small_allowlist_never_even_lists_the_other_repos(self):
+        # With a slug-shaped allowlist small enough to point-read, an excluded
+        # repo is not just unfetched, it is never listed.
+        result, wanted_api, unwanted_api = self._run(include_repos=['wanted_repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+
+    def test_a_repo_in_exclude_repos_is_never_fetched(self):
+        result, _, unwanted_api = self._run(exclude_repos=['unwanted_repo'])
+
+        self.assertEqual([r[1]['name'] for r in result], ['wanted_repo'])
+        self.assertEqual(unwanted_api.default_branch_reads, 0)
+        self.assertEqual(unwanted_api.paginate_calls, [])
+        self.assertEqual(unwanted_api.get_calls, 0)
+
+
+class TestBitbucketServerRepoRequestCount(TestCase):
+    """Each extra read here is paid once per repo, so a 16,000 repo instance
+    pays for it 16,000 times."""
+
+    def setUp(self):
+        self.test_projects = _get_test_data('test_projects.json')
+        self.test_repos = _get_test_data('test_repos.json')
+        self.test_branches = _get_test_data('test_branches.json')
+        self.api_repo = _RecordingRepo(self.test_repos[0], self.test_branches)
+
+    def _standardize(self):
+        return bitbucket_server._standardize_repo(
+            self.test_projects[0], self.api_repo, False, self.test_repos[0]
+        )
+
+    def test_the_repo_is_not_refetched(self):
+        # The listing already returned this object; refetching it cost one
+        # request per repo in each of the three phases.
+        self._standardize()
+
+        self.assertEqual(self.api_repo.get_calls, 0)
+
+    def test_default_branch_is_read_once(self):
+        # default_branch is an uncached property, so a second read is a second
+        # request for an answer already held.
+        self._standardize()
+
+        self.assertEqual(self.api_repo.default_branch_reads, 1)
+
+    def test_branches_are_requested_a_full_page_at_a_time(self):
+        # stashy's branches() sends no limit, so Bitbucket Server pages at 25.
+        self._standardize()
+
+        self.assertEqual(
+            self.api_repo.paginate_calls,
+            [('/branches', {'limit': bitbucket_server.BRANCH_PAGE_SIZE})],
+        )
+
+    def test_the_commits_phase_also_reads_default_branch_once(self):
+        # _get_default_branch_name is called once per repo by the commits phase
+        # and carried the same double read, so the saving here is the same size.
+        bitbucket_server._get_default_branch_name(self.api_repo)
+
+        self.assertEqual(self.api_repo.default_branch_reads, 1)
+
+    def test_the_standardized_repo_is_unchanged(self):
+        # The reads above are fewer, but what they produce must not change.
+        result = self._standardize()
+
+        self.assertEqual(result['id'], self.test_repos[0]['id'])
+        self.assertEqual(result['name'], self.test_repos[0]['name'])
+        self.assertEqual(result['default_branch_name'], 'main')
+        self.assertEqual(
+            [b['name'] for b in result['branches']],
+            [b['displayId'] for b in self.test_branches],
+        )
 
 
 if __name__ == "__main__":
