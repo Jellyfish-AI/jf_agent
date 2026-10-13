@@ -7,7 +7,7 @@ from typing import Any, NamedTuple
 import pytz
 import stashy
 from jf_ingest import diagnostics, logging_helper
-from requests.exceptions import ChunkedEncodingError, RetryError
+from requests.exceptions import ChunkedEncodingError, RequestException, RetryError
 from tqdm import tqdm
 from urllib3.exceptions import MaxRetryError
 
@@ -36,6 +36,19 @@ BRANCH_PAGE_SIZE = 1000
 # the repo name by lowercasing it and replacing each other character, so only an
 # entry that is already slug-shaped is certain to address the repo it names.
 _SLUG_SAFE_PATTERN = re.compile(r'^[a-z0-9._-]+$')
+
+# Anything an API can raise about ONE repo. stashy's three error classes share no
+# base, which is how a mid-run 401 escaped every handler and ended a 3,194-repo PR
+# download early. git_pull must log and carry on instead.
+_REPO_LEVEL_API_ERRORS = (
+    stashy.errors.NotFoundException,
+    stashy.errors.AuthenticationException,
+    stashy.errors.GenericException,
+    RetryError,
+    MaxRetryError,
+    ChunkedEncodingError,
+    RequestException,
+)
 
 
 class ApiRepo(NamedTuple):
@@ -344,6 +357,81 @@ def _standardize_commit(commit, repo, branch_name, strip_text_content, redact_na
     }
 
 
+def _commits_for_repo(
+    client,
+    entry,
+    included_branches,
+    strip_text_content,
+    server_git_instance_info,
+    redact_names_and_urls,
+    verbose,
+    commit_lookback_days=31,
+):
+    """Yield one repo's standardized commits."""
+    api_repo, repo = entry.resource, entry.data
+    if verbose:
+        logger.info(f"Beginning download of commits for repo {repo}")
+    api_project = client.projects[repo['project']['key']]
+    pull_since = pull_since_date_for_repo(
+        server_git_instance_info,
+        repo['project']['key'],
+        repo['id'],
+        'commits',
+        commit_lookback_days,
+    )
+
+    # Determine branches to pull commits from for this repo. If no branches are explicitly
+    # provided in a config, only pull from the repo's default branch.
+    # We are working with the BBS api object rather than a StandardizedRepository here,
+    # so we can not use get_branches_for_standardized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
+    branches_to_process = [_get_default_branch_name(api_repo)]
+    additional_branch_patterns = included_branches.get(repo['name'])
+
+    if additional_branch_patterns:
+        try:
+            repo_branches = [
+                b['displayId']
+                for b in api_repo.paginate('/branches', params={'limit': BRANCH_PAGE_SIZE})
+            ]
+        except stashy.errors.NotFoundException as e:
+            # The repo went away mid-run. Costs this repo its commits,
+            # rather than ending the commits phase for every repo after it.
+            logger.warning(
+                f'WARN: Got NotFoundException listing branches for repo '
+                f'{repo["name"]}, skipping: {e}'
+            )
+            return
+        branches_to_process.extend(get_matching_branches(additional_branch_patterns, repo_branches))
+
+    for branch in branches_to_process:
+        try:
+            if verbose:
+                logger.info(f"Beginning download of commits for repo {repo['name']}.")
+            commits = api_project.repos[repo['name']].commits(until=branch)
+
+            for j, commit in enumerate(
+                tqdm(commits, desc=f'downloading commits for {repo["name"]}', unit='commits'),
+                start=1,
+            ):
+                with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
+                    if verbose:
+                        tqdm.write(
+                            f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
+                        )
+                    standardized_commit = _standardize_commit(
+                        commit, repo, branch, strip_text_content, redact_names_and_urls
+                    )
+                    # commits are ordered newest to oldest
+                    # if this is too old, we're done with this repo
+                    if pull_since and standardized_commit['commit_date'] < pull_since:
+                        break
+
+                    yield standardized_commit
+
+        except stashy.errors.NotFoundException as e:
+            logger.warning(f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...')
+
+
 def get_commits_for_included_branches(
     client,
     api_repos,
@@ -355,66 +443,24 @@ def get_commits_for_included_branches(
     commit_lookback_days=31,
 ):
     for i, entry in enumerate(api_repos, start=1):
-        api_repo, repo = entry.resource, entry.data
+        repo = entry.data
         with logging_helper.log_loop_iters('repo for branch commits', i, 1):
-            if verbose:
-                logger.info(f"Beginning download of commits for repo {repo}")
-            api_project = client.projects[repo['project']['key']]
-            pull_since = pull_since_date_for_repo(
-                server_git_instance_info,
-                repo['project']['key'],
-                repo['id'],
-                'commits',
-                commit_lookback_days,
-            )
-
-            # Determine branches to pull commits from for this repo. If no branches are explicitly
-            # provided in a config, only pull from the repo's default branch.
-            # We are working with the BBS api object rather than a StandardizedRepository here,
-            # so we can not use get_branches_for_standardized_repo  as we do in bitbucket_cloud_adapter and gitlab_adapter.
-            branches_to_process = [_get_default_branch_name(api_repo)]
-            additional_branch_patterns = included_branches.get(repo['name'])
-
-            if additional_branch_patterns:
-                repo_branches = [
-                    b['displayId']
-                    for b in api_repo.paginate('/branches', params={'limit': BRANCH_PAGE_SIZE})
-                ]
-                branches_to_process.extend(
-                    get_matching_branches(additional_branch_patterns, repo_branches)
+            try:
+                yield from _commits_for_repo(
+                    client,
+                    entry,
+                    included_branches,
+                    strip_text_content,
+                    server_git_instance_info,
+                    redact_names_and_urls,
+                    verbose,
+                    commit_lookback_days,
                 )
-
-            for branch in branches_to_process:
-                try:
-                    if verbose:
-                        logger.info(f"Beginning download of commits for repo {repo['name']}.")
-                    commits = api_project.repos[repo['name']].commits(until=branch)
-
-                    for j, commit in enumerate(
-                        tqdm(
-                            commits, desc=f'downloading commits for {repo["name"]}', unit='commits'
-                        ),
-                        start=1,
-                    ):
-                        with logging_helper.log_loop_iters('branch commit inside repo', j, 100):
-                            if verbose:
-                                tqdm.write(
-                                    f"[{datetime.now().isoformat()}] Getting {commit['id']} ({repo['name']})"
-                                )
-                            standardized_commit = _standardize_commit(
-                                commit, repo, branch, strip_text_content, redact_names_and_urls
-                            )
-                            # commits are ordered newest to oldest
-                            # if this is too old, we're done with this repo
-                            if pull_since and standardized_commit['commit_date'] < pull_since:
-                                break
-
-                            yield standardized_commit
-
-                except stashy.errors.NotFoundException as e:
-                    logger.warning(
-                        f'WARN: Got NotFoundException for branch \"{branch}\": {e}. Skipping...'
-                    )
+            except _REPO_LEVEL_API_ERRORS as e:
+                logger.warning(
+                    f'WARN: {type(e).__name__} downloading commits for repo '
+                    f'{repo["name"]}, skipping the rest of it: {e}'
+                )
 
 
 def _standardize_pr_repo(repo, redact_names_and_urls):
@@ -449,231 +495,243 @@ def _pull_requests_or_skip(api_repo, repo):
         )
 
 
+def _pull_requests_for_repo(
+    client, entry, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
+):
+    """Yield one repo's standardized pull requests."""
+    repo = entry.data
+    if verbose:
+        logger.info(f"Beginning download of PRs for repo {repo}")
+    api_project = client.projects[repo['project']['key']]
+    api_repo = api_project.repos[repo['name']]
+    pull_since = pull_since_date_for_repo(
+        server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
+    )
+    if verbose:
+        logger.info(f"Pulling pull requests starting at {pull_since} for repo {repo}")
+
+    skipped_prs = 0
+
+    for pr in tqdm(
+        _pull_requests_or_skip(api_repo, repo),
+        desc=f'downloading PRs for {repo["name"]}',
+        unit='prs',
+    ):
+        if verbose:
+            tqdm.write(f"[{datetime.now().isoformat()}] Processing PR {pr['id']}")
+        updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
+        # PRs are ordered newest to oldest
+        # if this is too old, we're done with this repo
+        if pull_since and updated_at < pull_since:
+            break
+
+        api_pr = api_repo.pull_requests[pr['id']]
+
+        try:
+            pr_diffs = api_pr.diff().diffs
+        except TypeError:
+            additions, deletions, changed_files = None, None, None
+        except stashy.errors.NotFoundException:
+            additions, deletions, changed_files = None, None, None
+        except RetryError:
+            logger.warning(f"Could not retrieve diff data for PR {pr['id']} in repo {repo['name']}")
+            additions, deletions, changed_files = None, None, None
+        except ChunkedEncodingError as e:
+            logger.warning(
+                f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {repo["name"]}, error: {e}. Skipping.'
+            )
+            skipped_prs += 1
+            continue
+        except stashy.errors.GenericException:
+            logger.info(
+                f'Error retrieving diff data for PR {pr["id"]} in repo {repo["name"]}.  Skipping that PR...',
+            )
+            additions, deletions, changed_files = None, None, None
+        else:
+            additions, deletions, changed_files = 0, 0, 0
+
+            for pr_diff in pr_diffs:
+                changed_files += 1
+                for hunk in pr_diff.hunks:
+                    for segment in hunk['segments']:
+                        if segment['type'] == 'ADDED':
+                            additions += len(segment['lines'])
+                        if segment['type'] == 'REMOVED':
+                            deletions += len(segment['lines'])
+
+        comments = []
+        approvals = []
+        merge_date = None
+        merged_by = None
+
+        activites = []
+        for attempt in range(3):
+            try:
+                activites = sorted([a for a in api_pr.activities()], key=lambda x: x['createdDate'])
+                break
+            except ChunkedEncodingError as e:
+                if attempt < 2:
+                    logger.warning(
+                        f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {repo["name"]}, '
+                        f'retrying (attempt {attempt + 1}/3)...'
+                    )
+                    time.sleep(2**attempt)
+                else:
+                    logger.info(
+                        f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]} '
+                        f'after 3 attempts. Assuming no comments, approvals, etc, and continuing...\n{e}',
+                    )
+            except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
+                logger.info(
+                    f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
+                )
+                break
+
+        for activity in activites:
+            if activity['action'] == 'COMMENTED':
+                comments.append(
+                    {
+                        'user': _standardize_user(activity['comment']['author']),
+                        'body': sanitize_text(activity['comment']['text'], strip_text_content),
+                        'created_at': datetime_from_bitbucket_server_timestamp(
+                            activity['comment']['createdDate']
+                        ),
+                    }
+                )
+            elif activity['action'] in ('APPROVED', 'REVIEWED'):
+                approvals.append(
+                    {
+                        'foreign_id': activity['id'],
+                        'user': _standardize_user(activity['user']),
+                        'review_state': activity['action'],
+                    }
+                )
+            elif activity['action'] == 'MERGED':
+                merge_date = datetime_from_bitbucket_server_timestamp(activity['createdDate'])
+                merged_by = _standardize_user(activity['user'])
+
+        closed_date = (
+            datetime_from_bitbucket_server_timestamp(pr['closedDate'])
+            if pr.get('closedDate')
+            else None
+        )
+
+        commits = []
+        for attempt in range(3):
+            try:
+                commits = [
+                    _standardize_commit(
+                        c,
+                        repo,
+                        pr['toRef']['displayId'],
+                        strip_text_content,
+                        redact_names_and_urls,
+                    )
+                    for c in tqdm(
+                        api_pr.commits(),
+                        f'downloading commits for PR {pr["id"]}',
+                        leave=False,
+                        unit='commits',
+                    )
+                ]
+                break
+            except ChunkedEncodingError as e:
+                if attempt < 2:
+                    logger.warning(
+                        f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {repo["name"]}, '
+                        f'retrying (attempt {attempt + 1}/3)...'
+                    )
+                    time.sleep(2**attempt)
+                else:
+                    logger.warning(
+                        f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]} '
+                        f'after 3 attempts: {e}'
+                    )
+            except stashy.errors.NotFoundException as e:
+                logger.warning(
+                    f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}: {e}'
+                )
+                break
+            except (
+                stashy.errors.GenericException,
+                stashy.errors.AuthenticationException,
+                RetryError,
+                MaxRetryError,
+            ) as e:
+                # Very large PRs can make Bitbucket Server return 500s while paging
+                # commits, and some PRs can return 401s; skip this PR's commits
+                # rather than failing the whole download. Use repo['name']
+                # rather than api_repo.get() so logging doesn't hit the server again.
+                logger.warning(
+                    f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}. '
+                    f'Continuing without commits for this PR...\n{e}'
+                )
+                break
+
+        standardized_pr = {
+            'id': pr['id'],
+            'author': _standardize_user(pr['author']['user']),
+            'title': sanitize_text(pr['title'], strip_text_content),
+            'body': sanitize_text(pr.get('description'), strip_text_content),
+            'is_closed': pr['state'] != 'OPEN',
+            'is_merged': pr['state'] == 'MERGED',
+            'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
+            'updated_at': updated_at,
+            'closed_date': closed_date,
+            'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
+            'base_repo': _standardize_pr_repo(pr['toRef']['repository'], redact_names_and_urls),
+            'base_branch': (
+                pr['toRef']['displayId']
+                if not redact_names_and_urls
+                else _branch_redactor.redact_name(pr['toRef']['displayId'])
+            ),
+            'head_repo': _standardize_pr_repo(pr['fromRef']['repository'], redact_names_and_urls),
+            'head_branch': (
+                pr['fromRef']['displayId']
+                if not redact_names_and_urls
+                else _branch_redactor.redact_name(pr['fromRef']['displayId'])
+            ),
+            'additions': additions,
+            'deletions': deletions,
+            'changed_files': changed_files,
+            'comments': comments,
+            'approvals': approvals,
+            'merge_date': merge_date,
+            'merged_by': merged_by,
+            'commits': commits,
+            'merge_commit': None,
+        }
+
+        yield standardized_pr
+
+    if skipped_prs > 5:
+        logger.warning(
+            f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
+        )
+
+
 def get_pull_requests(
     client, api_repos, strip_text_content, server_git_instance_info, redact_names_and_urls, verbose
 ):
     for i, entry in enumerate(api_repos, start=1):
         repo = entry.data
         with logging_helper.log_loop_iters('repo for pull requests', i, 1):
-            if verbose:
-                logger.info(f"Beginning download of PRs for repo {repo}")
-            api_project = client.projects[repo['project']['key']]
-            api_repo = api_project.repos[repo['name']]
-            pull_since = pull_since_date_for_repo(
-                server_git_instance_info, repo['project']['key'], repo['id'], 'prs'
-            )
-            if verbose:
-                logger.info(f"Pulling pull requests starting at {pull_since} for repo {repo}")
-
-            skipped_prs = 0
-
-            for pr in tqdm(
-                _pull_requests_or_skip(api_repo, repo),
-                desc=f'downloading PRs for {repo["name"]}',
-                unit='prs',
-            ):
-                if verbose:
-                    tqdm.write(f"[{datetime.now().isoformat()}] Processing PR {pr['id']}")
-                updated_at = datetime_from_bitbucket_server_timestamp(pr['updatedDate'])
-                # PRs are ordered newest to oldest
-                # if this is too old, we're done with this repo
-                if pull_since and updated_at < pull_since:
-                    break
-
-                api_pr = api_repo.pull_requests[pr['id']]
-
-                try:
-                    pr_diffs = api_pr.diff().diffs
-                except TypeError:
-                    additions, deletions, changed_files = None, None, None
-                except stashy.errors.NotFoundException:
-                    additions, deletions, changed_files = None, None, None
-                except RetryError:
-                    logger.warning(
-                        f"Could not retrieve diff data for PR {pr['id']} in repo {repo['name']}"
-                    )
-                    additions, deletions, changed_files = None, None, None
-                except ChunkedEncodingError as e:
-                    logger.warning(
-                        f'Got ChunkedEncodingError trying to retrieve diff data for PR {pr["id"]} in repo {repo["name"]}, error: {e}. Skipping.'
-                    )
-                    skipped_prs += 1
-                    continue
-                except stashy.errors.GenericException:
-                    logger.info(
-                        f'Error retrieving diff data for PR {pr["id"]} in repo {repo["name"]}.  Skipping that PR...',
-                    )
-                    additions, deletions, changed_files = None, None, None
-                else:
-                    additions, deletions, changed_files = 0, 0, 0
-
-                    for pr_diff in pr_diffs:
-                        changed_files += 1
-                        for hunk in pr_diff.hunks:
-                            for segment in hunk['segments']:
-                                if segment['type'] == 'ADDED':
-                                    additions += len(segment['lines'])
-                                if segment['type'] == 'REMOVED':
-                                    deletions += len(segment['lines'])
-
-                comments = []
-                approvals = []
-                merge_date = None
-                merged_by = None
-
-                activites = []
-                for attempt in range(3):
-                    try:
-                        activites = sorted(
-                            [a for a in api_pr.activities()], key=lambda x: x['createdDate']
-                        )
-                        break
-                    except ChunkedEncodingError as e:
-                        if attempt < 2:
-                            logger.warning(
-                                f'ChunkedEncodingError retrieving activities for PR {pr["id"]} in repo {repo["name"]}, '
-                                f'retrying (attempt {attempt + 1}/3)...'
-                            )
-                            time.sleep(2**attempt)
-                        else:
-                            logger.info(
-                                f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]} '
-                                f'after 3 attempts. Assuming no comments, approvals, etc, and continuing...\n{e}',
-                            )
-                    except (stashy.errors.GenericException, RetryError, MaxRetryError) as e:
-                        logger.info(
-                            f'Error retrieving activity data for PR {pr["id"]} in repo {repo["name"]}.  Assuming no comments, approvals, etc, and continuing...\n{e}',
-                        )
-                        break
-
-                for activity in activites:
-                    if activity['action'] == 'COMMENTED':
-                        comments.append(
-                            {
-                                'user': _standardize_user(activity['comment']['author']),
-                                'body': sanitize_text(
-                                    activity['comment']['text'], strip_text_content
-                                ),
-                                'created_at': datetime_from_bitbucket_server_timestamp(
-                                    activity['comment']['createdDate']
-                                ),
-                            }
-                        )
-                    elif activity['action'] in ('APPROVED', 'REVIEWED'):
-                        approvals.append(
-                            {
-                                'foreign_id': activity['id'],
-                                'user': _standardize_user(activity['user']),
-                                'review_state': activity['action'],
-                            }
-                        )
-                    elif activity['action'] == 'MERGED':
-                        merge_date = datetime_from_bitbucket_server_timestamp(
-                            activity['createdDate']
-                        )
-                        merged_by = _standardize_user(activity['user'])
-
-                closed_date = (
-                    datetime_from_bitbucket_server_timestamp(pr['closedDate'])
-                    if pr.get('closedDate')
-                    else None
+            try:
+                yield from _pull_requests_for_repo(
+                    client,
+                    entry,
+                    strip_text_content,
+                    server_git_instance_info,
+                    redact_names_and_urls,
+                    verbose,
                 )
-
-                commits = []
-                for attempt in range(3):
-                    try:
-                        commits = [
-                            _standardize_commit(
-                                c,
-                                repo,
-                                pr['toRef']['displayId'],
-                                strip_text_content,
-                                redact_names_and_urls,
-                            )
-                            for c in tqdm(
-                                api_pr.commits(),
-                                f'downloading commits for PR {pr["id"]}',
-                                leave=False,
-                                unit='commits',
-                            )
-                        ]
-                        break
-                    except ChunkedEncodingError as e:
-                        if attempt < 2:
-                            logger.warning(
-                                f'ChunkedEncodingError fetching commits for PR {pr["id"]} in repo {repo["name"]}, '
-                                f'retrying (attempt {attempt + 1}/3)...'
-                            )
-                            time.sleep(2**attempt)
-                        else:
-                            logger.warning(
-                                f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]} '
-                                f'after 3 attempts: {e}'
-                            )
-                    except stashy.errors.NotFoundException as e:
-                        logger.warning(
-                            f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}: {e}'
-                        )
-                        break
-                    except (
-                        stashy.errors.GenericException,
-                        stashy.errors.AuthenticationException,
-                        RetryError,
-                        MaxRetryError,
-                    ) as e:
-                        # Very large PRs can make Bitbucket Server return 500s while paging
-                        # commits, and some PRs can return 401s; skip this PR's commits
-                        # rather than failing the whole download. Use repo['name']
-                        # rather than api_repo.get() so logging doesn't hit the server again.
-                        logger.warning(
-                            f'Error fetching commits for PR {pr["id"]} in repo {repo["name"]}. '
-                            f'Continuing without commits for this PR...\n{e}'
-                        )
-                        break
-
-                standardized_pr = {
-                    'id': pr['id'],
-                    'author': _standardize_user(pr['author']['user']),
-                    'title': sanitize_text(pr['title'], strip_text_content),
-                    'body': sanitize_text(pr.get('description'), strip_text_content),
-                    'is_closed': pr['state'] != 'OPEN',
-                    'is_merged': pr['state'] == 'MERGED',
-                    'created_at': datetime_from_bitbucket_server_timestamp(pr['createdDate']),
-                    'updated_at': updated_at,
-                    'closed_date': closed_date,
-                    'url': (pr['links']['self'][0]['href'] if not redact_names_and_urls else None),
-                    'base_repo': _standardize_pr_repo(
-                        pr['toRef']['repository'], redact_names_and_urls
-                    ),
-                    'base_branch': (
-                        pr['toRef']['displayId']
-                        if not redact_names_and_urls
-                        else _branch_redactor.redact_name(pr['toRef']['displayId'])
-                    ),
-                    'head_repo': _standardize_pr_repo(
-                        pr['fromRef']['repository'], redact_names_and_urls
-                    ),
-                    'head_branch': (
-                        pr['fromRef']['displayId']
-                        if not redact_names_and_urls
-                        else _branch_redactor.redact_name(pr['fromRef']['displayId'])
-                    ),
-                    'additions': additions,
-                    'deletions': deletions,
-                    'changed_files': changed_files,
-                    'comments': comments,
-                    'approvals': approvals,
-                    'merge_date': merge_date,
-                    'merged_by': merged_by,
-                    'commits': commits,
-                    'merge_commit': None,
-                }
-
-                yield standardized_pr
-
-            if skipped_prs > 5:
+            except _REPO_LEVEL_API_ERRORS as e:
+                # git_pull runs for hours. One repo's failure used to end the
+                # phase, losing every repo queued behind it, so it costs only
+                # itself now.
                 logger.warning(
-                    f'Skipped {skipped_prs} PRs in {repo["name"]}, there may be something bogus happening.',
+                    f'WARN: {type(e).__name__} downloading PRs for repo '
+                    f'{repo["name"]}, skipping the rest of it: {e}'
                 )
 
 

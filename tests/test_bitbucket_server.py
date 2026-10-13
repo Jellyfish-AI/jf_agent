@@ -1,7 +1,7 @@
 import json
 import unittest
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 import stashy.errors
 from requests.exceptions import RetryError
@@ -424,6 +424,139 @@ class TestBitbucketServer(TestCase):
         # Assert -- the live repo's commits still come through
         self.assertEqual(len(result), len(test_commits))
 
+    def test_get_branch_commits_survives_repo_deleted_while_listing_branches(self):
+        # With included_branches set, the commits phase lists a repo's branches.
+        # A repo deleted by then must cost only itself, not every repo after it.
+        test_projects = _get_test_data('test_projects.json')
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        deleted_repo = {**test_repos[0], 'name': 'deleted_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_deleted_repo = MagicMock()
+        mock_deleted_repo.default_branch = test_branches[0]
+        mock_deleted_repo.paginate.side_effect = stashy.errors.NotFoundException(MagicMock())
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.default_branch = test_branches[0]
+        mock_live_repo.paginate.return_value = test_branches
+        mock_live_repo.commits.return_value = test_commits
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {
+            'test_repo_name': mock_live_repo,
+            'deleted_repo_name': mock_deleted_repo,
+        }
+
+        included_branches = {'deleted_repo_name': ['*'], 'test_repo_name': ['*']}
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act -- must not raise
+        result = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_deleted_repo, deleted_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                included_branches,
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        # Assert -- the live repo after it still produced commits
+        self.assertTrue(len(result) > 0)
+
+    def test_get_pull_requests_survives_an_auth_error_mid_run(self):
+        # A real DTCC run died here: a 401 partway through ended the PR phase
+        # with 1,015 of 4,209 repos still unfetched, and still reported success.
+        test_repos = _get_test_data('test_repos.json')
+        test_prs = _get_test_data('test_prs.json')
+
+        bad_repo = {**test_repos[0], 'name': 'bad_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_bad_repo = MagicMock()
+        mock_bad_repo.pull_requests.all.side_effect = stashy.errors.AuthenticationException(
+            MagicMock()
+        )
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.pull_requests.all.return_value = test_prs
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo, 'bad_repo_name': mock_bad_repo}
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        # Act -- must not raise, and must not lose the repo queued behind it
+        result = list(
+            bitbucket_server.get_pull_requests(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_bad_repo, bad_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        self.assertEqual(len(result), len(test_prs))
+
+    def test_get_commits_survives_an_auth_error_mid_run(self):
+        # Same guarantee for the commits phase.
+        test_repos = _get_test_data('test_repos.json')
+        test_branches = _get_test_data('test_branches.json')
+        test_commits = _get_test_data('test_commits.json')
+
+        bad_repo = {**test_repos[0], 'name': 'bad_repo_name', 'id': 999}
+
+        mock_client = MagicMock()
+        mock_project = MagicMock()
+
+        mock_bad_repo = MagicMock()
+        type(mock_bad_repo).default_branch = PropertyMock(
+            side_effect=stashy.errors.AuthenticationException(MagicMock())
+        )
+
+        mock_live_repo = MagicMock()
+        mock_live_repo.default_branch = test_branches[0]
+        mock_live_repo.commits.return_value = test_commits
+
+        mock_client.projects = {'test_project_key': mock_project}
+        mock_project.repos = {'test_repo_name': mock_live_repo, 'bad_repo_name': mock_bad_repo}
+
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+
+        result = list(
+            bitbucket_server.get_commits_for_included_branches(
+                mock_client,
+                [
+                    bitbucket_server.ApiRepo(mock_bad_repo, bad_repo),
+                    bitbucket_server.ApiRepo(mock_live_repo, test_repos[0]),
+                ],
+                {},
+                False,
+                test_git_instance_info,
+                False,
+                False,
+            )
+        )
+
+        self.assertEqual(len(result), len(test_commits))
+
     def test_get_pull_requests_skips_deleted_repo(self):
         # pull_requests.all() pages lazily, so a deleted repo raises on its
         # first page. Unhandled that would end the whole PR download.
@@ -490,7 +623,8 @@ class TestBitbucketServer(TestCase):
         mock_project = MagicMock()
         mock_api_repo = MagicMock()
 
-        mock_api_repo.get.return_value = test_repos[0]
+        mock_api_repos = [bitbucket_server.ApiRepo(mock_api_repo, test_repos[0])]
+
         mock_api_repo.pull_requests.all.return_value = test_prs
         mock_client.projects = {'test_project_key': mock_project}
         mock_project.repos = {'test_repo_name': mock_api_repo}
@@ -512,7 +646,7 @@ class TestBitbucketServer(TestCase):
         # Act — should not raise despite the commits fetch failing
         result_prs = list(
             bitbucket_server.get_pull_requests(
-                mock_client, [mock_api_repo], False, test_git_instance_info, False, False
+                mock_client, mock_api_repos, False, test_git_instance_info, False, False
             )
         )
 
