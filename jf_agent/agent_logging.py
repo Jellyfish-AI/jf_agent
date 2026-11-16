@@ -375,6 +375,14 @@ def _color_switch(column: str, use_color: bool) -> str:
     return CONSOLE_RENDERER_STYLE[column]
 
 
+def _console_use_color(stream) -> bool:
+    # Per https://no-color.org, any non-empty NO_COLOR value disables color
+    if os.environ.get("NO_COLOR"):
+        return False
+
+    return stream.isatty()
+
+
 def json_log_formatter() -> structlog.stdlib.ProcessorFormatter:
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=SHARED_STRUCTLOG_PROCESSORS,
@@ -428,7 +436,9 @@ def configure(
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     console_log_handler = CustomStreamHandler(stream=sys.stdout)
-    console_log_handler.setFormatter(readable_log_formatter(use_color=True))
+    console_log_handler.setFormatter(
+        readable_log_formatter(use_color=_console_use_color(sys.stdout))
+    )
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
     logging_handlers.append(console_log_handler)
