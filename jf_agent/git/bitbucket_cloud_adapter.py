@@ -374,9 +374,10 @@ def _standardize_user(api_user):
 
         return StandardizedUser(
             id=api_user['uuid'],
-            name=api_user['display_name'],
+            name=api_user.get('display_name'),
             login=api_user.get('username'),
-            url=api_user['links']['html']['href'],
+            # App and bot accounts have no html link.
+            url=api_user.get('links', {}).get('html', {}).get('href'),
             account_id=api_user.get('account_id'),
             # no email available
         )
