@@ -542,8 +542,8 @@ def _standardize_pr(
 
     return StandardizedPullRequest(
         id=api_pr['id'],
-        title=api_pr['title'],
-        body=api_pr['description'],
+        title=sanitize_text(api_pr['title'], strip_text_content),
+        body=sanitize_text(api_pr['description'], strip_text_content),
         url=api_pr['links']['html']['href'],
         base_branch=api_pr['destination']['branch']['name'],
         head_branch=api_pr['source']['branch']['name'],
