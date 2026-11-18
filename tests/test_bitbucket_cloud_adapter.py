@@ -445,6 +445,40 @@ class TestBitbucketCloudAdapter(TestCase):
             "merge_commit should be None when Bitbucket returns 404 for the merge commit hash",
         )
 
+    def _get_single_pr(self, api_pr):
+        self.mock_client.get_pullrequests.return_value = [api_pr]
+        self.mock_client.pr_diff.return_value = ""
+        self.mock_client.pr_comments.return_value = []
+        self.mock_client.pr_activity.return_value = []
+        self.mock_client.pr_commits.return_value = []
+        test_git_instance_info = {'pull_from': '1900-07-23', 'repos_dict_v2': {}}
+        return list(self.adapter.get_pull_requests([MagicMock()], test_git_instance_info))
+
+    def test_get_prs_strips_title_and_description_to_jira_keys(self):
+        self.mock_config.git_strip_text_content = True
+        api_pr = _get_test_data('test_prs.json')[0]
+        api_pr['title'] = 'PROJ-12 Rotate the secret for acme-corp'
+        api_pr['description'] = 'Customer data in PROJ-12'
+
+        [resulting_pr] = self._get_single_pr(api_pr)
+
+        self.assertEqual(resulting_pr.title, 'PROJ-12')
+        self.assertEqual(resulting_pr.body, 'PROJ-12')
+
+    def test_get_prs_keeps_pr_authored_by_app_account(self):
+        api_pr = _get_test_data('test_prs.json')[0]
+        api_pr['author'] = {
+            'type': 'app_user',
+            'display_name': 'Renovate Bot',
+            'uuid': '{9a1b2c3d-0000-0000-0000-000000000000}',
+            'account_id': '5f0000000000000000000000',
+            'links': {'avatar': {'href': 'https://bitbucket.org/account/renovate/avatar/'}},
+        }
+
+        [resulting_pr] = self._get_single_pr(api_pr)
+
+        self.assertIsNone(resulting_pr.author.url)
+
 
 def _get_test_data(file_name):
     with open(f'{TEST_INPUT_FILE_PATH}{file_name}', 'r') as f:
