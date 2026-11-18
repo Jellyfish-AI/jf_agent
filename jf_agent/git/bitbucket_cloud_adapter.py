@@ -377,7 +377,7 @@ def _standardize_user(api_user):
             name=api_user.get('display_name'),
             login=api_user.get('username'),
             # App and bot accounts have no html link.
-            url=api_user.get('links', {}).get('html', {}).get('href'),
+            url=((api_user.get('links') or {}).get('html') or {}).get('href'),
             account_id=api_user.get('account_id'),
             # no email available
         )
