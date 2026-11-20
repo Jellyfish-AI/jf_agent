@@ -374,9 +374,10 @@ def _standardize_user(api_user):
 
         return StandardizedUser(
             id=api_user['uuid'],
-            name=api_user['display_name'],
+            name=api_user.get('display_name'),
             login=api_user.get('username'),
-            url=api_user['links']['html']['href'],
+            # App and bot accounts have no html link.
+            url=((api_user.get('links') or {}).get('html') or {}).get('href'),
             account_id=api_user.get('account_id'),
             # no email available
         )
@@ -541,8 +542,8 @@ def _standardize_pr(
 
     return StandardizedPullRequest(
         id=api_pr['id'],
-        title=api_pr['title'],
-        body=api_pr['description'],
+        title=sanitize_text(api_pr['title'], strip_text_content),
+        body=sanitize_text(api_pr['description'], strip_text_content),
         url=api_pr['links']['html']['href'],
         base_branch=api_pr['destination']['branch']['name'],
         head_branch=api_pr['source']['branch']['name'],
