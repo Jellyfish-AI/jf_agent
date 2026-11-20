@@ -9,7 +9,7 @@ from http.client import HTTPConnection, HTTPSConnection
 from logging import LogRecord
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, TextIO, Union
 from urllib.parse import urlparse
 
 import colorama
@@ -299,7 +299,9 @@ def configure_structlog() -> None:
     )
 
 
-def readable_log_formatter(use_color: bool) -> structlog.stdlib.ProcessorFormatter:
+def readable_log_formatter(
+    use_color: bool, use_brackets: Optional[bool] = None
+) -> structlog.stdlib.ProcessorFormatter:
     custom_console_renderer = structlog.dev.ConsoleRenderer(
         columns=[
             structlog.dev.Column(
@@ -321,7 +323,7 @@ def readable_log_formatter(use_color: bool) -> structlog.stdlib.ProcessorFormatt
                     value_style="",
                     reset_style="",
                     value_repr=lambda value: _log_level_colorizer(
-                        value, LOG_LEVEL_PADDING, use_color
+                        value, LOG_LEVEL_PADDING, use_color, use_brackets=use_brackets
                     ),
                 ),
             ),
@@ -358,14 +360,23 @@ def readable_log_formatter(use_color: bool) -> structlog.stdlib.ProcessorFormatt
     return formatter
 
 
-def _log_level_colorizer(log_level: str, pad_len: int, use_color: bool) -> str:
+def _log_level_colorizer(
+    log_level: str, pad_len: int, use_color: bool, use_brackets: Optional[bool] = None
+) -> str:
     log_level_padded = str(log_level + (' ' * (pad_len - len(log_level))))
 
-    if not use_color:
+    if use_color:
+        color = LOG_LEVEL_COLORS.get(log_level, colorama.Fore.WHITE)
+        log_level_padded = f"{color}{log_level_padded}{colorama.Style.RESET_ALL}"
+
+    # Brackets follow use_color unless set explicitly
+    if use_brackets is None:
+        use_brackets = use_color
+
+    if not use_brackets:
         return log_level_padded
 
-    color = LOG_LEVEL_COLORS.get(log_level, colorama.Fore.WHITE)
-    return f"[{color}{log_level_padded}{colorama.Style.RESET_ALL}]"
+    return f"[{log_level_padded}]"
 
 
 def _color_switch(column: str, use_color: bool) -> str:
@@ -373,6 +384,21 @@ def _color_switch(column: str, use_color: bool) -> str:
         return ""
 
     return CONSOLE_RENDERER_STYLE[column]
+
+
+def _console_use_color(stream: TextIO) -> bool:
+    # Per https://no-color.org, any non-empty NO_COLOR value disables color
+    if os.environ.get("NO_COLOR"):
+        return False
+
+    isatty = getattr(stream, "isatty", None)
+    if isatty is None:
+        return False
+
+    try:
+        return isatty()
+    except (ValueError, OSError):
+        return False
 
 
 def json_log_formatter() -> structlog.stdlib.ProcessorFormatter:
@@ -428,7 +454,9 @@ def configure(
     # Send log messages to std using a stream handler
     # All INFO level and above errors will go to STDOUT
     console_log_handler = CustomStreamHandler(stream=sys.stdout)
-    console_log_handler.setFormatter(readable_log_formatter(use_color=True))
+    console_log_handler.setFormatter(
+        readable_log_formatter(use_color=_console_use_color(sys.stdout), use_brackets=True)
+    )
     console_log_handler.setLevel(logging.INFO)
     console_log_handler.addFilter(AgentConsoleLogFilter())
     logging_handlers.append(console_log_handler)
